@@ -83,11 +83,10 @@ async function submitQuestion(question) {
   if (!challengeResponse.ok) {
     throw new Error("Failed to get challenge");
   }
-  const { challenge_id, challenge } = await challengeResponse.json();
+  const { challenge_id, challenge, difficulty } = await challengeResponse.json();
 
   // Solve the PoW.
   powStatus.textContent = "Computing proof of work...";
-  const difficulty = await getDifficulty();
   const nonce = await solveProofOfWork(challenge, difficulty);
 
   // Submit the question.
@@ -108,16 +107,6 @@ async function submitQuestion(question) {
   }
 
   return (await askResponse.json()).answer;
-}
-
-// Cache the difficulty from the first challenge response. The server doesn't
-// send it explicitly — we just hardcode it to match the server's config. If
-// the difficulty is wrong, the server will reject the PoW and the user will
-// see an error. In practice this is fine for a friends-group game.
-let cachedDifficulty = 20;
-
-async function getDifficulty() {
-  return cachedDifficulty;
 }
 
 askForm.addEventListener("submit", async (event) => {

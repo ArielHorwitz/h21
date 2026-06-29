@@ -51,9 +51,13 @@ async def index() -> FileResponse:
 
 
 @app.get("/api/challenge")
-async def get_challenge() -> dict[str, str]:
+async def get_challenge() -> dict[str, str | int]:
     challenge_id, challenge = proof_of_work.generate_challenge()
-    return {"challenge_id": challenge_id, "challenge": challenge}
+    return {
+        "challenge_id": challenge_id,
+        "challenge": challenge,
+        "difficulty": proof_of_work.difficulty,
+    }
 
 
 @app.post("/api/ask")
