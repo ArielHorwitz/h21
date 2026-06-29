@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hmac
 from contextlib import asynccontextmanager
 from datetime import date
 from pathlib import Path
@@ -20,8 +21,9 @@ STATIC_DIR = Path(__file__).resolve().parent.parent.parent / "static"
 
 class AskRequest(BaseModel):
     question: str
-    challenge_id: str
-    nonce: str
+    challenge_id: Optional[str] = None
+    nonce: Optional[str] = None
+    password: Optional[str] = None
     game_id: Optional[int] = None
     question_number: Optional[int] = None
 
@@ -36,16 +38,18 @@ class EndGameRequest(BaseModel):
 llm_client: OpenAIClient
 proof_of_work: ProofOfWork
 database: GameDatabase
+bypass_password: Optional[str]
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
-    global llm_client, proof_of_work, database
+    global llm_client, proof_of_work, database, bypass_password
 
     config = load_config()
     llm_client = OpenAIClient(config.openai_api_key)
     proof_of_work = ProofOfWork(difficulty=config.pow_difficulty)
     database = GameDatabase(config.db_path)
+    bypass_password = config.bypass_password
     database.ensure_schema()
     yield
     database.close()
@@ -71,6 +75,11 @@ async def get_today_solution() -> str:
 @app.get("/")
 async def index() -> FileResponse:
     return FileResponse(STATIC_DIR / "index.html")
+
+
+@app.get("/api/pow-bypass-available")
+async def pow_bypass_available() -> dict[str, bool]:
+    return {"available": bypass_password is not None}
 
 
 @app.get("/api/challenge")
@@ -106,8 +115,16 @@ async def end_game(request: EndGameRequest) -> dict[str, str]:
 
 @app.post("/api/ask")
 async def ask(request: AskRequest) -> dict[str, str]:
-    if not proof_of_work.verify(request.challenge_id, request.nonce):
-        raise HTTPException(status_code=403, detail="Invalid proof of work")
+    password_valid = (
+        bypass_password is not None
+        and request.password is not None
+        and hmac.compare_digest(request.password, bypass_password)
+    )
+    if not password_valid:
+        if not request.challenge_id or not request.nonce:
+            raise HTTPException(status_code=403, detail="Proof of work required")
+        if not proof_of_work.verify(request.challenge_id, request.nonce):
+            raise HTTPException(status_code=403, detail="Invalid proof of work")
 
     question = request.question.strip()
     if not question:

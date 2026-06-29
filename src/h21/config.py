@@ -4,6 +4,7 @@ import os
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Optional
 
 APP_NAME = "h21"
 
@@ -27,6 +28,7 @@ class Config:
     pow_difficulty: int
     openai_api_key: str
     db_path: Path
+    bypass_password: Optional[str]
 
 
 def load_config() -> Config:
@@ -51,8 +53,11 @@ def load_config() -> Config:
     data_dir.mkdir(parents=True, exist_ok=True)
     db_path = data_dir / "h21.db"
 
+    bypass_password = raw.get("bypass_password") or None
+
     return Config(
         pow_difficulty=pow_difficulty,
         openai_api_key=openai_api_key,
         db_path=db_path,
+        bypass_password=bypass_password,
     )

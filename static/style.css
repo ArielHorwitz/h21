@@ -148,3 +148,24 @@ h1 {
   background: #3a1b1b;
   color: #f44336;
 }
+
+#bypass-section {
+  position: fixed;
+  top: 0.75rem;
+  right: 0.75rem;
+}
+
+#bypass-password {
+  width: 8rem;
+  padding: 0.3rem 0.5rem;
+  border: 1px solid #333;
+  border-radius: 4px;
+  background: #16213e;
+  color: #e0e0e0;
+  font-size: 0.8rem;
+  outline: none;
+}
+
+#bypass-password:focus {
+  border-color: #e2b714;
+}

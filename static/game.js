@@ -7,6 +7,8 @@ const askForm = document.getElementById("ask-form");
 const questionCounter = document.getElementById("question-counter");
 const powStatus = document.getElementById("pow-status");
 const gameOverMessage = document.getElementById("game-over-message");
+const bypassSection = document.getElementById("bypass-section");
+const bypassPassword = document.getElementById("bypass-password");
 const todayDate = document.getElementById("today-date");
 
 let questionsAsked = 0;
@@ -105,30 +107,46 @@ async function solveProofOfWork(challenge, difficulty) {
 }
 
 async function submitQuestion(question) {
-  // Get a PoW challenge.
-  powStatus.textContent = "Getting challenge...";
-  const challengeResponse = await fetch("/api/challenge");
-  if (!challengeResponse.ok) {
-    throw new Error("Failed to get challenge");
-  }
-  const { challenge_id, challenge, difficulty } = await challengeResponse.json();
+  const password = bypassPassword.value.trim();
+  let body;
 
-  // Solve the PoW.
-  powStatus.textContent = "Computing proof of work...";
-  const nonce = await solveProofOfWork(challenge, difficulty);
+  if (password) {
+    // Bypass PoW with password.
+    powStatus.textContent = "Thinking...";
+    body = {
+      question: question,
+      password: password,
+      game_id: gameId,
+      question_number: questionsAsked + 1,
+    };
+  } else {
+    // Get a PoW challenge.
+    powStatus.textContent = "Getting challenge...";
+    const challengeResponse = await fetch("/api/challenge");
+    if (!challengeResponse.ok) {
+      throw new Error("Failed to get challenge");
+    }
+    const { challenge_id, challenge, difficulty } = await challengeResponse.json();
 
-  // Submit the question.
-  powStatus.textContent = "Thinking...";
-  const askResponse = await fetch("/api/ask", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
+    // Solve the PoW.
+    powStatus.textContent = "Computing proof of work...";
+    const nonce = await solveProofOfWork(challenge, difficulty);
+
+    powStatus.textContent = "Thinking...";
+    body = {
       question: question,
       challenge_id: challenge_id,
       nonce: nonce,
       game_id: gameId,
       question_number: questionsAsked + 1,
-    }),
+    };
+  }
+
+  // Submit the question.
+  const askResponse = await fetch("/api/ask", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
   });
 
   if (!askResponse.ok) {
@@ -174,5 +192,20 @@ askForm.addEventListener("submit", async (event) => {
   }
 });
 
+async function checkBypassAvailable() {
+  try {
+    const response = await fetch("/api/pow-bypass-available");
+    if (response.ok) {
+      const data = await response.json();
+      if (data.available) {
+        bypassSection.hidden = false;
+      }
+    }
+  } catch (error) {
+    // Bypass section stays hidden if the check fails.
+  }
+}
+
 updateCounter();
 startGameSession();
+checkBypassAvailable();
