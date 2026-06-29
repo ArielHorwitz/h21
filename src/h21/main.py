@@ -18,7 +18,6 @@ from h21.llm import (
     OpenAIClient,
     ask_question,
     generate_solution,
-    moderate_topic,
 )
 from h21.pow import ProofOfWork
 
@@ -122,12 +121,6 @@ async def create_topic(request: NewTopicRequest) -> dict[str, str]:
 
     if database.topic_exists(slug):
         raise HTTPException(status_code=409, detail="Topic already exists")
-
-    is_appropriate = await moderate_topic(llm_client, name)
-    if not is_appropriate:
-        raise HTTPException(
-            status_code=400, detail="Topic was rejected as inappropriate"
-        )
 
     database.add_topic(slug, name)
     return {"slug": slug, "name": name}
