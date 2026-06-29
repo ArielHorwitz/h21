@@ -3,26 +3,39 @@ from __future__ import annotations
 import os
 import tomllib
 from dataclasses import dataclass
-from datetime import date
 from pathlib import Path
 
-CONFIG_PATH = Path("config.toml")
+APP_NAME = "h21"
+
+
+def _config_dir() -> Path:
+    xdg = os.environ.get("XDG_CONFIG_HOME")
+    if xdg:
+        return Path(xdg) / APP_NAME
+    return Path.home().joinpath(".config", APP_NAME)
+
+
+def _data_dir() -> Path:
+    xdg = os.environ.get("XDG_DATA_HOME")
+    if xdg:
+        return Path(xdg) / APP_NAME
+    return Path.home().joinpath(".local", "share", APP_NAME)
 
 
 @dataclass(frozen=True)
 class Config:
-    start_date: date
-    solutions_file: Path
     pow_difficulty: int
     openai_api_key: str
     db_path: Path
 
 
-def load_config(path: Path = CONFIG_PATH) -> Config:
-    raw = tomllib.loads(path.read_text())
+def load_config() -> Config:
+    config_path = _config_dir() / "config.toml"
+    if config_path.exists():
+        raw = tomllib.loads(config_path.read_text())
+    else:
+        raw = {}
 
-    start_date = date.fromisoformat(raw["start_date"])
-    solutions_file = Path(raw.get("solutions_file", "daily-solutions.txt"))
     pow_difficulty = int(raw.get("pow_difficulty", 20))
 
     openai_api_key = os.environ.get(
@@ -30,15 +43,15 @@ def load_config(path: Path = CONFIG_PATH) -> Config:
     )
     if not openai_api_key:
         raise ValueError(
-            "OpenAI API key must be set in config.toml or via OPENAI_API_KEY "
-            "environment variable"
+            f"OpenAI API key must be set in {config_path} or via "
+            "OPENAI_API_KEY environment variable"
         )
 
-    db_path = Path(raw.get("db_path", "h21.db"))
+    data_dir = _data_dir()
+    data_dir.mkdir(parents=True, exist_ok=True)
+    db_path = data_dir / "h21.db"
 
     return Config(
-        start_date=start_date,
-        solutions_file=solutions_file,
         pow_difficulty=pow_difficulty,
         openai_api_key=openai_api_key,
         db_path=db_path,

@@ -7,8 +7,11 @@ RUN pip install --no-cache-dir .
 
 COPY src/ src/
 COPY static/ static/
-COPY daily-solutions.txt .
-COPY config.toml .
+
+ENV XDG_CONFIG_HOME=/app/config
+ENV XDG_DATA_HOME=/app/data
+
+RUN mkdir -p /app/config/h21 /app/data/h21
 
 EXPOSE 8000
 

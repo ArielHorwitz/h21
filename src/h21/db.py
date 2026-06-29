@@ -124,6 +124,23 @@ class GameDatabase:
 
         return result
 
+    def get_puzzle_solution(self, puzzle_date: date) -> Optional[str]:
+        """Return the solution for a given date, or None if not yet generated."""
+        row = self._connection.execute(
+            "SELECT solution FROM daily_puzzles WHERE date = ?",
+            (puzzle_date.isoformat(),),
+        ).fetchone()
+        if row is None:
+            return None
+        return row["solution"]
+
+    def get_all_solutions(self) -> list[str]:
+        """Return all previously used solutions, for deduplication."""
+        rows = self._connection.execute(
+            "SELECT solution FROM daily_puzzles ORDER BY date"
+        ).fetchall()
+        return [row["solution"] for row in rows]
+
     def get_game(self, game_id: int) -> Optional[dict[str, Any]]:
         row = self._connection.execute(
             "SELECT game_id, date, started_at, ended_at, result, questions_asked "

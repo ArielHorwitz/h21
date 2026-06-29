@@ -24,24 +24,70 @@ Do not reveal the solution. Do not explain. Respond with a single word only.\
 
 
 class LLMClient(Protocol):
-    async def ask(self, system_prompt: str, user_message: str) -> str: ...
+    async def ask(
+        self,
+        system_prompt: str,
+        user_message: str,
+        *,
+        max_tokens: int = 10,
+        temperature: float = 0.0,
+    ) -> str: ...
 
 
 class OpenAIClient:
     def __init__(self, api_key: str) -> None:
         self._client = AsyncOpenAI(api_key=api_key)
 
-    async def ask(self, system_prompt: str, user_message: str) -> str:
+    async def ask(
+        self,
+        system_prompt: str,
+        user_message: str,
+        *,
+        max_tokens: int = 10,
+        temperature: float = 0.0,
+    ) -> str:
         response = await self._client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_message},
             ],
-            max_tokens=10,
-            temperature=0.0,
+            max_tokens=max_tokens,
+            temperature=temperature,
         )
         return response.choices[0].message.content or ""
+
+
+GENERATE_SOLUTION_PROMPT = """\
+You are helping create daily puzzles for a history-themed 21 questions game.
+
+Generate a single historical subject — a well-known historical figure, event, \
+or place — that would work well as a 21-questions answer. The subject should be \
+famous enough that an educated person could reasonably guess it within 21 yes/no \
+questions.
+
+Reply with ONLY the name of the subject. No quotes, no explanation, no \
+punctuation beyond what the name itself requires.\
+"""
+
+
+async def generate_solution(
+    client: LLMClient, previous_solutions: list[str]
+) -> str:
+    """Ask the LLM to generate a new daily solution, avoiding repeats."""
+    prompt = GENERATE_SOLUTION_PROMPT
+    if previous_solutions:
+        formatted = "\n".join(f"- {solution}" for solution in previous_solutions)
+        prompt += (
+            "\n\nThe following subjects have already been used. "
+            "Do NOT repeat any of them:\n" + formatted
+        )
+
+    response = await client.ask(
+        prompt, "Generate a new historical subject.",
+        max_tokens=50, temperature=0.8,
+    )
+    return response.strip().strip('"').strip("'")
 
 
 async def ask_question(

@@ -12,9 +12,8 @@ from pydantic import BaseModel
 
 from h21.config import load_config
 from h21.db import GameDatabase
-from h21.llm import OpenAIClient, ask_question
+from h21.llm import OpenAIClient, ask_question, generate_solution
 from h21.pow import ProofOfWork
-from h21.puzzle import Puzzle
 
 STATIC_DIR = Path(__file__).resolve().parent.parent.parent / "static"
 
@@ -34,7 +33,6 @@ class EndGameRequest(BaseModel):
 
 # -- app state populated during lifespan --
 
-puzzle: Puzzle
 llm_client: OpenAIClient
 proof_of_work: ProofOfWork
 database: GameDatabase
@@ -42,10 +40,9 @@ database: GameDatabase
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
-    global puzzle, llm_client, proof_of_work, database
+    global llm_client, proof_of_work, database
 
     config = load_config()
-    puzzle = Puzzle(config.solutions_file, config.start_date)
     llm_client = OpenAIClient(config.openai_api_key)
     proof_of_work = ProofOfWork(difficulty=config.pow_difficulty)
     database = GameDatabase(config.db_path)
@@ -58,11 +55,17 @@ app = FastAPI(lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 
-def _record_todays_puzzle() -> None:
-    """Ensure today's puzzle is recorded in the database."""
+async def get_today_solution() -> str:
+    """Return today's solution, generating one via LLM if needed."""
     today = date.today()
-    solution = puzzle.get_today_solution()
+    existing = database.get_puzzle_solution(today)
+    if existing is not None:
+        return existing
+
+    previous_solutions = database.get_all_solutions()
+    solution = await generate_solution(llm_client, previous_solutions)
     database.record_puzzle(today, solution)
+    return solution
 
 
 @app.get("/")
@@ -82,7 +85,7 @@ async def get_challenge() -> dict[str, str | int]:
 
 @app.post("/api/game/new")
 async def new_game() -> dict[str, int]:
-    _record_todays_puzzle()
+    await get_today_solution()
     today = date.today()
     game_id = database.create_game(today)
     return {"game_id": game_id}
@@ -110,7 +113,7 @@ async def ask(request: AskRequest) -> dict[str, str]:
     if not question:
         raise HTTPException(status_code=400, detail="Question cannot be empty")
 
-    secret_solution = puzzle.get_today_solution()
+    secret_solution = await get_today_solution()
     response = await ask_question(llm_client, question, secret_solution)
 
     if response is None:
