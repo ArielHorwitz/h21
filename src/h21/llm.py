@@ -7,9 +7,25 @@ from openai import AsyncOpenAI
 
 LEGAL_RESPONSES = frozenset({"yes", "no", "partially", "depends", "win"})
 
+DIFFICULTY_GUIDANCE = {
+    "easy": (
+        "The subject should be very well-known — something that someone with "
+        "only basic familiarity with the topic would recognize immediately."
+    ),
+    "medium": (
+        "The subject should require moderate familiarity with the topic. "
+        "Someone who has studied it casually should be able to guess it."
+    ),
+    "hard": (
+        "The subject should be obscure — something that only someone "
+        "intimately familiar with the topic would know."
+    ),
+}
+
 SYSTEM_PROMPT_TEMPLATE = """\
 You are the host of a game of 21 questions. The secret solution is: "{solution}".
-The solution is a historical figure, event, or place.
+The topic is: {topic}. The solution is a notable figure, event, place, or concept \
+related to this topic.
 
 The player will ask you questions or make guesses. You must decide on EXACTLY
 one answer — one of: yes, no, partially, depends, win.
@@ -65,13 +81,15 @@ class OpenAIClient:
         return response.choices[0].message.content or ""
 
 
-GENERATE_SOLUTION_PROMPT = """\
-You are helping create daily puzzles for a history-themed 21 questions game.
+GENERATE_SOLUTION_PROMPT_TEMPLATE = """\
+You are helping create daily puzzles for a 21-questions trivia game.
 
-Generate a single historical subject — a well-known historical figure, event, \
-or place — that would work well as a 21-questions answer. The subject should be \
-famous enough that an educated person could reasonably guess it within 21 yes/no \
-questions.
+The topic is: {topic}.
+
+Generate a single subject — a notable figure, event, place, or concept \
+related to this topic — that would work well as a 21-questions answer.
+
+{difficulty_guidance}
 
 Reply with ONLY the name of the subject. No quotes, no explanation, no \
 punctuation beyond what the name itself requires.\
@@ -79,10 +97,17 @@ punctuation beyond what the name itself requires.\
 
 
 async def generate_solution(
-    client: LLMClient, previous_solutions: list[str]
+    client: LLMClient,
+    previous_solutions: list[str],
+    topic_name: str,
+    difficulty: str,
 ) -> str:
     """Ask the LLM to generate a new daily solution, avoiding repeats."""
-    prompt = GENERATE_SOLUTION_PROMPT
+    guidance = DIFFICULTY_GUIDANCE.get(difficulty, DIFFICULTY_GUIDANCE["medium"])
+    prompt = GENERATE_SOLUTION_PROMPT_TEMPLATE.format(
+        topic=topic_name,
+        difficulty_guidance=guidance,
+    )
     if previous_solutions:
         formatted = "\n".join(f"- {solution}" for solution in previous_solutions)
         prompt += (
@@ -91,7 +116,7 @@ async def generate_solution(
         )
 
     response = await client.ask(
-        prompt, "Generate a new historical subject.",
+        prompt, "Generate a new subject.",
         max_tokens=50, temperature=0.8,
     )
     return response.strip().strip('"').strip("'")
@@ -104,14 +129,19 @@ class AnswerResult:
 
 
 async def ask_question(
-    client: LLMClient, question: str, secret_solution: str
+    client: LLMClient,
+    question: str,
+    secret_solution: str,
+    topic_name: str,
 ) -> Optional[AnswerResult]:
     """Ask the LLM a question about the secret solution.
 
     Returns an AnswerResult with the answer and explanation, or None if
     the LLM gave an unparseable response.
     """
-    system_prompt = SYSTEM_PROMPT_TEMPLATE.format(solution=secret_solution)
+    system_prompt = SYSTEM_PROMPT_TEMPLATE.format(
+        solution=secret_solution, topic=topic_name,
+    )
     raw_response = await client.ask(system_prompt, question, max_tokens=200)
     lines = raw_response.strip().splitlines()
     answer = lines[-1].strip().lower().rstrip(".")
@@ -119,3 +149,33 @@ async def ask_question(
         return None
     explanation = "\n".join(lines[:-1]).strip()
     return AnswerResult(answer=answer, explanation=explanation)
+
+
+MODERATE_TOPIC_PROMPT = """\
+You are a content moderator for a trivia game. A user wants to add a new topic.
+
+Decide whether the following topic name is appropriate. Reject topics that are:
+- Slurs, hate speech, or discriminatory language
+- Sexually explicit or pornographic
+- Promoting violence, terrorism, or illegal activity
+- Nonsensical or clearly not a real trivia topic
+- Trolling or spam
+
+The topic should be a legitimate area of knowledge suitable for a trivia game.
+
+Reply with ONLY "yes" if the topic is appropriate, or "no" if it should be rejected.\
+"""
+
+
+async def moderate_topic(client: LLMClient, topic_name: str) -> bool:
+    """Check whether a proposed topic name is appropriate.
+
+    Returns True if acceptable, False if it should be rejected.
+    """
+    response = await client.ask(
+        MODERATE_TOPIC_PROMPT,
+        f"Proposed topic: {topic_name}",
+        max_tokens=10,
+        temperature=0.0,
+    )
+    return response.strip().lower().startswith("yes")

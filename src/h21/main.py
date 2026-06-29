@@ -12,8 +12,14 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from h21.config import load_config
-from h21.db import GameDatabase
-from h21.llm import AnswerResult, OpenAIClient, ask_question, generate_solution
+from h21.db import GameDatabase, VALID_DIFFICULTIES, slugify
+from h21.llm import (
+    AnswerResult,
+    OpenAIClient,
+    ask_question,
+    generate_solution,
+    moderate_topic,
+)
 from h21.pow import ProofOfWork
 
 STATIC_DIR = Path(__file__).resolve().parent.parent.parent / "static"
@@ -28,9 +34,18 @@ class AskRequest(BaseModel):
     question_number: Optional[int] = None
 
 
+class NewGameRequest(BaseModel):
+    topic_slug: str = "western-history"
+    difficulty: str = "medium"
+
+
 class EndGameRequest(BaseModel):
     game_id: int
     result: str  # "win" or "loss"
+
+
+class NewTopicRequest(BaseModel):
+    name: str
 
 
 # -- app state populated during lifespan --
@@ -59,22 +74,63 @@ app = FastAPI(lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 
-async def get_today_solution() -> str:
-    """Return today's solution, generating one via LLM if needed."""
+async def get_today_solution(topic_slug: str, difficulty: str) -> str:
+    """Return today's solution for a given topic+difficulty, generating via LLM if needed."""
     today = date.today()
-    existing = database.get_puzzle_solution(today)
+    existing = database.get_puzzle_solution(today, topic_slug, difficulty)
     if existing is not None:
         return existing
 
-    previous_solutions = database.get_all_solutions()
-    solution = await generate_solution(llm_client, previous_solutions)
-    database.record_puzzle(today, solution)
+    topic_name = database.get_topic_name(topic_slug)
+    if topic_name is None:
+        raise HTTPException(status_code=404, detail="Topic not found")
+
+    previous_solutions = database.get_all_solutions(topic_slug, difficulty)
+    solution = await generate_solution(
+        llm_client, previous_solutions, topic_name, difficulty,
+    )
+    database.record_puzzle(today, topic_slug, difficulty, solution)
     return solution
 
 
 @app.get("/")
-async def index() -> FileResponse:
+async def home() -> FileResponse:
+    return FileResponse(STATIC_DIR / "home.html")
+
+
+@app.get("/game")
+async def game_page() -> FileResponse:
     return FileResponse(STATIC_DIR / "index.html")
+
+
+@app.get("/api/topics")
+async def get_topics() -> list[dict[str, str]]:
+    return database.get_all_topics()
+
+
+@app.post("/api/topics")
+async def create_topic(request: NewTopicRequest) -> dict[str, str]:
+    name = request.name.strip()
+    if not name or len(name) > 100:
+        raise HTTPException(
+            status_code=400, detail="Topic name must be 1-100 characters"
+        )
+
+    slug = slugify(name)
+    if not slug:
+        raise HTTPException(status_code=400, detail="Invalid topic name")
+
+    if database.topic_exists(slug):
+        raise HTTPException(status_code=409, detail="Topic already exists")
+
+    is_appropriate = await moderate_topic(llm_client, name)
+    if not is_appropriate:
+        raise HTTPException(
+            status_code=400, detail="Topic was rejected as inappropriate"
+        )
+
+    database.add_topic(slug, name)
+    return {"slug": slug, "name": name}
 
 
 @app.get("/api/pow-bypass-available")
@@ -93,10 +149,18 @@ async def get_challenge() -> dict[str, str | int]:
 
 
 @app.post("/api/game/new")
-async def new_game() -> dict[str, int]:
-    await get_today_solution()
+async def new_game(request: NewGameRequest) -> dict[str, int]:
+    if request.difficulty not in VALID_DIFFICULTIES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Difficulty must be one of: {', '.join(sorted(VALID_DIFFICULTIES))}",
+        )
+    if not database.topic_exists(request.topic_slug):
+        raise HTTPException(status_code=404, detail="Topic not found")
+
+    await get_today_solution(request.topic_slug, request.difficulty)
     today = date.today()
-    game_id = database.create_game(today)
+    game_id = database.create_game(today, request.topic_slug, request.difficulty)
     return {"game_id": game_id}
 
 
@@ -130,8 +194,19 @@ async def ask(request: AskRequest) -> dict[str, str]:
     if not question:
         raise HTTPException(status_code=400, detail="Question cannot be empty")
 
-    secret_solution = await get_today_solution()
-    result = await ask_question(llm_client, question, secret_solution)
+    # Look up topic + difficulty from the game session.
+    topic_slug = "western-history"
+    difficulty = "medium"
+    if request.game_id is not None:
+        game = database.get_game(request.game_id)
+        if game is not None:
+            topic_slug = game["topic_slug"]
+            difficulty = game["difficulty"]
+
+    secret_solution = await get_today_solution(topic_slug, difficulty)
+    topic_name = database.get_topic_name(topic_slug) or topic_slug
+
+    result = await ask_question(llm_client, question, secret_solution, topic_name)
 
     if result is None:
         raise HTTPException(

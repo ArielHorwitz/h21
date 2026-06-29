@@ -10,10 +10,29 @@ const gameOverMessage = document.getElementById("game-over-message");
 const bypassSection = document.getElementById("bypass-section");
 const bypassPassword = document.getElementById("bypass-password");
 const todayDate = document.getElementById("today-date");
+const gameSubtitle = document.getElementById("game-subtitle");
+
+// Parse topic and difficulty from URL query params.
+const urlParams = new URLSearchParams(window.location.search);
+const topicSlug = urlParams.get("topic") || "western-history";
+const difficulty = urlParams.get("difficulty") || "medium";
+
+// Redirect to home if no topic specified in URL.
+if (!urlParams.has("topic")) {
+  window.location.href = "/";
+}
 
 let questionsAsked = 0;
 let gameFinished = false;
 let gameId = null;
+
+// Display topic and difficulty in the subtitle.
+const difficultyLabel = difficulty.charAt(0).toUpperCase() + difficulty.slice(1);
+const topicLabel = topicSlug
+  .split("-")
+  .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+  .join(" ");
+gameSubtitle.textContent = `${topicLabel} — ${difficultyLabel}`;
 
 todayDate.textContent = new Date().toLocaleDateString("en-US", {
   weekday: "long",
@@ -24,7 +43,11 @@ todayDate.textContent = new Date().toLocaleDateString("en-US", {
 
 async function startGameSession() {
   try {
-    const response = await fetch("/api/game/new", { method: "POST" });
+    const response = await fetch("/api/game/new", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ topic_slug: topicSlug, difficulty }),
+    });
     if (response.ok) {
       const data = await response.json();
       gameId = data.game_id;
@@ -158,11 +181,12 @@ async function submitQuestion(question) {
     if (!challengeResponse.ok) {
       throw new Error("Failed to get challenge");
     }
-    const { challenge_id, challenge, difficulty } = await challengeResponse.json();
+    const { challenge_id, challenge, difficulty: powDifficulty } =
+      await challengeResponse.json();
 
     // Solve the PoW.
     powStatus.textContent = "Computing proof of work...";
-    const nonce = await solveProofOfWork(challenge, difficulty);
+    const nonce = await solveProofOfWork(challenge, powDifficulty);
 
     powStatus.textContent = "Thinking...";
     body = {

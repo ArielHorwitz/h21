@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>H21 — 21 Questions</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <main>
+    <h1>H21</h1>
+    <p class="subtitle">21 Questions</p>
+    <p class="home-intro">Pick a topic and difficulty to start today's puzzle.</p>
+
+    <div id="topics-list"></div>
+
+    <div id="request-topic-section">
+      <h2>Request a Topic</h2>
+      <form id="request-topic-form">
+        <input
+          type="text"
+          id="topic-name-input"
+          placeholder="e.g. Ancient Rome, Jazz Music, Space Exploration..."
+          autocomplete="off"
+          maxlength="100"
+          required
+        >
+        <button type="submit" id="request-topic-btn">Request</button>
+      </form>
+      <p id="request-topic-status" hidden></p>
+    </div>
+  </main>
+  <script src="/static/home.js"></script>
+</body>
+</html>
