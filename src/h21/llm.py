@@ -19,6 +19,8 @@ one word — one of: yes, no, partially, depends, win.
 - "depends" if the answer varies based on interpretation or framing.
 - "win" ONLY if the player has correctly identified the secret solution.
 
+The player may ask questions in ANY language. Regardless of what language the \
+question is in, you MUST always respond with one of the five English words above. \
 Do not reveal the solution. Do not explain. Respond with a single word only.\
 """
 
