@@ -66,10 +66,39 @@ h1 {
   margin-right: 0.5rem;
 }
 
+.log-answer-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding-left: 1.5rem;
+}
+
 .log-answer {
   font-weight: bold;
   font-size: 0.95rem;
+}
+
+.explanation-toggle {
+  background: none;
+  border: 1px solid #444;
+  border-radius: 3px;
+  color: #888;
+  font-size: 0.75rem;
+  padding: 0.1rem 0.4rem;
+  cursor: pointer;
+}
+
+.explanation-toggle:hover {
+  color: #ccc;
+  border-color: #666;
+}
+
+.log-explanation {
   padding-left: 1.5rem;
+  margin-top: 0.25rem;
+  color: #999;
+  font-size: 0.85rem;
+  font-style: italic;
 }
 
 .log-answer.yes { color: #4caf50; }

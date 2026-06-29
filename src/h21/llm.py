@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Optional, Protocol
 
 from openai import AsyncOpenAI
@@ -10,8 +11,8 @@ SYSTEM_PROMPT_TEMPLATE = """\
 You are the host of a game of 21 questions. The secret solution is: "{solution}".
 The solution is a historical figure, event, or place.
 
-The player will ask you questions or make guesses. You must respond with EXACTLY
-one word — one of: yes, no, partially, depends, win.
+The player will ask you questions or make guesses. You must decide on EXACTLY
+one answer — one of: yes, no, partially, depends, win.
 
 - "yes" if the answer to their question is clearly yes.
 - "no" if the answer is clearly no.
@@ -19,9 +20,13 @@ one word — one of: yes, no, partially, depends, win.
 - "depends" if the answer varies based on interpretation or framing.
 - "win" ONLY if the player has correctly identified the secret solution.
 
+First, briefly explain your reasoning (1-3 sentences). Do not reveal the \
+solution or its name in your explanation. Then, on the LAST line, write ONLY \
+your one-word answer.
+
 The player may ask questions in ANY language. Regardless of what language the \
-question is in, you MUST always respond with one of the five English words above. \
-Do not reveal the solution. Do not explain. Respond with a single word only.\
+question is in, your final answer on the last line MUST always be one of the \
+five English words above. Your explanation may be in any language.\
 """
 
 
@@ -92,17 +97,25 @@ async def generate_solution(
     return response.strip().strip('"').strip("'")
 
 
+@dataclass
+class AnswerResult:
+    answer: str
+    explanation: str
+
+
 async def ask_question(
     client: LLMClient, question: str, secret_solution: str
-) -> Optional[str]:
+) -> Optional[AnswerResult]:
     """Ask the LLM a question about the secret solution.
 
-    Returns one of the legal responses, or None if the LLM gave an
-    unparseable response.
+    Returns an AnswerResult with the answer and explanation, or None if
+    the LLM gave an unparseable response.
     """
     system_prompt = SYSTEM_PROMPT_TEMPLATE.format(solution=secret_solution)
-    raw_response = await client.ask(system_prompt, question)
-    parsed = raw_response.strip().lower().rstrip(".")
-    if parsed in LEGAL_RESPONSES:
-        return parsed
-    return None
+    raw_response = await client.ask(system_prompt, question, max_tokens=200)
+    lines = raw_response.strip().splitlines()
+    answer = lines[-1].strip().lower().rstrip(".")
+    if answer not in LEGAL_RESPONSES:
+        return None
+    explanation = "\n".join(lines[:-1]).strip()
+    return AnswerResult(answer=answer, explanation=explanation)

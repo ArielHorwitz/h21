@@ -37,10 +37,12 @@ class GameDatabase:
                 question_number INTEGER NOT NULL,
                 question        TEXT NOT NULL,
                 answer          TEXT NOT NULL,
+                explanation     TEXT NOT NULL DEFAULT '',
                 asked_at        TEXT NOT NULL,
                 FOREIGN KEY (game_id) REFERENCES games(game_id)
             );
         """)
+        self._migrate_add_explanation_column()
 
     def record_puzzle(self, puzzle_date: date, solution: str) -> None:
         self._connection.execute(
@@ -59,20 +61,33 @@ class GameDatabase:
         assert cursor.lastrowid is not None
         return cursor.lastrowid
 
+    def _migrate_add_explanation_column(self) -> None:
+        columns = [
+            row["name"]
+            for row in self._connection.execute("PRAGMA table_info(questions)")
+        ]
+        if "explanation" not in columns:
+            self._connection.execute(
+                "ALTER TABLE questions ADD COLUMN explanation TEXT NOT NULL DEFAULT ''"
+            )
+            self._connection.commit()
+
     def record_question(
         self,
         game_id: int,
         question_number: int,
         question: str,
         answer: str,
+        explanation: str = "",
     ) -> None:
         now = _utcnow_iso()
         self._connection.execute(
             """
-            INSERT INTO questions (game_id, question_number, question, answer, asked_at)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO questions
+                (game_id, question_number, question, answer, explanation, asked_at)
+            VALUES (?, ?, ?, ?, ?, ?)
             """,
-            (game_id, question_number, question, answer, now),
+            (game_id, question_number, question, answer, explanation, now),
         )
         self._connection.execute(
             "UPDATE games SET questions_asked = ? WHERE game_id = ?",
@@ -103,7 +118,7 @@ class GameDatabase:
         for game in games:
             questions = self._connection.execute(
                 """
-                SELECT question_number, question, answer, asked_at
+                SELECT question_number, question, answer, explanation, asked_at
                 FROM questions
                 WHERE game_id = ?
                 ORDER BY question_number

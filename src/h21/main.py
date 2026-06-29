@@ -13,7 +13,7 @@ from pydantic import BaseModel
 
 from h21.config import load_config
 from h21.db import GameDatabase
-from h21.llm import OpenAIClient, ask_question, generate_solution
+from h21.llm import AnswerResult, OpenAIClient, ask_question, generate_solution
 from h21.pow import ProofOfWork
 
 STATIC_DIR = Path(__file__).resolve().parent.parent.parent / "static"
@@ -131,9 +131,9 @@ async def ask(request: AskRequest) -> dict[str, str]:
         raise HTTPException(status_code=400, detail="Question cannot be empty")
 
     secret_solution = await get_today_solution()
-    response = await ask_question(llm_client, question, secret_solution)
+    result = await ask_question(llm_client, question, secret_solution)
 
-    if response is None:
+    if result is None:
         raise HTTPException(
             status_code=502,
             detail="Could not process the question. Please try again.",
@@ -147,10 +147,11 @@ async def ask(request: AskRequest) -> dict[str, str]:
                 request.game_id,
                 request.question_number,
                 question,
-                response,
+                result.answer,
+                result.explanation,
             )
 
-    return {"answer": response}
+    return {"answer": result.answer, "explanation": result.explanation}
 
 
 @app.get("/api/history")

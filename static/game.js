@@ -51,7 +51,7 @@ function updateCounter() {
   questionCounter.textContent = `Question ${questionsAsked} / ${MAX_QUESTIONS}`;
 }
 
-function addLogEntry(question, answer) {
+function addLogEntry(question, answer, explanation) {
   const entry = document.createElement("div");
   entry.className = "log-entry";
 
@@ -64,14 +64,45 @@ function addLogEntry(question, answer) {
   questionEl.appendChild(numberSpan);
   questionEl.appendChild(document.createTextNode(question));
 
-  const answerEl = document.createElement("div");
+  const answerRow = document.createElement("div");
+  answerRow.className = "log-answer-row";
+
+  const answerEl = document.createElement("span");
   answerEl.className = `log-answer ${answer}`;
   answerEl.textContent = answer === "win" ? "Correct!" : answer;
+  answerRow.appendChild(answerEl);
 
   entry.appendChild(questionEl);
-  entry.appendChild(answerEl);
+  entry.appendChild(answerRow);
+
+  if (explanation) {
+    const explanationEl = document.createElement("div");
+    explanationEl.className = "log-explanation";
+    explanationEl.textContent = explanation;
+    explanationEl.hidden = true;
+    entry.appendChild(explanationEl);
+  }
+
   questionLog.appendChild(entry);
   questionLog.scrollTop = questionLog.scrollHeight;
+}
+
+function revealExplanationButtons() {
+  for (const entry of questionLog.querySelectorAll(".log-entry")) {
+    const explanationEl = entry.querySelector(".log-explanation");
+    if (!explanationEl) continue;
+
+    const toggle = document.createElement("button");
+    toggle.className = "explanation-toggle";
+    toggle.textContent = "why?";
+    toggle.addEventListener("click", () => {
+      const visible = !explanationEl.hidden;
+      explanationEl.hidden = visible;
+      toggle.textContent = visible ? "why?" : "hide";
+    });
+
+    entry.querySelector(".log-answer-row").appendChild(toggle);
+  }
 }
 
 function endGame(won) {
@@ -88,6 +119,7 @@ function endGame(won) {
   }
   gameOverMessage.hidden = false;
 
+  revealExplanationButtons();
   endGameSession(won ? "win" : "loss");
 }
 
@@ -154,7 +186,7 @@ async function submitQuestion(question) {
     throw new Error(error.detail || "Request failed");
   }
 
-  return (await askResponse.json()).answer;
+  return await askResponse.json();
 }
 
 askForm.addEventListener("submit", async (event) => {
@@ -170,10 +202,10 @@ askForm.addEventListener("submit", async (event) => {
   submitBtn.disabled = true;
 
   try {
-    const answer = await submitQuestion(question);
+    const { answer, explanation } = await submitQuestion(question);
     questionsAsked++;
     updateCounter();
-    addLogEntry(question, answer);
+    addLogEntry(question, answer, explanation);
 
     if (answer === "win") {
       endGame(true);
