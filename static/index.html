@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>H21 — History 21 Questions</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <main>
+    <h1>H21</h1>
+    <p class="subtitle">History — 21 Questions</p>
+    <p class="date" id="today-date"></p>
+
+    <div id="question-log"></div>
+
+    <div id="status-bar">
+      <span id="question-counter">Question 0 / 21</span>
+      <span id="pow-status"></span>
+    </div>
+
+    <form id="ask-form">
+      <input
+        type="text"
+        id="question-input"
+        placeholder="Ask a yes/no question or make a guess..."
+        autocomplete="off"
+        required
+      >
+      <button type="submit" id="submit-btn">Ask</button>
+    </form>
+
+    <div id="game-over-message" hidden></div>
+  </main>
+  <script src="/static/game.js"></script>
+</body>
+</html>
