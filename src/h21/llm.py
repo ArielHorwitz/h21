@@ -162,30 +162,30 @@ async def ask_question(
     return AnswerResult(answer=answer, explanation=explanation)
 
 
-MODERATE_TOPIC_PROMPT = """\
-You are a content moderator for a trivia game. A user wants to add a new topic.
+NORMALIZE_TOPIC_PROMPT = """\
+You are helping organize topics for a trivia game.
 
-Decide whether the following topic name is appropriate. Reject topics that are:
-- Slurs, hate speech, or discriminatory language
-- Sexually explicit or pornographic
-- Promoting violence, terrorism, or illegal activity
-- Nonsensical or clearly not a real trivia topic
-- Trolling or spam
+Given a user's suggested topic (which may be in any language, misspelled, \
+informal, or vaguely described), return a clean, concise English topic name \
+suitable for display.
 
-The topic should be a legitimate area of knowledge suitable for a trivia game.
+Examples:
+- "la guerra civil española" -> "Spanish Civil War"
+- "dinos" -> "Dinosaurs"
+- "ww2 pacific" -> "World War II: Pacific Theater"
+- "古代ローマ" -> "Ancient Rome"
+- "marvel movies and comics" -> "Marvel"
 
-Reply with ONLY "yes" if the topic is appropriate, or "no" if it should be rejected.\
+Reply with ONLY the normalized topic name. No quotes, no explanation.\
 """
 
 
-async def moderate_topic(client: LLMClient, topic_name: str) -> bool:
-    """Check whether a proposed topic name is appropriate.
-
-    Returns True if acceptable, False if it should be rejected.
-    """
+async def normalize_topic(client: LLMClient, raw_name: str) -> str:
+    """Normalize a user-submitted topic name into clean English."""
     response = await client.ask(
-        MODERATE_TOPIC_PROMPT,
-        f"Proposed topic: {topic_name}",
-        max_tokens=10,
+        NORMALIZE_TOPIC_PROMPT,
+        f"Suggested topic: {raw_name}",
+        max_tokens=30,
+        temperature=0.0,
     )
-    return response.strip().lower().startswith("yes")
+    return response.strip().strip('"').strip("'")

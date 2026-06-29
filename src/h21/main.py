@@ -18,6 +18,7 @@ from h21.llm import (
     OpenAIClient,
     ask_question,
     generate_solution,
+    normalize_topic,
 )
 from h21.pow import ProofOfWork
 
@@ -109,12 +110,13 @@ async def get_topics() -> list[dict[str, str]]:
 
 @app.post("/api/topics")
 async def create_topic(request: NewTopicRequest) -> dict[str, str]:
-    name = request.name.strip()
-    if not name or len(name) > 100:
+    raw_name = request.name.strip()
+    if not raw_name or len(raw_name) > 100:
         raise HTTPException(
             status_code=400, detail="Topic name must be 1-100 characters"
         )
 
+    name = await normalize_topic(llm_client, raw_name)
     slug = slugify(name)
     if not slug:
         raise HTTPException(status_code=400, detail="Invalid topic name")
