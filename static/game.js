@@ -11,6 +11,7 @@ const todayDate = document.getElementById("today-date");
 
 let questionsAsked = 0;
 let gameFinished = false;
+let gameId = null;
 
 todayDate.textContent = new Date().toLocaleDateString("en-US", {
   weekday: "long",
@@ -18,6 +19,31 @@ todayDate.textContent = new Date().toLocaleDateString("en-US", {
   month: "long",
   day: "numeric",
 });
+
+async function startGameSession() {
+  try {
+    const response = await fetch("/api/game/new", { method: "POST" });
+    if (response.ok) {
+      const data = await response.json();
+      gameId = data.game_id;
+    }
+  } catch (error) {
+    console.error("Failed to start game session:", error);
+  }
+}
+
+async function endGameSession(result) {
+  if (gameId === null) return;
+  try {
+    await fetch("/api/game/end", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ game_id: gameId, result }),
+    });
+  } catch (error) {
+    console.error("Failed to end game session:", error);
+  }
+}
 
 function updateCounter() {
   questionCounter.textContent = `Question ${questionsAsked} / ${MAX_QUESTIONS}`;
@@ -59,6 +85,8 @@ function endGame(won) {
     gameOverMessage.className = "loss";
   }
   gameOverMessage.hidden = false;
+
+  endGameSession(won ? "win" : "loss");
 }
 
 async function solveProofOfWork(challenge, difficulty) {
@@ -98,6 +126,8 @@ async function submitQuestion(question) {
       question: question,
       challenge_id: challenge_id,
       nonce: nonce,
+      game_id: gameId,
+      question_number: questionsAsked + 1,
     }),
   });
 
@@ -145,3 +175,4 @@ askForm.addEventListener("submit", async (event) => {
 });
 
 updateCounter();
+startGameSession();

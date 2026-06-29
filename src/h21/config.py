@@ -15,6 +15,7 @@ class Config:
     solutions_file: Path
     pow_difficulty: int
     openai_api_key: str
+    db_path: Path
 
 
 def load_config(path: Path = CONFIG_PATH) -> Config:
@@ -33,9 +34,12 @@ def load_config(path: Path = CONFIG_PATH) -> Config:
             "environment variable"
         )
 
+    db_path = Path(raw.get("db_path", "h21.db"))
+
     return Config(
         start_date=start_date,
         solutions_file=solutions_file,
         pow_difficulty=pow_difficulty,
         openai_api_key=openai_api_key,
+        db_path=db_path,
     )
