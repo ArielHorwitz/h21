@@ -233,6 +233,10 @@ askForm.addEventListener("submit", async (event) => {
 
   try {
     const { answer, explanation } = await submitQuestion(question);
+    const currentPassword = bypassPassword.value.trim();
+    if (currentPassword) {
+      localStorage.setItem("bypass-password", currentPassword);
+    }
     questionsAsked++;
     updateCounter();
     addLogEntry(question, answer, explanation);
@@ -264,6 +268,10 @@ async function checkBypassAvailable() {
       const data = await response.json();
       if (data.available) {
         bypassSection.hidden = false;
+        const savedPassword = localStorage.getItem("bypass-password");
+        if (savedPassword) {
+          bypassPassword.value = savedPassword;
+        }
       }
     }
   } catch (error) {
