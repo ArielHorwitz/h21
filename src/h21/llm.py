@@ -36,9 +36,22 @@ one answer — one of: yes, no, partially, depends, win.
 - "depends" if the answer varies based on interpretation or framing.
 - "win" ONLY if the player has correctly identified the secret solution.
 
-First, briefly explain your reasoning (1-3 sentences). Do not reveal the \
-solution or its name in your explanation. Then, on the LAST line, write ONLY \
-your one-word answer.
+Before giving your answer, write a detailed explanation covering the following. \
+Do not reveal the solution or its name anywhere in your explanation — refer to \
+it indirectly (e.g. "the subject", "this person", "this event").
+
+1. REASONING: Explain why you chose this answer. What facts about the subject \
+led you to this conclusion?
+2. NUANCE: If applicable, explain what makes the answer not fully \
+straightforward — e.g. common misconceptions, edge cases, or historical \
+context that complicates a simple yes/no.
+3. NEAR MISSES: Suggest how the player could rephrase or narrow their \
+question to get a more decisive or useful answer. For example, "If you had \
+asked whether they were born in Europe, the answer would be yes" or "Asking \
+about the century rather than the exact year would narrow it down faster."
+
+Keep the explanation concise but substantive (3-6 sentences total). Then, on \
+the LAST line, write ONLY your one-word answer.
 
 The player may ask questions in ANY language. Regardless of what language the \
 question is in, your final answer on the last line MUST always be one of the \
@@ -140,7 +153,7 @@ async def ask_question(
     system_prompt = SYSTEM_PROMPT_TEMPLATE.format(
         solution=secret_solution, topic=topic_name,
     )
-    raw_response = await client.ask(system_prompt, question, max_tokens=200)
+    raw_response = await client.ask(system_prompt, question, max_tokens=400)
     lines = raw_response.strip().splitlines()
     answer = lines[-1].strip().lower().rstrip(".")
     if answer not in LEGAL_RESPONSES:
