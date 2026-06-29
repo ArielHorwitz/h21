@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import hmac
+import logging
 from contextlib import asynccontextmanager
 from datetime import date
 from pathlib import Path
 from typing import AsyncIterator, Optional
+
+logger = logging.getLogger("h21")
 
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
@@ -15,6 +18,7 @@ from h21.config import load_config
 from h21.db import GameDatabase, VALID_DIFFICULTIES, slugify
 from h21.llm import (
     AnswerResult,
+    LLMError,
     OpenAIClient,
     ask_question,
     generate_solution,
@@ -60,6 +64,12 @@ bypass_password: Optional[str]
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     global llm_client, proof_of_work, database, bypass_password
 
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+
     config = load_config()
     llm_client = OpenAIClient(config.openai_api_key, model=config.model)
     proof_of_work = ProofOfWork(difficulty=config.pow_difficulty)
@@ -86,9 +96,13 @@ async def get_today_solution(topic_slug: str, difficulty: str) -> str:
         raise HTTPException(status_code=404, detail="Topic not found")
 
     previous_solutions = database.get_all_solutions(topic_slug, difficulty)
-    solution = await generate_solution(
-        llm_client, previous_solutions, topic_name, difficulty,
-    )
+    try:
+        solution = await generate_solution(
+            llm_client, previous_solutions, topic_name, difficulty,
+        )
+    except LLMError as exc:
+        logger.error("Failed to generate solution: %s", exc)
+        raise HTTPException(status_code=502, detail=exc.detail)
     database.record_puzzle(today, topic_slug, difficulty, solution)
     return solution
 
@@ -116,7 +130,11 @@ async def create_topic(request: NewTopicRequest) -> dict[str, str]:
             status_code=400, detail="Topic name must be 1-100 characters"
         )
 
-    name = await normalize_topic(llm_client, raw_name)
+    try:
+        name = await normalize_topic(llm_client, raw_name)
+    except LLMError as exc:
+        logger.error("Failed to normalize topic: %s", exc)
+        raise HTTPException(status_code=502, detail=exc.detail)
     slug = slugify(name)
     if not slug:
         raise HTTPException(status_code=400, detail="Invalid topic name")
@@ -201,12 +219,16 @@ async def ask(request: AskRequest) -> dict[str, str]:
     secret_solution = await get_today_solution(topic_slug, difficulty)
     topic_name = database.get_topic_name(topic_slug) or topic_slug
 
-    result = await ask_question(llm_client, question, secret_solution, topic_name)
+    try:
+        result = await ask_question(llm_client, question, secret_solution, topic_name)
+    except LLMError as exc:
+        logger.error("Failed to answer question: %s", exc)
+        raise HTTPException(status_code=502, detail=exc.detail)
 
     if result is None:
         raise HTTPException(
             status_code=502,
-            detail="Could not process the question. Please try again.",
+            detail="AI returned an unparseable response. Please try again.",
         )
 
     # Record the Q&A if a game session is active.

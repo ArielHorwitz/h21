@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from typing import Optional, Protocol
 
-from openai import AsyncOpenAI
+from openai import APIConnectionError, APIStatusError, AsyncOpenAI
+
+logger = logging.getLogger("h21.llm")
 
 LEGAL_RESPONSES = frozenset({"yes", "no", "partially", "depends", "win"})
 
@@ -66,7 +69,16 @@ class LLMClient(Protocol):
         user_message: str,
         *,
         max_tokens: int = 10,
+        temperature: Optional[float] = None,
     ) -> str: ...
+
+
+class LLMError(Exception):
+    """Raised when an LLM call fails in a way we can describe to the user."""
+
+    def __init__(self, message: str, detail: str) -> None:
+        super().__init__(message)
+        self.detail = detail
 
 
 class OpenAIClient:
@@ -80,16 +92,66 @@ class OpenAIClient:
         user_message: str,
         *,
         max_tokens: int = 10,
+        temperature: Optional[float] = None,
     ) -> str:
-        response = await self._client.chat.completions.create(
-            model=self._model,
-            messages=[
+        kwargs: dict = {
+            "model": self._model,
+            "messages": [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_message},
             ],
-            max_completion_tokens=max_tokens,
+            "max_completion_tokens": max_tokens,
+        }
+        if temperature is not None:
+            kwargs["temperature"] = temperature
+
+        logger.info(
+            "LLM request: model=%s max_tokens=%d user_message=%r",
+            self._model, max_tokens, user_message[:200],
         )
-        return response.choices[0].message.content or ""
+        logger.debug(
+            "LLM request system_prompt: %s", system_prompt[:500],
+        )
+
+        try:
+            response = await self._client.chat.completions.create(**kwargs)
+        except APIConnectionError:
+            logger.exception("LLM connection error")
+            raise LLMError(
+                "Failed to connect to the AI service",
+                "Could not reach the AI service. Please try again later.",
+            )
+        except APIStatusError as exc:
+            logger.error(
+                "LLM API error: status=%d body=%s",
+                exc.status_code, exc.body,
+            )
+            if exc.status_code == 429:
+                raise LLMError(
+                    f"LLM rate limited: {exc.status_code}",
+                    "AI service is rate-limited. Please wait a moment and try again.",
+                )
+            raise LLMError(
+                f"LLM API error: {exc.status_code}",
+                "AI service returned an error. Please try again later.",
+            )
+
+        content = response.choices[0].message.content or ""
+        finish_reason = response.choices[0].finish_reason
+
+        logger.info(
+            "LLM response: finish_reason=%s length=%d content=%r",
+            finish_reason, len(content), content[:300],
+        )
+
+        if not content.strip():
+            logger.warning("LLM returned empty response")
+            raise LLMError(
+                "LLM returned empty response",
+                "AI returned an empty response. Please try again.",
+            )
+
+        return content
 
 
 GENERATE_SOLUTION_PROMPT_TEMPLATE = """\
@@ -130,7 +192,15 @@ async def generate_solution(
         prompt, "Generate a new subject.",
         max_tokens=50,
     )
-    return response.strip().strip('"').strip("'")
+    solution = response.strip().strip('"').strip("'")
+    if not solution:
+        logger.error("LLM generated empty solution after stripping for topic=%r", topic_name)
+        raise LLMError(
+            "LLM generated empty solution",
+            "AI failed to generate a valid puzzle. Please try again.",
+        )
+    logger.info("Generated solution for topic=%r difficulty=%r: %r", topic_name, difficulty, solution)
+    return solution
 
 
 @dataclass
@@ -155,8 +225,15 @@ async def ask_question(
     )
     raw_response = await client.ask(system_prompt, question, max_tokens=400)
     lines = raw_response.strip().splitlines()
+    if not lines:
+        logger.warning("LLM response had no lines after stripping for question=%r", question)
+        return None
     answer = lines[-1].strip().lower().rstrip(".")
     if answer not in LEGAL_RESPONSES:
+        logger.warning(
+            "LLM gave invalid answer=%r for question=%r, full response=%r",
+            answer, question, raw_response,
+        )
         return None
     explanation = "\n".join(lines[:-1]).strip()
     return AnswerResult(answer=answer, explanation=explanation)
@@ -188,4 +265,12 @@ async def normalize_topic(client: LLMClient, raw_name: str) -> str:
         max_tokens=30,
         temperature=0.0,
     )
-    return response.strip().strip('"').strip("'")
+    normalized = response.strip().strip('"').strip("'")
+    if not normalized:
+        logger.error("LLM returned empty normalization for raw_name=%r", raw_name)
+        raise LLMError(
+            "LLM returned empty topic normalization",
+            "AI could not normalize the topic name. Please try a different name.",
+        )
+    logger.info("Normalized topic %r -> %r", raw_name, normalized)
+    return normalized

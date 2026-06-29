@@ -260,6 +260,12 @@ h1 a.home-link:hover {
   font-style: italic;
 }
 
+#pow-status.error {
+  color: #ff6b6b;
+  font-style: normal;
+  font-weight: bold;
+}
+
 #ask-form {
   display: flex;
   gap: 0.5rem;

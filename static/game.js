@@ -51,9 +51,14 @@ async function startGameSession() {
     if (response.ok) {
       const data = await response.json();
       gameId = data.game_id;
+    } else {
+      const error = await response.json().catch(() => ({}));
+      powStatus.textContent = error.detail || "Failed to start game session.";
+      powStatus.classList.add("error");
     }
   } catch (error) {
-    console.error("Failed to start game session:", error);
+    powStatus.textContent = "Network error — could not start game.";
+    powStatus.classList.add("error");
   }
 }
 
@@ -224,6 +229,7 @@ askForm.addEventListener("submit", async (event) => {
   questionInput.value = "";
   questionInput.disabled = true;
   submitBtn.disabled = true;
+  powStatus.classList.remove("error");
 
   try {
     const { answer, explanation } = await submitQuestion(question);
@@ -237,13 +243,16 @@ askForm.addEventListener("submit", async (event) => {
       endGame(false);
     }
   } catch (error) {
-    powStatus.textContent = `Error: ${error.message}`;
+    powStatus.textContent = error.message;
+    powStatus.classList.add("error");
   } finally {
     if (!gameFinished) {
       questionInput.disabled = false;
       submitBtn.disabled = false;
       questionInput.focus();
-      powStatus.textContent = "";
+      if (!powStatus.classList.contains("error")) {
+        powStatus.textContent = "";
+      }
     }
   }
 });
