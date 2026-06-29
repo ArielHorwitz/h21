@@ -53,13 +53,13 @@ class LLMClient(Protocol):
         user_message: str,
         *,
         max_tokens: int = 10,
-        temperature: float = 0.0,
     ) -> str: ...
 
 
 class OpenAIClient:
-    def __init__(self, api_key: str) -> None:
+    def __init__(self, api_key: str, model: str = "gpt-4o") -> None:
         self._client = AsyncOpenAI(api_key=api_key)
+        self._model = model
 
     async def ask(
         self,
@@ -67,16 +67,14 @@ class OpenAIClient:
         user_message: str,
         *,
         max_tokens: int = 10,
-        temperature: float = 0.0,
     ) -> str:
         response = await self._client.chat.completions.create(
-            model="gpt-4o-mini",
+            model=self._model,
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_message},
             ],
-            max_tokens=max_tokens,
-            temperature=temperature,
+            max_completion_tokens=max_tokens,
         )
         return response.choices[0].message.content or ""
 
@@ -117,7 +115,7 @@ async def generate_solution(
 
     response = await client.ask(
         prompt, "Generate a new subject.",
-        max_tokens=50, temperature=0.8,
+        max_tokens=50,
     )
     return response.strip().strip('"').strip("'")
 
@@ -176,6 +174,5 @@ async def moderate_topic(client: LLMClient, topic_name: str) -> bool:
         MODERATE_TOPIC_PROMPT,
         f"Proposed topic: {topic_name}",
         max_tokens=10,
-        temperature=0.0,
     )
     return response.strip().lower().startswith("yes")

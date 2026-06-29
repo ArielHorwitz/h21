@@ -61,7 +61,7 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     global llm_client, proof_of_work, database, bypass_password
 
     config = load_config()
-    llm_client = OpenAIClient(config.openai_api_key)
+    llm_client = OpenAIClient(config.openai_api_key, model=config.model)
     proof_of_work = ProofOfWork(difficulty=config.pow_difficulty)
     database = GameDatabase(config.db_path)
     bypass_password = config.bypass_password

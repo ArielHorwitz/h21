@@ -27,6 +27,7 @@ def _data_dir() -> Path:
 class Config:
     pow_difficulty: int
     openai_api_key: str
+    model: str
     db_path: Path
     bypass_password: Optional[str]
 
@@ -53,11 +54,14 @@ def load_config() -> Config:
     data_dir.mkdir(parents=True, exist_ok=True)
     db_path = data_dir / "h21.db"
 
+    model = raw.get("model", "gpt-4o")
+
     bypass_password = raw.get("bypass_password") or None
 
     return Config(
         pow_difficulty=pow_difficulty,
         openai_api_key=openai_api_key,
+        model=model,
         db_path=db_path,
         bypass_password=bypass_password,
     )
