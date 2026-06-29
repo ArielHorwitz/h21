@@ -67,9 +67,6 @@ class LLMClient(Protocol):
         self,
         system_prompt: str,
         user_message: str,
-        *,
-        max_tokens: int = 10,
-        temperature: Optional[float] = None,
     ) -> str: ...
 
 
@@ -90,31 +87,23 @@ class OpenAIClient:
         self,
         system_prompt: str,
         user_message: str,
-        *,
-        max_tokens: int = 10,
-        temperature: Optional[float] = None,
     ) -> str:
-        kwargs: dict = {
-            "model": self._model,
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_message},
-            ],
-            "max_completion_tokens": max_tokens,
-        }
-        if temperature is not None:
-            kwargs["temperature"] = temperature
-
         logger.info(
-            "LLM request: model=%s max_tokens=%d user_message=%r",
-            self._model, max_tokens, user_message[:200],
+            "LLM request: model=%s user_message=%r",
+            self._model, user_message[:200],
         )
         logger.debug(
             "LLM request system_prompt: %s", system_prompt[:500],
         )
 
         try:
-            response = await self._client.chat.completions.create(**kwargs)
+            response = await self._client.chat.completions.create(
+                model=self._model,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_message},
+                ],
+            )
         except APIConnectionError:
             logger.exception("LLM connection error")
             raise LLMError(
@@ -188,10 +177,7 @@ async def generate_solution(
             "Do NOT repeat any of them:\n" + formatted
         )
 
-    response = await client.ask(
-        prompt, "Generate a new subject.",
-        max_tokens=50,
-    )
+    response = await client.ask(prompt, "Generate a new subject.")
     solution = response.strip().strip('"').strip("'")
     if not solution:
         logger.error("LLM generated empty solution after stripping for topic=%r", topic_name)
@@ -223,7 +209,7 @@ async def ask_question(
     system_prompt = SYSTEM_PROMPT_TEMPLATE.format(
         solution=secret_solution, topic=topic_name,
     )
-    raw_response = await client.ask(system_prompt, question, max_tokens=400)
+    raw_response = await client.ask(system_prompt, question)
     lines = raw_response.strip().splitlines()
     if not lines:
         logger.warning("LLM response had no lines after stripping for question=%r", question)
@@ -262,8 +248,6 @@ async def normalize_topic(client: LLMClient, raw_name: str) -> str:
     response = await client.ask(
         NORMALIZE_TOPIC_PROMPT,
         f"Suggested topic: {raw_name}",
-        max_tokens=30,
-        temperature=0.0,
     )
     normalized = response.strip().strip('"').strip("'")
     if not normalized:
