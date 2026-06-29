@@ -135,7 +135,6 @@ function revealExplanationButtons() {
 
 function endGame(won) {
   gameFinished = true;
-  questionInput.disabled = true;
   submitBtn.disabled = true;
 
   if (won) {
@@ -221,13 +220,12 @@ async function submitQuestion(question) {
 askForm.addEventListener("submit", async (event) => {
   event.preventDefault();
 
-  if (gameFinished) return;
+  if (gameFinished || submitBtn.disabled) return;
 
   const question = questionInput.value.trim();
   if (!question) return;
 
   questionInput.value = "";
-  questionInput.disabled = true;
   submitBtn.disabled = true;
   powStatus.classList.remove("error");
 
@@ -251,7 +249,6 @@ askForm.addEventListener("submit", async (event) => {
     powStatus.classList.add("error");
   } finally {
     if (!gameFinished) {
-      questionInput.disabled = false;
       submitBtn.disabled = false;
       questionInput.focus();
       if (!powStatus.classList.contains("error")) {
