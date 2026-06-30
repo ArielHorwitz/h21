@@ -470,10 +470,12 @@ async def end_game(request_body: EndGameRequest) -> dict[str, str]:
 
     database.end_game(request_body.game_id, request_body.result)
 
+    today = date.today()
     solution = database.get_puzzle_solution(
-        date.today(), game["topic_slug"], game["difficulty"],
+        today, game["topic_slug"], game["difficulty"],
     )
-    return {"status": "ok", "solution": solution or ""}
+    hints = database.get_puzzle_hints(today, game["topic_slug"], game["difficulty"])
+    return {"status": "ok", "solution": solution or "", "hints": hints}
 
 
 @app.post("/api/ask")

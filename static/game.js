@@ -82,9 +82,48 @@ async function endGameSession(result) {
       if (data.solution) {
         showSolution(data.solution);
       }
+      if (data.hints) {
+        revealAllHints(data.hints);
+      }
     }
   } catch (error) {
     console.error("Failed to end game session:", error);
+  }
+}
+
+function revealAllHints(hints) {
+  hintPanel.hidden = false;
+
+  for (let index = 0; index < hints.length; index++) {
+    if (revealedHintIndices.has(index)) continue;
+
+    let li;
+    if (index < hintList.children.length) {
+      li = hintList.children[index];
+    } else {
+      li = document.createElement("li");
+      li.className = "hint-item locked";
+      li.dataset.hintIndex = index;
+
+      const revealBtn = document.createElement("button");
+      revealBtn.className = "hint-reveal-btn";
+      li.appendChild(revealBtn);
+
+      const textSpan = document.createElement("span");
+      textSpan.className = "hint-text";
+      textSpan.hidden = true;
+      li.appendChild(textSpan);
+
+      hintList.appendChild(li);
+    }
+
+    const btn = li.querySelector(".hint-reveal-btn");
+    const textSpan = li.querySelector(".hint-text");
+    textSpan.textContent = hints[index];
+    textSpan.hidden = false;
+    if (btn) btn.hidden = true;
+    li.classList.remove("locked");
+    li.classList.add("revealed");
   }
 }
 
