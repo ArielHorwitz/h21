@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import re
+import secrets
 import sqlite3
 from datetime import date, datetime, timezone
 from pathlib import Path
@@ -65,11 +67,29 @@ class GameDatabase:
                 asked_at        TEXT NOT NULL,
                 FOREIGN KEY (game_id) REFERENCES games(game_id)
             );
+
+            CREATE TABLE IF NOT EXISTS accounts (
+                user_id     INTEGER PRIMARY KEY AUTOINCREMENT,
+                username    TEXT NOT NULL UNIQUE,
+                password_hash TEXT NOT NULL,
+                invite_code TEXT,
+                created_at  TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS invites (
+                code            TEXT PRIMARY KEY,
+                alias           TEXT,
+                remaining_uses  INTEGER NOT NULL DEFAULT 1,
+                created_at      TEXT NOT NULL
+            );
         """)
         self._migrate_add_explanation_column()
         self._migrate_daily_puzzles_composite_key()
         self._migrate_games_topic_difficulty()
         self._migrate_add_hints_column()
+        self._migrate_add_user_id_to_games()
+        self._migrate_invites_multi_use()
+        self._migrate_add_invite_code_to_accounts()
         self._seed_default_topic()
 
     def _seed_default_topic(self) -> None:
@@ -229,12 +249,14 @@ class GameDatabase:
     # -- Games --
 
     def create_game(
-        self, puzzle_date: date, topic_slug: str, difficulty: str
+        self, puzzle_date: date, topic_slug: str, difficulty: str,
+        user_id: Optional[int] = None,
     ) -> int:
         now = _utcnow_iso()
         cursor = self._connection.execute(
-            "INSERT INTO games (date, topic_slug, difficulty, started_at) VALUES (?, ?, ?, ?)",
-            (puzzle_date.isoformat(), topic_slug, difficulty, now),
+            "INSERT INTO games (date, topic_slug, difficulty, started_at, user_id) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (puzzle_date.isoformat(), topic_slug, difficulty, now, user_id),
         )
         self._connection.commit()
         assert cursor.lastrowid is not None
@@ -281,20 +303,37 @@ class GameDatabase:
             return None
         return dict(row)
 
-    def get_history(self) -> list[dict[str, Any]]:
-        games = self._connection.execute(
-            """
-            SELECT g.game_id, g.date, g.topic_slug, g.difficulty,
-                   dp.solution, g.started_at, g.ended_at,
-                   g.result, g.questions_asked
-            FROM games g
-            JOIN daily_puzzles dp
-                ON g.date = dp.date
-                AND g.topic_slug = dp.topic_slug
-                AND g.difficulty = dp.difficulty
-            ORDER BY g.started_at DESC
-            """
-        ).fetchall()
+    def get_history(self, user_id: Optional[int] = None) -> list[dict[str, Any]]:
+        if user_id is not None:
+            games = self._connection.execute(
+                """
+                SELECT g.game_id, g.date, g.topic_slug, g.difficulty,
+                       dp.solution, g.started_at, g.ended_at,
+                       g.result, g.questions_asked
+                FROM games g
+                JOIN daily_puzzles dp
+                    ON g.date = dp.date
+                    AND g.topic_slug = dp.topic_slug
+                    AND g.difficulty = dp.difficulty
+                WHERE g.user_id = ?
+                ORDER BY g.started_at DESC
+                """,
+                (user_id,),
+            ).fetchall()
+        else:
+            games = self._connection.execute(
+                """
+                SELECT g.game_id, g.date, g.topic_slug, g.difficulty,
+                       dp.solution, g.started_at, g.ended_at,
+                       g.result, g.questions_asked
+                FROM games g
+                JOIN daily_puzzles dp
+                    ON g.date = dp.date
+                    AND g.topic_slug = dp.topic_slug
+                    AND g.difficulty = dp.difficulty
+                ORDER BY g.started_at DESC
+                """
+            ).fetchall()
 
         result = []
         for game in games:
@@ -330,6 +369,140 @@ class GameDatabase:
         if row is None:
             return None
         return row["name"]
+
+    # -- Migrations (accounts) --
+
+    def _migrate_add_user_id_to_games(self) -> None:
+        columns = [
+            row["name"]
+            for row in self._connection.execute("PRAGMA table_info(games)")
+        ]
+        if "user_id" not in columns:
+            self._connection.execute(
+                "ALTER TABLE games ADD COLUMN user_id INTEGER"
+            )
+            self._connection.commit()
+
+    def _migrate_invites_multi_use(self) -> None:
+        columns = [
+            row["name"]
+            for row in self._connection.execute("PRAGMA table_info(invites)")
+        ]
+        if "remaining_uses" in columns:
+            return
+        # Old schema had used_at/used_by; new schema has alias/remaining_uses.
+        self._connection.executescript("""
+            ALTER TABLE invites RENAME TO invites_old;
+
+            CREATE TABLE invites (
+                code            TEXT PRIMARY KEY,
+                alias           TEXT,
+                remaining_uses  INTEGER NOT NULL DEFAULT 1,
+                created_at      TEXT NOT NULL
+            );
+
+            INSERT INTO invites (code, remaining_uses, created_at)
+                SELECT code, CASE WHEN used_at IS NOT NULL THEN 0 ELSE 1 END, created_at
+                FROM invites_old;
+
+            DROP TABLE invites_old;
+        """)
+        self._connection.commit()
+
+    def _migrate_add_invite_code_to_accounts(self) -> None:
+        columns = [
+            row["name"]
+            for row in self._connection.execute("PRAGMA table_info(accounts)")
+        ]
+        if "invite_code" not in columns:
+            self._connection.execute(
+                "ALTER TABLE accounts ADD COLUMN invite_code TEXT"
+            )
+            self._connection.commit()
+
+    # -- Accounts --
+
+    @staticmethod
+    def _hash_password(password: str) -> str:
+        salt = secrets.token_hex(16)
+        digest = hashlib.sha256((salt + password).encode()).hexdigest()
+        return f"{salt}:{digest}"
+
+    @staticmethod
+    def _verify_password(password: str, password_hash: str) -> bool:
+        salt, digest = password_hash.split(":", 1)
+        return hashlib.sha256((salt + password).encode()).hexdigest() == digest
+
+    def create_account(
+        self, username: str, password: str, invite_code: Optional[str] = None,
+    ) -> int:
+        now = _utcnow_iso()
+        password_hash = self._hash_password(password)
+        cursor = self._connection.execute(
+            "INSERT INTO accounts (username, password_hash, invite_code, created_at) "
+            "VALUES (?, ?, ?, ?)",
+            (username, password_hash, invite_code, now),
+        )
+        self._connection.commit()
+        assert cursor.lastrowid is not None
+        return cursor.lastrowid
+
+    def get_account_by_username(self, username: str) -> Optional[dict[str, Any]]:
+        row = self._connection.execute(
+            "SELECT user_id, username, password_hash, created_at FROM accounts WHERE username = ?",
+            (username,),
+        ).fetchone()
+        if row is None:
+            return None
+        return dict(row)
+
+    def get_account_by_id(self, user_id: int) -> Optional[dict[str, Any]]:
+        row = self._connection.execute(
+            "SELECT user_id, username, invite_code, created_at FROM accounts WHERE user_id = ?",
+            (user_id,),
+        ).fetchone()
+        if row is None:
+            return None
+        return dict(row)
+
+    def authenticate(self, username: str, password: str) -> Optional[int]:
+        """Return user_id if credentials are valid, else None."""
+        account = self.get_account_by_username(username)
+        if account is None:
+            return None
+        if not self._verify_password(password, account["password_hash"]):
+            return None
+        return account["user_id"]
+
+    # -- Invites --
+
+    def create_invite(
+        self, alias: Optional[str] = None, uses: int = 1,
+    ) -> str:
+        code = secrets.token_hex(4).upper()
+        now = _utcnow_iso()
+        self._connection.execute(
+            "INSERT INTO invites (code, alias, remaining_uses, created_at) VALUES (?, ?, ?, ?)",
+            (code, alias, uses, now),
+        )
+        self._connection.commit()
+        return code
+
+    def consume_invite(self, code: str) -> bool:
+        """Decrement remaining uses. Returns True if the code was valid and had uses left."""
+        row = self._connection.execute(
+            "SELECT remaining_uses FROM invites WHERE code = ?", (code,)
+        ).fetchone()
+        if row is None:
+            return False
+        if row["remaining_uses"] <= 0:
+            return False
+        self._connection.execute(
+            "UPDATE invites SET remaining_uses = remaining_uses - 1 WHERE code = ?",
+            (code,),
+        )
+        self._connection.commit()
+        return True
 
     def close(self) -> None:
         self._connection.close()

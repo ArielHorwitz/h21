@@ -1,0 +1,4 @@
+title = "Registered accounts with invite codes, replacing PoW"
+status = "open"
+created = "2026-06-30T13:27:00.415796"
+keywords = ["auth", "accounts", "invites", "login", "registration", "pow-removal"]

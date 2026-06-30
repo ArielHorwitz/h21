@@ -12,6 +12,7 @@ dependencies = [
 [project.scripts]
 h21 = "h21.main:cli"
 h21-reset = "h21.reset:main"
+h21-invite = "h21.invite:main"
 
 [build-system]
 requires = ["hatchling"]

@@ -4,7 +4,7 @@
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='15' fill='%231a1a2e'/><text x='50' y='76' font-size='80' font-weight='bold' font-family='sans-serif' fill='%23e2b714' text-anchor='middle'>H</text></svg>">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>H21 — Help</title>
+  <title>H21 — Account</title>
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
@@ -15,21 +15,19 @@
   </nav>
   <main>
     <h1><a href="/" class="home-link">H21</a></h1>
-    <p class="subtitle">How to Play</p>
+    <p class="subtitle">Account</p>
 
-    <div id="help-body"></div>
-
-    <div class="settings-actions">
-      <button type="button" id="back-btn" class="secondary-btn">Back</button>
+    <div id="account-info" class="auth-section">
+      <div class="settings-field">
+        <label>Username</label>
+        <p id="account-username" class="account-value"></p>
+      </div>
+      <div class="settings-actions">
+        <button type="button" id="logout-btn">Log out</button>
+        <button type="button" id="back-btn" class="secondary-btn">Back</button>
+      </div>
     </div>
   </main>
-  <script>
-    fetch("/static/help-content.html")
-      .then(response => response.text())
-      .then(html => { document.getElementById("help-body").innerHTML = html; });
-    document.getElementById("back-btn").addEventListener("click", () => {
-      if (history.length > 1) { history.back(); } else { location.href = "/"; }
-    });
-  </script>
+  <script src="/static/account.js"></script>
 </body>
 </html>

@@ -3,11 +3,8 @@ const requestForm = document.getElementById("request-topic-form");
 const topicNameInput = document.getElementById("topic-name-input");
 const requestTopicBtn = document.getElementById("request-topic-btn");
 const requestStatus = document.getElementById("request-topic-status");
-const passwordBanner = document.getElementById("password-banner");
 
 const DIFFICULTIES = ["easy", "medium", "hard"];
-
-let passwordValid = false;
 
 function renderTopics(topics) {
   topicsList.innerHTML = "";
@@ -29,10 +26,6 @@ function renderTopics(topics) {
       link.className = `difficulty-btn ${difficulty}`;
       link.textContent = difficulty.charAt(0).toUpperCase() + difficulty.slice(1);
       link.href = `/game?topic=${encodeURIComponent(topic.slug)}&difficulty=${difficulty}`;
-      if (!passwordValid) {
-        link.classList.add("disabled");
-        link.addEventListener("click", (event) => event.preventDefault());
-      }
       buttons.appendChild(link);
     }
 
@@ -55,8 +48,6 @@ async function loadTopics() {
 
 requestForm.addEventListener("submit", async (event) => {
   event.preventDefault();
-
-  if (!passwordValid) return;
 
   const name = topicNameInput.value.trim();
   if (!name) return;
@@ -93,37 +84,4 @@ requestForm.addEventListener("submit", async (event) => {
   }
 });
 
-async function checkPassword() {
-  const password = localStorage.getItem("bypass-password") || "";
-  try {
-    const response = await fetch("/api/validate-password", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ password }),
-    });
-    if (response.ok) {
-      const data = await response.json();
-      if (!data.required) {
-        // No bypass password configured on server; no gating needed.
-        passwordValid = true;
-        return;
-      }
-      passwordValid = data.valid;
-    }
-  } catch (error) {
-    passwordValid = false;
-  }
-
-  if (!passwordValid) {
-    passwordBanner.hidden = false;
-    requestTopicBtn.disabled = true;
-    topicNameInput.disabled = true;
-  }
-}
-
-async function init() {
-  await checkPassword();
-  await loadTopics();
-}
-
-init();
+loadTopics();

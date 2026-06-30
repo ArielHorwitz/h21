@@ -5,7 +5,7 @@ const questionInput = document.getElementById("question-input");
 const submitBtn = document.getElementById("submit-btn");
 const askForm = document.getElementById("ask-form");
 const questionCounter = document.getElementById("question-counter");
-const powStatus = document.getElementById("pow-status");
+const statusText = document.getElementById("status-text");
 const gameOverMessage = document.getElementById("game-over-message");
 const todayDate = document.getElementById("today-date");
 const gameSubtitle = document.getElementById("game-subtitle");
@@ -22,19 +22,16 @@ if (!urlParams.has("topic")) {
   window.location.href = "/";
 }
 
-const passwordBanner = document.getElementById("password-banner");
-
 const HINTS_TOTAL = 5;
 const QUESTIONS_PER_HINT = 4;
 
 let questionsAsked = 0;
 let gameFinished = false;
 let gameId = null;
-let passwordValid = false;
 const answerHistory = [];
-let hintsUnlocked = 0;   // How many hints the player is eligible to see
-let hintsRevealed = 0;    // How many hints the player has actually clicked to reveal
-const revealedHintIndices = new Set(); // Track which hint indices were revealed (for share)
+let hintsUnlocked = 0;
+let hintsRevealed = 0;
+const revealedHintIndices = new Set();
 
 // Display topic and difficulty in the subtitle.
 const difficultyLabel = difficulty.charAt(0).toUpperCase() + difficulty.slice(1);
@@ -63,12 +60,12 @@ async function startGameSession() {
       gameId = data.game_id;
     } else {
       const error = await response.json().catch(() => ({}));
-      powStatus.textContent = error.detail || "Failed to start game session.";
-      powStatus.classList.add("error");
+      statusText.textContent = error.detail || "Failed to start game session.";
+      statusText.classList.add("error");
     }
   } catch (error) {
-    powStatus.textContent = "Network error — could not start game.";
-    powStatus.classList.add("error");
+    statusText.textContent = "Network error — could not start game.";
+    statusText.classList.add("error");
   }
 }
 
@@ -157,12 +154,10 @@ function updateHintPanel() {
   if (newUnlocked <= hintsUnlocked) return;
   hintsUnlocked = newUnlocked;
 
-  // Show the panel once at least one hint is available
   if (hintsUnlocked > 0) {
     hintPanel.hidden = false;
   }
 
-  // Add new locked hint items up to hintsUnlocked
   while (hintList.children.length < hintsUnlocked) {
     const index = hintList.children.length;
     const li = document.createElement("li");
@@ -172,7 +167,6 @@ function updateHintPanel() {
     const revealBtn = document.createElement("button");
     revealBtn.className = "hint-reveal-btn";
     revealBtn.textContent = `Reveal hint ${index + 1}`;
-    // Only allow revealing sequentially
     if (index > hintsRevealed) {
       revealBtn.disabled = true;
     }
@@ -218,7 +212,6 @@ async function fetchAndRevealHint(hintIndex) {
     hintsRevealed++;
     revealedHintIndices.add(hintIndex);
 
-    // Enable the next hint button if it exists
     if (hintList.children.length > hintsRevealed) {
       const nextBtn = hintList.children[hintsRevealed].querySelector(".hint-reveal-btn");
       if (nextBtn) nextBtn.disabled = false;
@@ -242,7 +235,6 @@ function buildShareText(won) {
   let emojis = "";
   for (let question_index = 0; question_index < answerHistory.length; question_index++) {
     emojis += ANSWER_EMOJI[answerHistory[question_index]] || "";
-    // Insert hint emoji after every QUESTIONS_PER_HINT answers if that hint was revealed
     const questionNumber = question_index + 1;
     if (questionNumber % QUESTIONS_PER_HINT === 0) {
       const hintIndex = questionNumber / QUESTIONS_PER_HINT - 1;
@@ -315,71 +307,25 @@ function endGame(won) {
   endGameSession(won ? "win" : "loss");
 }
 
-async function solveProofOfWork(challenge, difficulty) {
-  return new Promise((resolve, reject) => {
-    const worker = new Worker("/static/pow-worker.js");
-    worker.onmessage = (event) => {
-      worker.terminate();
-      resolve(event.data.nonce);
-    };
-    worker.onerror = (error) => {
-      worker.terminate();
-      reject(error);
-    };
-    worker.postMessage({ challenge, difficulty });
-  });
-}
-
 async function submitQuestion(question) {
-  const password = localStorage.getItem("bypass-password") || "";
-  let body;
+  statusText.textContent = "Thinking...";
 
-  if (password) {
-    // Bypass PoW with password.
-    powStatus.textContent = "Thinking...";
-    body = {
-      question: question,
-      password: password,
-      game_id: gameId,
-      question_number: questionsAsked + 1,
-    };
-  } else {
-    // Get a PoW challenge.
-    powStatus.textContent = "Getting challenge...";
-    const challengeResponse = await fetch("/api/challenge");
-    if (!challengeResponse.ok) {
-      throw new Error("Failed to get challenge");
-    }
-    const { challenge_id, challenge, difficulty: powDifficulty } =
-      await challengeResponse.json();
-
-    // Solve the PoW.
-    powStatus.textContent = "Computing proof of work...";
-    const nonce = await solveProofOfWork(challenge, powDifficulty);
-
-    powStatus.textContent = "Thinking...";
-    body = {
-      question: question,
-      challenge_id: challenge_id,
-      nonce: nonce,
-      game_id: gameId,
-      question_number: questionsAsked + 1,
-    };
-  }
-
-  // Submit the question.
-  const askResponse = await fetch("/api/ask", {
+  const response = await fetch("/api/ask", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+    body: JSON.stringify({
+      question,
+      game_id: gameId,
+      question_number: questionsAsked + 1,
+    }),
   });
 
-  if (!askResponse.ok) {
-    const error = await askResponse.json().catch(() => ({}));
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
     throw new Error(error.detail || "Request failed");
   }
 
-  return await askResponse.json();
+  return await response.json();
 }
 
 askForm.addEventListener("submit", async (event) => {
@@ -392,7 +338,7 @@ askForm.addEventListener("submit", async (event) => {
 
   questionInput.value = "";
   submitBtn.disabled = true;
-  powStatus.classList.remove("error");
+  statusText.classList.remove("error");
 
   try {
     const { answer, explanation } = await submitQuestion(question);
@@ -409,60 +355,30 @@ askForm.addEventListener("submit", async (event) => {
       updateHintPanel();
     }
   } catch (error) {
-    powStatus.textContent = error.message;
-    powStatus.classList.add("error");
+    statusText.textContent = error.message;
+    statusText.classList.add("error");
   } finally {
     if (!gameFinished) {
       submitBtn.disabled = false;
       questionInput.focus();
-      if (!powStatus.classList.contains("error")) {
-        powStatus.textContent = "";
+      if (!statusText.classList.contains("error")) {
+        statusText.textContent = "";
       }
     }
   }
 });
 
-async function checkPassword() {
-  const password = localStorage.getItem("bypass-password") || "";
-  try {
-    const response = await fetch("/api/validate-password", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ password }),
-    });
-    if (response.ok) {
-      const data = await response.json();
-      if (!data.required) {
-        passwordValid = true;
-        return;
-      }
-      passwordValid = data.valid;
-    }
-  } catch (error) {
-    passwordValid = false;
-  }
-
-  if (!passwordValid) {
-    passwordBanner.hidden = false;
-    submitBtn.disabled = true;
-    questionInput.disabled = true;
-  }
-}
-
 async function init() {
   updateCounter();
+  statusText.textContent = "Generating today's game...";
   submitBtn.disabled = true;
   questionInput.disabled = true;
-  await checkPassword();
-  if (passwordValid) {
-    powStatus.textContent = "Generating today's game...";
-    await startGameSession();
-    if (gameId !== null) {
-      powStatus.textContent = "";
-      submitBtn.disabled = false;
-      questionInput.disabled = false;
-      questionInput.focus();
-    }
+  await startGameSession();
+  if (gameId !== null) {
+    statusText.textContent = "";
+    submitBtn.disabled = false;
+    questionInput.disabled = false;
+    questionInput.focus();
   }
 }
 

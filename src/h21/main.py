@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import hmac
 import logging
 import logging.handlers
+import sqlite3
 from contextlib import asynccontextmanager
 from datetime import date
 from pathlib import Path
@@ -11,14 +11,19 @@ from typing import Any, AsyncIterator, Optional
 logger = logging.getLogger("h21")
 
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
-from h21.config import load_config
+from h21.auth import (
+    _ensure_signing_secret,
+    clear_session_cookie,
+    get_session_user_id,
+    set_session_cookie,
+)
+from h21.config import load_config, _data_dir
 from h21.db import GameDatabase, VALID_DIFFICULTIES, slugify
 from h21.llm import (
-    AnswerResult,
     LLMError,
     OpenAIClient,
     ask_question,
@@ -26,16 +31,16 @@ from h21.llm import (
     generate_solution,
     normalize_topic,
 )
-from h21.pow import ProofOfWork
 
 STATIC_DIR = Path(__file__).resolve().parent.parent.parent / "static"
+
+# Routes that don't require authentication.
+PUBLIC_PATHS = frozenset({"/login", "/api/login", "/api/register"})
+PUBLIC_PREFIXES = ("/static/",)
 
 
 class AskRequest(BaseModel):
     question: str
-    challenge_id: Optional[str] = None
-    nonce: Optional[str] = None
-    password: Optional[str] = None
     game_id: Optional[int] = None
     question_number: Optional[int] = None
 
@@ -54,17 +59,27 @@ class NewTopicRequest(BaseModel):
     name: str
 
 
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+
+class RegisterRequest(BaseModel):
+    username: str
+    password: str
+    invite_code: str
+
+
 # -- app state populated during lifespan --
 
 llm_client: OpenAIClient
-proof_of_work: ProofOfWork
 database: GameDatabase
-bypass_password: Optional[str]
+signing_secret: str
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
-    global llm_client, proof_of_work, database, bypass_password
+    global llm_client, database, signing_secret
 
     config = load_config()
 
@@ -87,9 +102,8 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
 
     logger.info("Logging to %s", config.log_path)
     llm_client = OpenAIClient(config.openai_api_key, model=config.model)
-    proof_of_work = ProofOfWork(difficulty=config.pow_difficulty)
     database = GameDatabase(config.db_path)
-    bypass_password = config.bypass_password
+    signing_secret = _ensure_signing_secret(_data_dir())
     database.ensure_schema()
     yield
     database.close()
@@ -106,6 +120,22 @@ async def no_cache_static(request: Request, call_next):
     if path.startswith("/static/") or not path.startswith("/api/"):
         response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     return response
+
+
+@app.middleware("http")
+async def require_auth(request: Request, call_next):
+    path = request.url.path
+    if path in PUBLIC_PATHS or any(path.startswith(prefix) for prefix in PUBLIC_PREFIXES):
+        return await call_next(request)
+
+    user_id = get_session_user_id(request, signing_secret)
+    if user_id is None:
+        if path.startswith("/api/"):
+            return JSONResponse({"detail": "Not authenticated"}, status_code=401)
+        return RedirectResponse("/login", status_code=302)
+
+    request.state.user_id = user_id
+    return await call_next(request)
 
 
 async def get_today_solution(topic_slug: str, difficulty: str) -> str:
@@ -157,6 +187,8 @@ async def ensure_hints_exist(
     database.update_puzzle_hints(puzzle_date, topic_slug, difficulty, hints)
 
 
+# -- Page routes --
+
 @app.get("/")
 async def home() -> FileResponse:
     return FileResponse(STATIC_DIR / "home.html")
@@ -167,9 +199,9 @@ async def game_page() -> FileResponse:
     return FileResponse(STATIC_DIR / "index.html")
 
 
-@app.get("/settings")
-async def settings_page() -> FileResponse:
-    return FileResponse(STATIC_DIR / "settings.html")
+@app.get("/account")
+async def account_page() -> FileResponse:
+    return FileResponse(STATIC_DIR / "account.html")
 
 
 @app.get("/help")
@@ -177,14 +209,76 @@ async def help_page() -> FileResponse:
     return FileResponse(STATIC_DIR / "help.html")
 
 
+@app.get("/login")
+async def login_page() -> FileResponse:
+    return FileResponse(STATIC_DIR / "login.html")
+
+
+# -- Auth endpoints --
+
+@app.post("/api/register")
+async def register(request_body: RegisterRequest) -> JSONResponse:
+    username = request_body.username.strip()
+    password = request_body.password
+
+    if not username or len(username) > 40:
+        raise HTTPException(status_code=400, detail="Username must be 1-40 characters")
+    if len(password) < 4:
+        raise HTTPException(status_code=400, detail="Password must be at least 4 characters")
+
+    invite_code = request_body.invite_code.strip().upper()
+
+    if not database.consume_invite(invite_code):
+        raise HTTPException(status_code=400, detail="Invalid or exhausted invite code")
+
+    try:
+        user_id = database.create_account(username, password, invite_code=invite_code)
+    except sqlite3.IntegrityError:
+        raise HTTPException(status_code=409, detail="Username already taken")
+
+    response = JSONResponse({"user_id": user_id, "username": username})
+    set_session_cookie(response, user_id, signing_secret)
+    return response
+
+
+@app.post("/api/login")
+async def login(request_body: LoginRequest) -> JSONResponse:
+    username = request_body.username.strip()
+    user_id = database.authenticate(username, request_body.password)
+    if user_id is None:
+        raise HTTPException(status_code=401, detail="Invalid username or password")
+
+    response = JSONResponse({"user_id": user_id, "username": username})
+    set_session_cookie(response, user_id, signing_secret)
+    return response
+
+
+@app.post("/api/logout")
+async def logout() -> JSONResponse:
+    response = JSONResponse({"status": "ok"})
+    clear_session_cookie(response)
+    return response
+
+
+@app.get("/api/me")
+async def get_me(request: Request) -> dict[str, Any]:
+    user_id = request.state.user_id
+    account = database.get_account_by_id(user_id)
+    if account is None:
+        raise HTTPException(status_code=404, detail="Account not found")
+    return {"user_id": account["user_id"], "username": account["username"]}
+
+
+# -- Topic endpoints --
+
 @app.get("/api/topics")
 async def get_topics() -> list[dict[str, str]]:
     return database.get_all_topics()
 
 
 @app.post("/api/topics")
-async def create_topic(request: NewTopicRequest) -> dict[str, str]:
-    raw_name = request.name.strip()
+async def create_topic(request_body: NewTopicRequest) -> dict[str, str]:
+    raw_name = request_body.name.strip()
     if not raw_name or len(raw_name) > 100:
         raise HTTPException(
             status_code=400, detail="Topic name must be 1-100 characters"
@@ -206,60 +300,35 @@ async def create_topic(request: NewTopicRequest) -> dict[str, str]:
     return {"slug": slug, "name": name}
 
 
-@app.get("/api/pow-bypass-available")
-async def pow_bypass_available() -> dict[str, bool]:
-    return {"available": bypass_password is not None}
-
-
-class ValidatePasswordRequest(BaseModel):
-    password: str
-
-
-@app.post("/api/validate-password")
-async def validate_password(request: ValidatePasswordRequest) -> dict[str, bool]:
-    """Check whether the given password matches the configured bypass password."""
-    if bypass_password is None:
-        return {"valid": False, "required": False}
-    valid = hmac.compare_digest(request.password, bypass_password)
-    return {"valid": valid, "required": True}
-
-
-@app.get("/api/challenge")
-async def get_challenge() -> dict[str, str | int]:
-    challenge_id, challenge = proof_of_work.generate_challenge()
-    return {
-        "challenge_id": challenge_id,
-        "challenge": challenge,
-        "difficulty": proof_of_work.difficulty,
-    }
-
+# -- Game endpoints --
 
 @app.post("/api/game/new")
-async def new_game(request: NewGameRequest) -> dict[str, int]:
-    if request.difficulty not in VALID_DIFFICULTIES:
+async def new_game(request_body: NewGameRequest, request: Request) -> dict[str, int]:
+    if request_body.difficulty not in VALID_DIFFICULTIES:
         raise HTTPException(
             status_code=400,
             detail=f"Difficulty must be one of: {', '.join(sorted(VALID_DIFFICULTIES))}",
         )
-    if not database.topic_exists(request.topic_slug):
+    if not database.topic_exists(request_body.topic_slug):
         raise HTTPException(status_code=404, detail="Topic not found")
 
-    await get_today_solution(request.topic_slug, request.difficulty)
+    await get_today_solution(request_body.topic_slug, request_body.difficulty)
     today = date.today()
-    game_id = database.create_game(today, request.topic_slug, request.difficulty)
+    user_id = request.state.user_id
+    game_id = database.create_game(today, request_body.topic_slug, request_body.difficulty, user_id=user_id)
     return {"game_id": game_id}
 
 
 @app.post("/api/game/end")
-async def end_game(request: EndGameRequest) -> dict[str, str]:
-    if request.result not in ("win", "loss"):
+async def end_game(request_body: EndGameRequest) -> dict[str, str]:
+    if request_body.result not in ("win", "loss"):
         raise HTTPException(status_code=400, detail="Result must be 'win' or 'loss'")
 
-    game = database.get_game(request.game_id)
+    game = database.get_game(request_body.game_id)
     if game is None:
         raise HTTPException(status_code=404, detail="Game not found")
 
-    database.end_game(request.game_id, request.result)
+    database.end_game(request_body.game_id, request_body.result)
 
     solution = database.get_puzzle_solution(
         date.today(), game["topic_slug"], game["difficulty"],
@@ -268,27 +337,16 @@ async def end_game(request: EndGameRequest) -> dict[str, str]:
 
 
 @app.post("/api/ask")
-async def ask(request: AskRequest) -> dict[str, str]:
-    password_valid = (
-        bypass_password is not None
-        and request.password is not None
-        and hmac.compare_digest(request.password, bypass_password)
-    )
-    if not password_valid:
-        if not request.challenge_id or not request.nonce:
-            raise HTTPException(status_code=403, detail="Proof of work required")
-        if not proof_of_work.verify(request.challenge_id, request.nonce):
-            raise HTTPException(status_code=403, detail="Invalid proof of work")
-
-    question = request.question.strip()
+async def ask(request_body: AskRequest) -> dict[str, str]:
+    question = request_body.question.strip()
     if not question or len(question) > 500:
         raise HTTPException(status_code=400, detail="Question must be 1-500 characters")
 
     # Look up topic + difficulty from the game session.
     topic_slug = "western-history"
     difficulty = "medium"
-    if request.game_id is not None:
-        game = database.get_game(request.game_id)
+    if request_body.game_id is not None:
+        game = database.get_game(request_body.game_id)
         if game is not None:
             topic_slug = game["topic_slug"]
             difficulty = game["difficulty"]
@@ -309,12 +367,12 @@ async def ask(request: AskRequest) -> dict[str, str]:
         )
 
     # Record the Q&A if a game session is active.
-    if request.game_id is not None and request.question_number is not None:
-        game = database.get_game(request.game_id)
+    if request_body.game_id is not None and request_body.question_number is not None:
+        game = database.get_game(request_body.game_id)
         if game is not None:
             database.record_question(
-                request.game_id,
-                request.question_number,
+                request_body.game_id,
+                request_body.question_number,
                 question,
                 result.answer,
                 result.explanation,
@@ -329,15 +387,15 @@ class HintRequest(BaseModel):
 
 
 @app.post("/api/hint")
-async def get_hint(request: HintRequest) -> dict[str, Any]:
-    if request.hint_index < 0 or request.hint_index > 4:
+async def get_hint(request_body: HintRequest) -> dict[str, Any]:
+    if request_body.hint_index < 0 or request_body.hint_index > 4:
         raise HTTPException(status_code=400, detail="hint_index must be 0-4")
 
-    game = database.get_game(request.game_id)
+    game = database.get_game(request_body.game_id)
     if game is None:
         raise HTTPException(status_code=404, detail="Game not found")
 
-    required_questions = (request.hint_index + 1) * 4
+    required_questions = (request_body.hint_index + 1) * 4
     if game["questions_asked"] < required_questions:
         raise HTTPException(
             status_code=403,
@@ -346,15 +404,16 @@ async def get_hint(request: HintRequest) -> dict[str, Any]:
 
     today = date.today()
     hints = database.get_puzzle_hints(today, game["topic_slug"], game["difficulty"])
-    if request.hint_index >= len(hints):
+    if request_body.hint_index >= len(hints):
         raise HTTPException(status_code=404, detail="Hint not available")
 
-    return {"hint": hints[request.hint_index], "hint_index": request.hint_index}
+    return {"hint": hints[request_body.hint_index], "hint_index": request_body.hint_index}
 
 
 @app.get("/api/history")
-async def get_history() -> list[dict]:
-    return database.get_history()
+async def get_history(request: Request) -> list[dict]:
+    user_id = request.state.user_id
+    return database.get_history(user_id=user_id)
 
 
 def cli() -> None:

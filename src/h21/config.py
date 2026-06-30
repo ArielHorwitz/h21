@@ -4,8 +4,6 @@ import os
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
-
 APP_NAME = "h21"
 
 
@@ -25,12 +23,10 @@ def _data_dir() -> Path:
 
 @dataclass(frozen=True)
 class Config:
-    pow_difficulty: int
     openai_api_key: str
     model: str
     db_path: Path
     log_path: Path
-    bypass_password: Optional[str]
 
 
 def load_config() -> Config:
@@ -39,8 +35,6 @@ def load_config() -> Config:
         raw = tomllib.loads(config_path.read_text())
     else:
         raw = {}
-
-    pow_difficulty = int(raw.get("pow_difficulty", 20))
 
     openai_api_key = os.environ.get(
         "OPENAI_API_KEY", raw.get("openai_api_key", "")
@@ -57,13 +51,9 @@ def load_config() -> Config:
 
     model = raw.get("model", "gpt-4o")
 
-    bypass_password = raw.get("bypass_password") or None
-
     return Config(
-        pow_difficulty=pow_difficulty,
         openai_api_key=openai_api_key,
         model=model,
         db_path=db_path,
         log_path=data_dir / "h21.log",
-        bypass_password=bypass_password,
     )
