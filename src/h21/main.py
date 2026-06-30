@@ -271,6 +271,18 @@ async def get_history() -> list[dict]:
 
 
 def cli() -> None:
+    import argparse
+
     import uvicorn
 
-    uvicorn.run(app, host="127.0.0.1", port=8000)
+    parser = argparse.ArgumentParser(description="Run the h21 server")
+    parser.add_argument("--public", action="store_true",
+                        help="Listen on 0.0.0.0:80 (overridden by --host/--port)")
+    parser.add_argument("--host", default=None)
+    parser.add_argument("--port", type=int, default=None)
+    args = parser.parse_args()
+
+    host = args.host or ("0.0.0.0" if args.public else "127.0.0.1")
+    port = args.port or (80 if args.public else 8000)
+
+    uvicorn.run(app, host=host, port=port)
