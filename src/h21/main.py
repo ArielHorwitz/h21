@@ -170,6 +170,19 @@ async def pow_bypass_available() -> dict[str, bool]:
     return {"available": bypass_password is not None}
 
 
+class ValidatePasswordRequest(BaseModel):
+    password: str
+
+
+@app.post("/api/validate-password")
+async def validate_password(request: ValidatePasswordRequest) -> dict[str, bool]:
+    """Check whether the given password matches the configured bypass password."""
+    if bypass_password is None:
+        return {"valid": False, "required": False}
+    valid = hmac.compare_digest(request.password, bypass_password)
+    return {"valid": valid, "required": True}
+
+
 @app.get("/api/challenge")
 async def get_challenge() -> dict[str, str | int]:
     challenge_id, challenge = proof_of_work.generate_challenge()

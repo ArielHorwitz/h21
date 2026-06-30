@@ -20,9 +20,12 @@ if (!urlParams.has("topic")) {
   window.location.href = "/";
 }
 
+const passwordBanner = document.getElementById("password-banner");
+
 let questionsAsked = 0;
 let gameFinished = false;
 let gameId = null;
+let passwordValid = false;
 
 // Display topic and difficulty in the subtitle.
 const difficultyLabel = difficulty.charAt(0).toUpperCase() + difficulty.slice(1);
@@ -252,5 +255,39 @@ askForm.addEventListener("submit", async (event) => {
   }
 });
 
-updateCounter();
-startGameSession();
+async function checkPassword() {
+  const password = localStorage.getItem("bypass-password") || "";
+  try {
+    const response = await fetch("/api/validate-password", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password }),
+    });
+    if (response.ok) {
+      const data = await response.json();
+      if (!data.required) {
+        passwordValid = true;
+        return;
+      }
+      passwordValid = data.valid;
+    }
+  } catch (error) {
+    passwordValid = false;
+  }
+
+  if (!passwordValid) {
+    passwordBanner.hidden = false;
+    submitBtn.disabled = true;
+    questionInput.disabled = true;
+  }
+}
+
+async function init() {
+  updateCounter();
+  await checkPassword();
+  if (passwordValid) {
+    await startGameSession();
+  }
+}
+
+init();

@@ -49,6 +49,37 @@ h1 a.home-link:hover {
   margin-bottom: 1.5rem;
 }
 
+/* -- Password banner -- */
+
+.password-banner {
+  background: #3a2a1b;
+  border: 1px solid #ff9800;
+  color: #ffcc80;
+  text-align: center;
+  padding: 0.6rem 1rem;
+  font-size: 0.9rem;
+  border-radius: 4px;
+  margin-bottom: 1rem;
+}
+
+.password-banner a {
+  color: #e2b714;
+  font-weight: bold;
+  text-decoration: underline;
+}
+
+.password-banner a:hover {
+  color: #fff;
+}
+
+/* -- Disabled links -- */
+
+.difficulty-btn.disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
 /* -- Home page -- */
 
 .home-intro {

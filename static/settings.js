@@ -53,7 +53,12 @@ settingsForm.addEventListener("submit", (event) => {
 });
 
 document.getElementById("back-btn").addEventListener("click", () => {
-  history.back();
+  if (document.referrer && new URL(document.referrer).origin === location.origin) {
+    // Force a fresh load of the previous page so password state is re-checked.
+    window.location.href = document.referrer;
+  } else {
+    window.location.href = "/";
+  }
 });
 
 loadSettings();
