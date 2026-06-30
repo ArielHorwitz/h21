@@ -488,3 +488,85 @@ h1 a.home-link:hover {
 #save-status {
   font-size: 0.9rem;
 }
+
+/* -- Help page -- */
+
+.help-link {
+  position: fixed;
+  top: 0.75rem;
+  right: 2.75rem;
+  color: #555;
+  font-size: 1.4rem;
+  text-decoration: none;
+  line-height: 1;
+  transition: color 0.15s;
+}
+
+.help-link:hover {
+  color: #e2b714;
+}
+
+.help-section {
+  margin-top: 1.5rem;
+}
+
+.help-section h2 {
+  font-size: 1.1rem;
+  color: #e2b714;
+  margin-bottom: 0.5rem;
+}
+
+.help-section p {
+  color: #ccc;
+  line-height: 1.6;
+  margin-bottom: 0.5rem;
+}
+
+.help-section ol,
+.help-section ul {
+  padding-left: 1.25rem;
+  color: #ccc;
+  line-height: 1.6;
+}
+
+.help-section li {
+  margin-bottom: 0.4rem;
+}
+
+.help-section a {
+  color: #e2b714;
+  text-decoration: underline;
+}
+
+.help-section a:hover {
+  color: #fff;
+}
+
+.answer-legend {
+  list-style: none;
+  padding-left: 0.5rem;
+  margin-top: 0.4rem;
+}
+
+.answer-legend li {
+  margin-bottom: 0.3rem;
+}
+
+.answer-tag {
+  display: inline-block;
+  font-weight: bold;
+  font-size: 0.85rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 3px;
+  margin-right: 0.3rem;
+}
+
+.answer-tag.yes { color: #4caf50; }
+.answer-tag.no { color: #f44336; }
+.answer-tag.partially { color: #ff9800; }
+.answer-tag.depends { color: #2196f3; }
+.answer-tag.win { color: #e2b714; }
+
+.emoji-example {
+  margin-right: 0.4rem;
+}

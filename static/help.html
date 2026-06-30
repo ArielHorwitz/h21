@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>H21 — Help</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <a href="/" class="home-icon-link" title="Home">&#8962;</a>
+  <a href="/settings" class="settings-link" title="Settings">&#9881;</a>
+  <main>
+    <h1><a href="/" class="home-link">H21</a></h1>
+    <p class="subtitle">How to Play</p>
+
+    <div id="help-body"></div>
+
+    <div class="settings-actions">
+      <button type="button" id="back-btn" class="secondary-btn">Back</button>
+    </div>
+  </main>
+  <script>
+    fetch("/static/help-content.html")
+      .then(response => response.text())
+      .then(html => { document.getElementById("help-body").innerHTML = html; });
+    document.getElementById("back-btn").addEventListener("click", () => {
+      if (history.length > 1) { history.back(); } else { location.href = "/"; }
+    });
+  </script>
+</body>
+</html>

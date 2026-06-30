@@ -136,6 +136,11 @@ async def settings_page() -> FileResponse:
     return FileResponse(STATIC_DIR / "settings.html")
 
 
+@app.get("/help")
+async def help_page() -> FileResponse:
+    return FileResponse(STATIC_DIR / "help.html")
+
+
 @app.get("/api/topics")
 async def get_topics() -> list[dict[str, str]]:
     return database.get_all_topics()
