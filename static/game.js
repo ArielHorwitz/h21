@@ -26,6 +26,7 @@ let questionsAsked = 0;
 let gameFinished = false;
 let gameId = null;
 let passwordValid = false;
+const answerHistory = [];
 
 // Display topic and difficulty in the subtitle.
 const difficultyLabel = difficulty.charAt(0).toUpperCase() + difficulty.slice(1);
@@ -140,11 +141,48 @@ function revealExplanationButtons() {
   }
 }
 
+const ANSWER_EMOJI = {
+  yes: "\u{1F7E2}",
+  no: "\u{1F534}",
+  partially: "\u{1F7E1}",
+  depends: "\u{1F535}",
+  win: "\u{1F3C6}",
+};
+
+function buildShareText(won) {
+  const dateStr = todayDate.textContent;
+  const emojis = answerHistory.map((answer) => ANSWER_EMOJI[answer] || "").join("");
+  const resultLine = won
+    ? `Won in ${questionsAsked}/${MAX_QUESTIONS} questions!`
+    : `Lost after ${questionsAsked} questions.`;
+  return `H21 \u2014 ${topicLabel} (${difficultyLabel})\n${dateStr}\n\n${resultLine}\n${emojis}`;
+}
+
+function showShareButton(won) {
+  const shareBtn = document.createElement("button");
+  shareBtn.id = "share-btn";
+  shareBtn.textContent = "Share";
+  shareBtn.addEventListener("click", async () => {
+    const text = buildShareText(won);
+    try {
+      await navigator.clipboard.writeText(text);
+      shareBtn.textContent = "Copied!";
+      setTimeout(() => { shareBtn.textContent = "Share"; }, 2000);
+    } catch {
+      shareBtn.textContent = "Failed to copy";
+      setTimeout(() => { shareBtn.textContent = "Share"; }, 2000);
+    }
+  });
+  gameOverMessage.insertAdjacentElement("afterend", shareBtn);
+}
+
 function showSolution(solution) {
   const solutionEl = document.createElement("div");
   solutionEl.id = "solution-reveal";
   solutionEl.textContent = `The answer was: ${solution}`;
-  gameOverMessage.insertAdjacentElement("afterend", solutionEl);
+  const shareBtn = document.getElementById("share-btn");
+  const anchor = shareBtn || gameOverMessage;
+  anchor.insertAdjacentElement("afterend", solutionEl);
 }
 
 function endGame(won) {
@@ -161,6 +199,7 @@ function endGame(won) {
   gameOverMessage.hidden = false;
 
   revealExplanationButtons();
+  showShareButton(won);
   endGameSession(won ? "win" : "loss");
 }
 
@@ -246,6 +285,7 @@ askForm.addEventListener("submit", async (event) => {
   try {
     const { answer, explanation } = await submitQuestion(question);
     questionsAsked++;
+    answerHistory.push(answer);
     updateCounter();
     addLogEntry(question, answer, explanation);
 
