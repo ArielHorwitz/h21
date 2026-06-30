@@ -7,8 +7,6 @@ const askForm = document.getElementById("ask-form");
 const questionCounter = document.getElementById("question-counter");
 const powStatus = document.getElementById("pow-status");
 const gameOverMessage = document.getElementById("game-over-message");
-const bypassSection = document.getElementById("bypass-section");
-const bypassPassword = document.getElementById("bypass-password");
 const todayDate = document.getElementById("today-date");
 const gameSubtitle = document.getElementById("game-subtitle");
 
@@ -166,7 +164,7 @@ async function solveProofOfWork(challenge, difficulty) {
 }
 
 async function submitQuestion(question) {
-  const password = bypassPassword.value.trim();
+  const password = localStorage.getItem("bypass-password") || "";
   let body;
 
   if (password) {
@@ -231,10 +229,6 @@ askForm.addEventListener("submit", async (event) => {
 
   try {
     const { answer, explanation } = await submitQuestion(question);
-    const currentPassword = bypassPassword.value.trim();
-    if (currentPassword) {
-      localStorage.setItem("bypass-password", currentPassword);
-    }
     questionsAsked++;
     updateCounter();
     addLogEntry(question, answer, explanation);
@@ -258,24 +252,5 @@ askForm.addEventListener("submit", async (event) => {
   }
 });
 
-async function checkBypassAvailable() {
-  try {
-    const response = await fetch("/api/pow-bypass-available");
-    if (response.ok) {
-      const data = await response.json();
-      if (data.available) {
-        bypassSection.hidden = false;
-        const savedPassword = localStorage.getItem("bypass-password");
-        if (savedPassword) {
-          bypassPassword.value = savedPassword;
-        }
-      }
-    }
-  } catch (error) {
-    // Bypass section stays hidden if the check fails.
-  }
-}
-
 updateCounter();
 startGameSession();
-checkBypassAvailable();

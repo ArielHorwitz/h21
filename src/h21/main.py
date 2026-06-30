@@ -117,6 +117,11 @@ async def game_page() -> FileResponse:
     return FileResponse(STATIC_DIR / "index.html")
 
 
+@app.get("/settings")
+async def settings_page() -> FileResponse:
+    return FileResponse(STATIC_DIR / "settings.html")
+
+
 @app.get("/api/topics")
 async def get_topics() -> list[dict[str, str]]:
     return database.get_all_topics()
