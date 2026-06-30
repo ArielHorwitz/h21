@@ -122,6 +122,9 @@ async def no_cache_static(request: Request, call_next):
     return response
 
 
+DEV_PATHS = ("/control", "/api/invites")
+
+
 @app.middleware("http")
 async def require_auth(request: Request, call_next):
     path = request.url.path
@@ -134,7 +137,21 @@ async def require_auth(request: Request, call_next):
             return JSONResponse({"detail": "Not authenticated"}, status_code=401)
         return RedirectResponse("/login", status_code=302)
 
+    account = database.get_account_by_id(user_id)
+    if account is None:
+        if path.startswith("/api/"):
+            return JSONResponse({"detail": "Not authenticated"}, status_code=401)
+        return RedirectResponse("/login", status_code=302)
+
     request.state.user_id = user_id
+    request.state.role = account["role"]
+
+    if any(path.startswith(prefix) for prefix in DEV_PATHS):
+        if account["role"] != "dev":
+            if path.startswith("/api/"):
+                return JSONResponse({"detail": "Forbidden"}, status_code=403)
+            return RedirectResponse("/", status_code=302)
+
     return await call_next(request)
 
 
@@ -209,6 +226,11 @@ async def help_page() -> FileResponse:
     return FileResponse(STATIC_DIR / "help.html")
 
 
+@app.get("/control")
+async def control_page() -> FileResponse:
+    return FileResponse(STATIC_DIR / "control.html")
+
+
 @app.get("/login")
 async def login_page() -> FileResponse:
     return FileResponse(STATIC_DIR / "login.html")
@@ -228,11 +250,12 @@ async def register(request_body: RegisterRequest) -> JSONResponse:
 
     invite_code = request_body.invite_code.strip().upper()
 
-    if not database.consume_invite(invite_code):
+    role = database.consume_invite(invite_code)
+    if role is None:
         raise HTTPException(status_code=400, detail="Invalid or exhausted invite code")
 
     try:
-        user_id = database.create_account(username, password, invite_code=invite_code)
+        user_id = database.create_account(username, password, role=role, invite_code=invite_code)
     except sqlite3.IntegrityError:
         raise HTTPException(status_code=409, detail="Username already taken")
 
@@ -266,7 +289,43 @@ async def get_me(request: Request) -> dict[str, Any]:
     account = database.get_account_by_id(user_id)
     if account is None:
         raise HTTPException(status_code=404, detail="Account not found")
-    return {"user_id": account["user_id"], "username": account["username"]}
+    return {
+        "user_id": account["user_id"],
+        "username": account["username"],
+        "role": account["role"],
+    }
+
+
+# -- Invite management (dev only, protected by middleware) --
+
+class CreateInviteRequest(BaseModel):
+    alias: Optional[str] = None
+    uses: int = 1
+    role: str = "user"
+
+
+@app.get("/api/invites")
+async def list_invites() -> list[dict[str, Any]]:
+    return database.get_all_invites()
+
+
+@app.post("/api/invites")
+async def create_invite_api(request_body: CreateInviteRequest) -> dict[str, Any]:
+    if request_body.role not in ("user", "dev"):
+        raise HTTPException(status_code=400, detail="Role must be 'user' or 'dev'")
+    if request_body.uses < 1:
+        raise HTTPException(status_code=400, detail="Uses must be at least 1")
+    alias = request_body.alias.strip() if request_body.alias else None
+    code = database.create_invite(alias=alias, uses=request_body.uses, role=request_body.role)
+    invite = database.get_invite(code)
+    return invite
+
+
+@app.delete("/api/invites/{code}")
+async def delete_invite_api(code: str) -> dict[str, str]:
+    if not database.delete_invite(code.upper()):
+        raise HTTPException(status_code=404, detail="Invite not found")
+    return {"status": "ok"}
 
 
 # -- Topic endpoints --

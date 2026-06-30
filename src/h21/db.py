@@ -72,6 +72,7 @@ class GameDatabase:
                 user_id     INTEGER PRIMARY KEY AUTOINCREMENT,
                 username    TEXT NOT NULL UNIQUE,
                 password_hash TEXT NOT NULL,
+                role        TEXT NOT NULL DEFAULT 'user',
                 invite_code TEXT,
                 created_at  TEXT NOT NULL
             );
@@ -79,6 +80,7 @@ class GameDatabase:
             CREATE TABLE IF NOT EXISTS invites (
                 code            TEXT PRIMARY KEY,
                 alias           TEXT,
+                role            TEXT NOT NULL DEFAULT 'user',
                 remaining_uses  INTEGER NOT NULL DEFAULT 1,
                 created_at      TEXT NOT NULL
             );
@@ -90,6 +92,7 @@ class GameDatabase:
         self._migrate_add_user_id_to_games()
         self._migrate_invites_multi_use()
         self._migrate_add_invite_code_to_accounts()
+        self._migrate_add_role_columns()
         self._seed_default_topic()
 
     def _seed_default_topic(self) -> None:
@@ -420,6 +423,25 @@ class GameDatabase:
             )
             self._connection.commit()
 
+    def _migrate_add_role_columns(self) -> None:
+        account_columns = [
+            row["name"]
+            for row in self._connection.execute("PRAGMA table_info(accounts)")
+        ]
+        if "role" not in account_columns:
+            self._connection.execute(
+                "ALTER TABLE accounts ADD COLUMN role TEXT NOT NULL DEFAULT 'user'"
+            )
+        invite_columns = [
+            row["name"]
+            for row in self._connection.execute("PRAGMA table_info(invites)")
+        ]
+        if "role" not in invite_columns:
+            self._connection.execute(
+                "ALTER TABLE invites ADD COLUMN role TEXT NOT NULL DEFAULT 'user'"
+            )
+        self._connection.commit()
+
     # -- Accounts --
 
     @staticmethod
@@ -434,14 +456,15 @@ class GameDatabase:
         return hashlib.sha256((salt + password).encode()).hexdigest() == digest
 
     def create_account(
-        self, username: str, password: str, invite_code: Optional[str] = None,
+        self, username: str, password: str,
+        role: str = "user", invite_code: Optional[str] = None,
     ) -> int:
         now = _utcnow_iso()
         password_hash = self._hash_password(password)
         cursor = self._connection.execute(
-            "INSERT INTO accounts (username, password_hash, invite_code, created_at) "
-            "VALUES (?, ?, ?, ?)",
-            (username, password_hash, invite_code, now),
+            "INSERT INTO accounts (username, password_hash, role, invite_code, created_at) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (username, password_hash, role, invite_code, now),
         )
         self._connection.commit()
         assert cursor.lastrowid is not None
@@ -449,7 +472,8 @@ class GameDatabase:
 
     def get_account_by_username(self, username: str) -> Optional[dict[str, Any]]:
         row = self._connection.execute(
-            "SELECT user_id, username, password_hash, created_at FROM accounts WHERE username = ?",
+            "SELECT user_id, username, password_hash, role, created_at "
+            "FROM accounts WHERE username = ?",
             (username,),
         ).fetchone()
         if row is None:
@@ -458,7 +482,8 @@ class GameDatabase:
 
     def get_account_by_id(self, user_id: int) -> Optional[dict[str, Any]]:
         row = self._connection.execute(
-            "SELECT user_id, username, invite_code, created_at FROM accounts WHERE user_id = ?",
+            "SELECT user_id, username, role, invite_code, created_at "
+            "FROM accounts WHERE user_id = ?",
             (user_id,),
         ).fetchone()
         if row is None:
@@ -477,32 +502,56 @@ class GameDatabase:
     # -- Invites --
 
     def create_invite(
-        self, alias: Optional[str] = None, uses: int = 1,
+        self, alias: Optional[str] = None, uses: int = 1, role: str = "user",
     ) -> str:
         code = secrets.token_hex(4).upper()
         now = _utcnow_iso()
         self._connection.execute(
-            "INSERT INTO invites (code, alias, remaining_uses, created_at) VALUES (?, ?, ?, ?)",
-            (code, alias, uses, now),
+            "INSERT INTO invites (code, alias, role, remaining_uses, created_at) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (code, alias, role, uses, now),
         )
         self._connection.commit()
         return code
 
-    def consume_invite(self, code: str) -> bool:
-        """Decrement remaining uses. Returns True if the code was valid and had uses left."""
+    def get_invite(self, code: str) -> Optional[dict[str, Any]]:
         row = self._connection.execute(
-            "SELECT remaining_uses FROM invites WHERE code = ?", (code,)
+            "SELECT code, alias, role, remaining_uses, created_at FROM invites WHERE code = ?",
+            (code,),
         ).fetchone()
         if row is None:
-            return False
+            return None
+        return dict(row)
+
+    def get_all_invites(self) -> list[dict[str, Any]]:
+        rows = self._connection.execute(
+            "SELECT code, alias, role, remaining_uses, created_at "
+            "FROM invites ORDER BY created_at DESC"
+        ).fetchall()
+        return [dict(row) for row in rows]
+
+    def consume_invite(self, code: str) -> Optional[str]:
+        """Decrement remaining uses. Returns the invite's role if valid, else None."""
+        row = self._connection.execute(
+            "SELECT remaining_uses, role FROM invites WHERE code = ?", (code,)
+        ).fetchone()
+        if row is None:
+            return None
         if row["remaining_uses"] <= 0:
-            return False
+            return None
         self._connection.execute(
             "UPDATE invites SET remaining_uses = remaining_uses - 1 WHERE code = ?",
             (code,),
         )
         self._connection.commit()
-        return True
+        return row["role"]
+
+    def delete_invite(self, code: str) -> bool:
+        cursor = self._connection.execute(
+            "DELETE FROM invites WHERE code = ?", (code,),
+        )
+        self._connection.commit()
+        return cursor.rowcount > 0
 
     def close(self) -> None:
         self._connection.close()

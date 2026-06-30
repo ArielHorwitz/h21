@@ -1,4 +1,5 @@
 const accountUsername = document.getElementById("account-username");
+const controlLink = document.getElementById("control-link");
 const logoutBtn = document.getElementById("logout-btn");
 const backBtn = document.getElementById("back-btn");
 
@@ -8,6 +9,9 @@ async function loadAccount() {
     if (response.ok) {
       const data = await response.json();
       accountUsername.textContent = data.username;
+      if (data.role === "dev") {
+        controlLink.hidden = false;
+      }
     } else {
       window.location.href = "/login";
     }
