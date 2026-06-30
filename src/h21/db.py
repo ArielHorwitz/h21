@@ -73,6 +73,7 @@ class GameDatabase:
                 username    TEXT NOT NULL UNIQUE,
                 password_hash TEXT NOT NULL,
                 role        TEXT NOT NULL DEFAULT 'user',
+                blocked     INTEGER NOT NULL DEFAULT 0,
                 invite_code TEXT,
                 created_at  TEXT NOT NULL
             );
@@ -93,6 +94,7 @@ class GameDatabase:
         self._migrate_invites_multi_use()
         self._migrate_add_invite_code_to_accounts()
         self._migrate_add_role_columns()
+        self._migrate_add_blocked_column()
         self._seed_default_topic()
 
     def _seed_default_topic(self) -> None:
@@ -442,6 +444,17 @@ class GameDatabase:
             )
         self._connection.commit()
 
+    def _migrate_add_blocked_column(self) -> None:
+        columns = [
+            row["name"]
+            for row in self._connection.execute("PRAGMA table_info(accounts)")
+        ]
+        if "blocked" not in columns:
+            self._connection.execute(
+                "ALTER TABLE accounts ADD COLUMN blocked INTEGER NOT NULL DEFAULT 0"
+            )
+            self._connection.commit()
+
     # -- Accounts --
 
     @staticmethod
@@ -472,7 +485,7 @@ class GameDatabase:
 
     def get_account_by_username(self, username: str) -> Optional[dict[str, Any]]:
         row = self._connection.execute(
-            "SELECT user_id, username, password_hash, role, created_at "
+            "SELECT user_id, username, password_hash, role, blocked, created_at "
             "FROM accounts WHERE username = ?",
             (username,),
         ).fetchone()
@@ -482,13 +495,28 @@ class GameDatabase:
 
     def get_account_by_id(self, user_id: int) -> Optional[dict[str, Any]]:
         row = self._connection.execute(
-            "SELECT user_id, username, role, invite_code, created_at "
+            "SELECT user_id, username, role, blocked, invite_code, created_at "
             "FROM accounts WHERE user_id = ?",
             (user_id,),
         ).fetchone()
         if row is None:
             return None
         return dict(row)
+
+    def get_all_accounts(self) -> list[dict[str, Any]]:
+        rows = self._connection.execute(
+            "SELECT user_id, username, role, blocked, invite_code, created_at "
+            "FROM accounts ORDER BY created_at DESC"
+        ).fetchall()
+        return [dict(row) for row in rows]
+
+    def set_account_blocked(self, user_id: int, blocked: bool) -> bool:
+        cursor = self._connection.execute(
+            "UPDATE accounts SET blocked = ? WHERE user_id = ?",
+            (1 if blocked else 0, user_id),
+        )
+        self._connection.commit()
+        return cursor.rowcount > 0
 
     def authenticate(self, username: str, password: str) -> Optional[int]:
         """Return user_id if credentials are valid, else None."""

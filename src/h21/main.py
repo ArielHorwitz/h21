@@ -122,7 +122,7 @@ async def no_cache_static(request: Request, call_next):
     return response
 
 
-DEV_PATHS = ("/control", "/api/invites")
+DEV_PATHS = ("/control", "/api/invites", "/api/accounts")
 
 
 @app.middleware("http")
@@ -138,7 +138,7 @@ async def require_auth(request: Request, call_next):
         return RedirectResponse("/login", status_code=302)
 
     account = database.get_account_by_id(user_id)
-    if account is None:
+    if account is None or account["blocked"]:
         if path.startswith("/api/"):
             return JSONResponse({"detail": "Not authenticated"}, status_code=401)
         return RedirectResponse("/login", status_code=302)
@@ -325,6 +325,29 @@ async def create_invite_api(request_body: CreateInviteRequest) -> dict[str, Any]
 async def delete_invite_api(code: str) -> dict[str, str]:
     if not database.delete_invite(code.upper()):
         raise HTTPException(status_code=404, detail="Invite not found")
+    return {"status": "ok"}
+
+
+# -- Account management (dev only, protected by middleware) --
+
+@app.get("/api/accounts")
+async def list_accounts() -> list[dict[str, Any]]:
+    return database.get_all_accounts()
+
+
+@app.post("/api/accounts/{user_id}/block")
+async def block_account(user_id: int, request: Request) -> dict[str, str]:
+    if user_id == request.state.user_id:
+        raise HTTPException(status_code=400, detail="Cannot block yourself")
+    if not database.set_account_blocked(user_id, blocked=True):
+        raise HTTPException(status_code=404, detail="Account not found")
+    return {"status": "ok"}
+
+
+@app.post("/api/accounts/{user_id}/unblock")
+async def unblock_account(user_id: int) -> dict[str, str]:
+    if not database.set_account_blocked(user_id, blocked=False):
+        raise HTTPException(status_code=404, detail="Account not found")
     return {"status": "ok"}
 
 
