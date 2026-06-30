@@ -122,7 +122,7 @@ async def no_cache_static(request: Request, call_next):
     return response
 
 
-DEV_PATHS = ("/control", "/api/invites", "/api/accounts")
+DEV_PATHS = ("/control", "/api/invites", "/api/accounts", "/api/query")
 
 
 @app.middleware("http")
@@ -382,6 +382,24 @@ async def update_limits(user_id: int, request_body: UpdateLimitsRequest) -> dict
 async def reset_usage(user_id: int) -> dict[str, str]:
     database.reset_daily_usage(user_id, date.today())
     return {"status": "ok"}
+
+
+# -- Query (dev only) --
+
+class QueryRequest(BaseModel):
+    sql: str
+
+
+@app.post("/api/query")
+async def run_query(request_body: QueryRequest) -> dict[str, Any]:
+    sql = request_body.sql.strip()
+    if not sql:
+        raise HTTPException(status_code=400, detail="SQL query must not be empty")
+    try:
+        result = database.execute_readonly_query(sql)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    return result
 
 
 # -- Topic endpoints --

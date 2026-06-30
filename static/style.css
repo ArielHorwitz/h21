@@ -725,6 +725,40 @@ h1 a.home-link:hover {
   gap: 0.3rem;
 }
 
+#query-input {
+  width: 100%;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid #333;
+  border-radius: 4px;
+  background: #0d1117;
+  color: #e0e0e0;
+  font-family: monospace;
+  font-size: 0.9rem;
+  resize: vertical;
+  outline: none;
+}
+
+#query-input:focus {
+  border-color: #e2b714;
+}
+
+#query-result {
+  margin-top: 0.75rem;
+  overflow-x: auto;
+}
+
+#query-result .invites-table td {
+  font-family: monospace;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+.query-row-count {
+  font-size: 0.8rem;
+  color: #888;
+  margin-bottom: 0.4rem;
+}
+
 @media (max-width: 640px) {
   .control-row {
     flex-direction: column;

@@ -51,6 +51,15 @@
       <h2>Users</h2>
       <div id="users-list"></div>
     </div>
+
+    <div class="control-section">
+      <h2>Query</h2>
+      <form id="query-form">
+        <textarea id="query-input" rows="3" placeholder="SELECT * FROM accounts LIMIT 10" spellcheck="false"></textarea>
+        <button type="submit" id="query-btn">Run</button>
+      </form>
+      <div id="query-result"></div>
+    </div>
   </main>
   <script src="/static/control.js"></script>
 </body>

@@ -275,5 +275,77 @@ async function resetUsage(userId) {
   }
 }
 
+// -- Query --
+
+const queryForm = document.getElementById("query-form");
+const queryInput = document.getElementById("query-input");
+const queryResult = document.getElementById("query-result");
+
+queryForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const sql = queryInput.value.trim();
+  if (!sql) return;
+
+  queryResult.innerHTML = "";
+  queryResult.textContent = "Running...";
+
+  try {
+    const response = await fetch("/api/query", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sql }),
+    });
+    const data = await response.json();
+
+    if (!response.ok) {
+      queryResult.textContent = data.detail || "Query failed.";
+      queryResult.className = "status-error";
+      return;
+    }
+
+    queryResult.className = "";
+
+    if (data.columns.length === 0) {
+      queryResult.textContent = "Query returned no columns.";
+      return;
+    }
+
+    const table = document.createElement("table");
+    table.className = "invites-table";
+
+    const thead = document.createElement("thead");
+    const headerRow = document.createElement("tr");
+    for (const column of data.columns) {
+      const th = document.createElement("th");
+      th.textContent = column;
+      headerRow.appendChild(th);
+    }
+    thead.appendChild(headerRow);
+    table.appendChild(thead);
+
+    const tbody = document.createElement("tbody");
+    for (const row of data.rows) {
+      const tr = document.createElement("tr");
+      for (const value of row) {
+        const td = document.createElement("td");
+        td.textContent = value === null ? "NULL" : String(value);
+        tr.appendChild(td);
+      }
+      tbody.appendChild(tr);
+    }
+    table.appendChild(tbody);
+
+    queryResult.innerHTML = "";
+    const count = document.createElement("p");
+    count.className = "query-row-count";
+    count.textContent = `${data.rows.length} row${data.rows.length === 1 ? "" : "s"}`;
+    queryResult.appendChild(count);
+    queryResult.appendChild(table);
+  } catch {
+    queryResult.textContent = "Network error.";
+    queryResult.className = "status-error";
+  }
+});
+
 loadInvites();
 loadUsers();

@@ -655,6 +655,15 @@ class GameDatabase:
         )
         self._connection.commit()
 
+    # -- Query --
+
+    def execute_readonly_query(self, sql: str) -> dict[str, Any]:
+        """Execute a read-only SQL query and return columns + rows."""
+        cursor = self._connection.execute(sql)
+        columns = [desc[0] for desc in cursor.description] if cursor.description else []
+        rows = [list(row) for row in cursor.fetchall()]
+        return {"columns": columns, "rows": rows}
+
     def close(self) -> None:
         self._connection.close()
 
