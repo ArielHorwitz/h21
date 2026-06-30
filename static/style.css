@@ -324,7 +324,22 @@ h1 a.home-link:hover {
   color: #f44336;
 }
 
-/* -- Settings link -- */
+/* -- Fixed icon links -- */
+
+.home-icon-link {
+  position: fixed;
+  top: 0.75rem;
+  left: 0.75rem;
+  color: #555;
+  font-size: 1.5rem;
+  text-decoration: none;
+  line-height: 1;
+  transition: color 0.15s;
+}
+
+.home-icon-link:hover {
+  color: #e2b714;
+}
 
 .settings-link {
   position: fixed;
