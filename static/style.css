@@ -720,6 +720,11 @@ h1 a.home-link:hover {
   background: rgba(76, 175, 80, 0.1);
 }
 
+.user-actions {
+  display: flex;
+  gap: 0.3rem;
+}
+
 @media (max-width: 640px) {
   .control-row {
     flex-direction: column;

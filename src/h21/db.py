@@ -74,6 +74,8 @@ class GameDatabase:
                 password_hash TEXT NOT NULL,
                 role        TEXT NOT NULL DEFAULT 'user',
                 blocked     INTEGER NOT NULL DEFAULT 0,
+                daily_question_limit INTEGER NOT NULL DEFAULT 105,
+                daily_topic_limit    INTEGER NOT NULL DEFAULT 1,
                 invite_code TEXT,
                 created_at  TEXT NOT NULL
             );
@@ -85,6 +87,14 @@ class GameDatabase:
                 remaining_uses  INTEGER NOT NULL DEFAULT 1,
                 created_at      TEXT NOT NULL
             );
+
+            CREATE TABLE IF NOT EXISTS daily_usage (
+                user_id                INTEGER NOT NULL,
+                date                   TEXT NOT NULL,
+                questions_used         INTEGER NOT NULL DEFAULT 0,
+                topic_suggestions_used INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY (user_id, date)
+            );
         """)
         self._migrate_add_explanation_column()
         self._migrate_daily_puzzles_composite_key()
@@ -95,6 +105,7 @@ class GameDatabase:
         self._migrate_add_invite_code_to_accounts()
         self._migrate_add_role_columns()
         self._migrate_add_blocked_column()
+        self._migrate_add_daily_limits()
         self._seed_default_topic()
 
     def _seed_default_topic(self) -> None:
@@ -455,6 +466,21 @@ class GameDatabase:
             )
             self._connection.commit()
 
+    def _migrate_add_daily_limits(self) -> None:
+        columns = [
+            row["name"]
+            for row in self._connection.execute("PRAGMA table_info(accounts)")
+        ]
+        if "daily_question_limit" not in columns:
+            self._connection.execute(
+                "ALTER TABLE accounts ADD COLUMN daily_question_limit INTEGER NOT NULL DEFAULT 105"
+            )
+        if "daily_topic_limit" not in columns:
+            self._connection.execute(
+                "ALTER TABLE accounts ADD COLUMN daily_topic_limit INTEGER NOT NULL DEFAULT 1"
+            )
+        self._connection.commit()
+
     # -- Accounts --
 
     @staticmethod
@@ -495,7 +521,8 @@ class GameDatabase:
 
     def get_account_by_id(self, user_id: int) -> Optional[dict[str, Any]]:
         row = self._connection.execute(
-            "SELECT user_id, username, role, blocked, invite_code, created_at "
+            "SELECT user_id, username, role, blocked, "
+            "daily_question_limit, daily_topic_limit, invite_code, created_at "
             "FROM accounts WHERE user_id = ?",
             (user_id,),
         ).fetchone()
@@ -505,10 +532,22 @@ class GameDatabase:
 
     def get_all_accounts(self) -> list[dict[str, Any]]:
         rows = self._connection.execute(
-            "SELECT user_id, username, role, blocked, invite_code, created_at "
+            "SELECT user_id, username, role, blocked, "
+            "daily_question_limit, daily_topic_limit, invite_code, created_at "
             "FROM accounts ORDER BY created_at DESC"
         ).fetchall()
         return [dict(row) for row in rows]
+
+    def update_account_limits(
+        self, user_id: int, daily_question_limit: int, daily_topic_limit: int,
+    ) -> bool:
+        cursor = self._connection.execute(
+            "UPDATE accounts SET daily_question_limit = ?, daily_topic_limit = ? "
+            "WHERE user_id = ?",
+            (daily_question_limit, daily_topic_limit, user_id),
+        )
+        self._connection.commit()
+        return cursor.rowcount > 0
 
     def set_account_blocked(self, user_id: int, blocked: bool) -> bool:
         cursor = self._connection.execute(
@@ -580,6 +619,41 @@ class GameDatabase:
         )
         self._connection.commit()
         return cursor.rowcount > 0
+
+    # -- Daily usage --
+
+    def get_daily_usage(self, user_id: int, usage_date: date) -> dict[str, int]:
+        row = self._connection.execute(
+            "SELECT questions_used, topic_suggestions_used FROM daily_usage "
+            "WHERE user_id = ? AND date = ?",
+            (user_id, usage_date.isoformat()),
+        ).fetchone()
+        if row is None:
+            return {"questions_used": 0, "topic_suggestions_used": 0}
+        return dict(row)
+
+    def increment_daily_questions(self, user_id: int, usage_date: date) -> None:
+        self._connection.execute(
+            "INSERT INTO daily_usage (user_id, date, questions_used) VALUES (?, ?, 1) "
+            "ON CONFLICT(user_id, date) DO UPDATE SET questions_used = questions_used + 1",
+            (user_id, usage_date.isoformat()),
+        )
+        self._connection.commit()
+
+    def increment_daily_topic_suggestions(self, user_id: int, usage_date: date) -> None:
+        self._connection.execute(
+            "INSERT INTO daily_usage (user_id, date, topic_suggestions_used) VALUES (?, ?, 1) "
+            "ON CONFLICT(user_id, date) DO UPDATE SET topic_suggestions_used = topic_suggestions_used + 1",
+            (user_id, usage_date.isoformat()),
+        )
+        self._connection.commit()
+
+    def reset_daily_usage(self, user_id: int, usage_date: date) -> None:
+        self._connection.execute(
+            "DELETE FROM daily_usage WHERE user_id = ? AND date = ?",
+            (user_id, usage_date.isoformat()),
+        )
+        self._connection.commit()
 
     def close(self) -> None:
         self._connection.close()

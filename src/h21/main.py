@@ -289,10 +289,15 @@ async def get_me(request: Request) -> dict[str, Any]:
     account = database.get_account_by_id(user_id)
     if account is None:
         raise HTTPException(status_code=404, detail="Account not found")
+    usage = database.get_daily_usage(user_id, date.today())
     return {
         "user_id": account["user_id"],
         "username": account["username"],
         "role": account["role"],
+        "daily_question_limit": account["daily_question_limit"],
+        "daily_topic_limit": account["daily_topic_limit"],
+        "questions_used_today": usage["questions_used"],
+        "topic_suggestions_used_today": usage["topic_suggestions_used"],
     }
 
 
@@ -332,7 +337,13 @@ async def delete_invite_api(code: str) -> dict[str, str]:
 
 @app.get("/api/accounts")
 async def list_accounts() -> list[dict[str, Any]]:
-    return database.get_all_accounts()
+    accounts = database.get_all_accounts()
+    today = date.today()
+    for account in accounts:
+        usage = database.get_daily_usage(account["user_id"], today)
+        account["questions_used_today"] = usage["questions_used"]
+        account["topic_suggestions_used_today"] = usage["topic_suggestions_used"]
+    return accounts
 
 
 @app.post("/api/accounts/{user_id}/block")
@@ -351,6 +362,28 @@ async def unblock_account(user_id: int) -> dict[str, str]:
     return {"status": "ok"}
 
 
+class UpdateLimitsRequest(BaseModel):
+    daily_question_limit: int
+    daily_topic_limit: int
+
+
+@app.post("/api/accounts/{user_id}/limits")
+async def update_limits(user_id: int, request_body: UpdateLimitsRequest) -> dict[str, str]:
+    if request_body.daily_question_limit < 0 or request_body.daily_topic_limit < 0:
+        raise HTTPException(status_code=400, detail="Limits must be non-negative")
+    if not database.update_account_limits(
+        user_id, request_body.daily_question_limit, request_body.daily_topic_limit,
+    ):
+        raise HTTPException(status_code=404, detail="Account not found")
+    return {"status": "ok"}
+
+
+@app.post("/api/accounts/{user_id}/reset-usage")
+async def reset_usage(user_id: int) -> dict[str, str]:
+    database.reset_daily_usage(user_id, date.today())
+    return {"status": "ok"}
+
+
 # -- Topic endpoints --
 
 @app.get("/api/topics")
@@ -359,7 +392,13 @@ async def get_topics() -> list[dict[str, str]]:
 
 
 @app.post("/api/topics")
-async def create_topic(request_body: NewTopicRequest) -> dict[str, str]:
+async def create_topic(request_body: NewTopicRequest, request: Request) -> dict[str, str]:
+    user_id = request.state.user_id
+    account = database.get_account_by_id(user_id)
+    usage = database.get_daily_usage(user_id, date.today())
+    if account and usage["topic_suggestions_used"] >= account["daily_topic_limit"]:
+        raise HTTPException(status_code=429, detail="Daily topic suggestion limit reached")
+
     raw_name = request_body.name.strip()
     if not raw_name or len(raw_name) > 100:
         raise HTTPException(
@@ -379,6 +418,7 @@ async def create_topic(request_body: NewTopicRequest) -> dict[str, str]:
         raise HTTPException(status_code=409, detail="Topic already exists")
 
     database.add_topic(slug, name)
+    database.increment_daily_topic_suggestions(user_id, date.today())
     return {"slug": slug, "name": name}
 
 
@@ -419,7 +459,13 @@ async def end_game(request_body: EndGameRequest) -> dict[str, str]:
 
 
 @app.post("/api/ask")
-async def ask(request_body: AskRequest) -> dict[str, str]:
+async def ask(request_body: AskRequest, request: Request) -> dict[str, str]:
+    user_id = request.state.user_id
+    account = database.get_account_by_id(user_id)
+    usage = database.get_daily_usage(user_id, date.today())
+    if account and usage["questions_used"] >= account["daily_question_limit"]:
+        raise HTTPException(status_code=429, detail="Daily question limit reached")
+
     question = request_body.question.strip()
     if not question or len(question) > 500:
         raise HTTPException(status_code=400, detail="Question must be 1-500 characters")
@@ -447,6 +493,8 @@ async def ask(request_body: AskRequest) -> dict[str, str]:
             status_code=502,
             detail="AI returned an unparseable response. Please try again.",
         )
+
+    database.increment_daily_questions(user_id, date.today())
 
     # Record the Q&A if a game session is active.
     if request_body.game_id is not None and request_body.question_number is not None:

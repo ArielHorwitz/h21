@@ -140,8 +140,9 @@ function renderUsers(users) {
   thead.innerHTML = `<tr>
     <th>Username</th>
     <th>Role</th>
-    <th>Invite</th>
     <th>Status</th>
+    <th>Questions</th>
+    <th>Topics</th>
     <th></th>
   </tr>`;
   table.appendChild(thead);
@@ -161,16 +162,33 @@ function renderUsers(users) {
     roleCell.textContent = user.role;
     tr.appendChild(roleCell);
 
-    const inviteCell = document.createElement("td");
-    inviteCell.className = "invite-code";
-    inviteCell.textContent = user.invite_code || "";
-    tr.appendChild(inviteCell);
-
     const statusCell = document.createElement("td");
     statusCell.textContent = user.blocked ? "blocked" : "active";
     tr.appendChild(statusCell);
 
+    const questionsCell = document.createElement("td");
+    questionsCell.textContent = `${user.questions_used_today} / ${user.daily_question_limit}`;
+    tr.appendChild(questionsCell);
+
+    const topicsCell = document.createElement("td");
+    topicsCell.textContent = `${user.topic_suggestions_used_today} / ${user.daily_topic_limit}`;
+    tr.appendChild(topicsCell);
+
     const actionCell = document.createElement("td");
+    actionCell.className = "user-actions";
+
+    const editBtn = document.createElement("button");
+    editBtn.className = "unblock-btn";
+    editBtn.textContent = "Limits";
+    editBtn.addEventListener("click", () => promptLimits(user));
+    actionCell.appendChild(editBtn);
+
+    const resetBtn = document.createElement("button");
+    resetBtn.className = "unblock-btn";
+    resetBtn.textContent = "Reset";
+    resetBtn.addEventListener("click", () => resetUsage(user.user_id));
+    actionCell.appendChild(resetBtn);
+
     if (user.blocked) {
       const unblockBtn = document.createElement("button");
       unblockBtn.className = "unblock-btn";
@@ -184,8 +202,8 @@ function renderUsers(users) {
       blockBtn.addEventListener("click", () => toggleBlock(user.user_id, true));
       actionCell.appendChild(blockBtn);
     }
-    tr.appendChild(actionCell);
 
+    tr.appendChild(actionCell);
     tbody.appendChild(tr);
   }
 
@@ -217,6 +235,43 @@ async function toggleBlock(userId, block) {
     }
   } catch (error) {
     console.error(`Failed to ${action} user:`, error);
+  }
+}
+
+function promptLimits(user) {
+  const questionLimit = prompt(`Daily question limit for ${user.username}:`, user.daily_question_limit);
+  if (questionLimit === null) return;
+  const topicLimit = prompt(`Daily topic suggestion limit for ${user.username}:`, user.daily_topic_limit);
+  if (topicLimit === null) return;
+  updateLimits(user.user_id, parseInt(questionLimit, 10), parseInt(topicLimit, 10));
+}
+
+async function updateLimits(userId, questionLimit, topicLimit) {
+  if (isNaN(questionLimit) || isNaN(topicLimit) || questionLimit < 0 || topicLimit < 0) {
+    return;
+  }
+  try {
+    const response = await fetch(`/api/accounts/${userId}/limits`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ daily_question_limit: questionLimit, daily_topic_limit: topicLimit }),
+    });
+    if (response.ok) {
+      await loadUsers();
+    }
+  } catch (error) {
+    console.error("Failed to update limits:", error);
+  }
+}
+
+async function resetUsage(userId) {
+  try {
+    const response = await fetch(`/api/accounts/${userId}/reset-usage`, { method: "POST" });
+    if (response.ok) {
+      await loadUsers();
+    }
+  } catch (error) {
+    console.error("Failed to reset usage:", error);
   }
 }
 
