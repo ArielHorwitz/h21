@@ -265,14 +265,25 @@ function showShareButton(won) {
   shareBtn.textContent = "Share";
   shareBtn.addEventListener("click", async () => {
     const text = buildShareText(won);
-    try {
-      await navigator.clipboard.writeText(text);
-      shareBtn.textContent = "Copied!";
-      setTimeout(() => { shareBtn.textContent = "Share"; }, 2000);
-    } catch {
-      shareBtn.textContent = "Failed to copy";
-      setTimeout(() => { shareBtn.textContent = "Share"; }, 2000);
+    let copied = false;
+    if (navigator.clipboard && window.isSecureContext) {
+      try {
+        await navigator.clipboard.writeText(text);
+        copied = true;
+      } catch { /* fall through to execCommand fallback */ }
     }
+    if (!copied) {
+      const textarea = document.createElement("textarea");
+      textarea.value = text;
+      textarea.style.position = "fixed";
+      textarea.style.opacity = "0";
+      document.body.appendChild(textarea);
+      textarea.select();
+      copied = document.execCommand("copy");
+      document.body.removeChild(textarea);
+    }
+    shareBtn.textContent = copied ? "Copied!" : "Failed to copy";
+    setTimeout(() => { shareBtn.textContent = "Share"; }, 2000);
   });
   gameOverMessage.insertAdjacentElement("afterend", shareBtn);
 }
