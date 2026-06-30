@@ -6,7 +6,7 @@ import logging.handlers
 from contextlib import asynccontextmanager
 from datetime import date
 from pathlib import Path
-from typing import AsyncIterator, Optional
+from typing import Any, AsyncIterator, Optional
 
 logger = logging.getLogger("h21")
 
@@ -22,6 +22,7 @@ from h21.llm import (
     LLMError,
     OpenAIClient,
     ask_question,
+    generate_hints,
     generate_solution,
     normalize_topic,
 )
@@ -103,6 +104,7 @@ async def get_today_solution(topic_slug: str, difficulty: str) -> str:
     today = date.today()
     existing = database.get_puzzle_solution(today, topic_slug, difficulty)
     if existing is not None:
+        await ensure_hints_exist(today, topic_slug, difficulty, existing)
         return existing
 
     topic_name = database.get_topic_name(topic_slug)
@@ -117,8 +119,33 @@ async def get_today_solution(topic_slug: str, difficulty: str) -> str:
     except LLMError as exc:
         logger.error("Failed to generate solution: %s", exc)
         raise HTTPException(status_code=502, detail=exc.detail)
-    database.record_puzzle(today, topic_slug, difficulty, solution)
+
+    try:
+        hints = await generate_hints(llm_client, topic_name, solution)
+    except LLMError as exc:
+        logger.error("Failed to generate hints: %s", exc)
+        hints = []
+
+    database.record_puzzle(today, topic_slug, difficulty, solution, hints=hints)
     return solution
+
+
+async def ensure_hints_exist(
+    puzzle_date: date, topic_slug: str, difficulty: str, solution: str
+) -> None:
+    """Backfill hints for puzzles that were created before the hints feature."""
+    existing_hints = database.get_puzzle_hints(puzzle_date, topic_slug, difficulty)
+    if existing_hints:
+        return
+    topic_name = database.get_topic_name(topic_slug)
+    if topic_name is None:
+        return
+    try:
+        hints = await generate_hints(llm_client, topic_name, solution)
+    except LLMError as exc:
+        logger.error("Failed to backfill hints: %s", exc)
+        return
+    database.update_puzzle_hints(puzzle_date, topic_slug, difficulty, hints)
 
 
 @app.get("/")
@@ -285,6 +312,35 @@ async def ask(request: AskRequest) -> dict[str, str]:
             )
 
     return {"answer": result.answer, "explanation": result.explanation}
+
+
+class HintRequest(BaseModel):
+    game_id: int
+    hint_index: int
+
+
+@app.post("/api/hint")
+async def get_hint(request: HintRequest) -> dict[str, Any]:
+    if request.hint_index < 0 or request.hint_index > 4:
+        raise HTTPException(status_code=400, detail="hint_index must be 0-4")
+
+    game = database.get_game(request.game_id)
+    if game is None:
+        raise HTTPException(status_code=404, detail="Game not found")
+
+    required_questions = (request.hint_index + 1) * 4
+    if game["questions_asked"] < required_questions:
+        raise HTTPException(
+            status_code=403,
+            detail=f"Must have asked at least {required_questions} questions to unlock this hint",
+        )
+
+    today = date.today()
+    hints = database.get_puzzle_hints(today, game["topic_slug"], game["difficulty"])
+    if request.hint_index >= len(hints):
+        raise HTTPException(status_code=404, detail="Hint not available")
+
+    return {"hint": hints[request.hint_index], "hint_index": request.hint_index}
 
 
 @app.get("/api/history")

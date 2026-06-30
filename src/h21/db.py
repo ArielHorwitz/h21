@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 import sqlite3
 from datetime import date, datetime, timezone
@@ -68,6 +69,7 @@ class GameDatabase:
         self._migrate_add_explanation_column()
         self._migrate_daily_puzzles_composite_key()
         self._migrate_games_topic_difficulty()
+        self._migrate_add_hints_column()
         self._seed_default_topic()
 
     def _seed_default_topic(self) -> None:
@@ -134,6 +136,18 @@ class GameDatabase:
             )
         self._connection.commit()
 
+    def _migrate_add_hints_column(self) -> None:
+        """Add hints column to daily_puzzles if missing."""
+        columns = [
+            row["name"]
+            for row in self._connection.execute("PRAGMA table_info(daily_puzzles)")
+        ]
+        if "hints" not in columns:
+            self._connection.execute(
+                "ALTER TABLE daily_puzzles ADD COLUMN hints TEXT NOT NULL DEFAULT '[]'"
+            )
+            self._connection.commit()
+
     # -- Topics --
 
     def get_all_topics(self) -> list[dict[str, str]]:
@@ -158,12 +172,24 @@ class GameDatabase:
     # -- Puzzles --
 
     def record_puzzle(
-        self, puzzle_date: date, topic_slug: str, difficulty: str, solution: str
+        self, puzzle_date: date, topic_slug: str, difficulty: str, solution: str,
+        hints: Optional[list[str]] = None,
     ) -> None:
         self._connection.execute(
-            "INSERT OR IGNORE INTO daily_puzzles (date, topic_slug, difficulty, solution) "
-            "VALUES (?, ?, ?, ?)",
-            (puzzle_date.isoformat(), topic_slug, difficulty, solution),
+            "INSERT OR IGNORE INTO daily_puzzles (date, topic_slug, difficulty, solution, hints) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (puzzle_date.isoformat(), topic_slug, difficulty, solution,
+             json.dumps(hints or [])),
+        )
+        self._connection.commit()
+
+    def update_puzzle_hints(
+        self, puzzle_date: date, topic_slug: str, difficulty: str, hints: list[str],
+    ) -> None:
+        self._connection.execute(
+            "UPDATE daily_puzzles SET hints = ? "
+            "WHERE date = ? AND topic_slug = ? AND difficulty = ?",
+            (json.dumps(hints), puzzle_date.isoformat(), topic_slug, difficulty),
         )
         self._connection.commit()
 
@@ -177,6 +203,17 @@ class GameDatabase:
         if row is None:
             return None
         return row["solution"]
+
+    def get_puzzle_hints(
+        self, puzzle_date: date, topic_slug: str, difficulty: str
+    ) -> list[str]:
+        row = self._connection.execute(
+            "SELECT hints FROM daily_puzzles WHERE date = ? AND topic_slug = ? AND difficulty = ?",
+            (puzzle_date.isoformat(), topic_slug, difficulty),
+        ).fetchone()
+        if row is None:
+            return []
+        return json.loads(row["hints"])
 
     def get_all_solutions(
         self, topic_slug: str, difficulty: str

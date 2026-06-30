@@ -9,6 +9,8 @@ const powStatus = document.getElementById("pow-status");
 const gameOverMessage = document.getElementById("game-over-message");
 const todayDate = document.getElementById("today-date");
 const gameSubtitle = document.getElementById("game-subtitle");
+const hintPanel = document.getElementById("hint-panel");
+const hintList = document.getElementById("hint-list");
 
 // Parse topic and difficulty from URL query params.
 const urlParams = new URLSearchParams(window.location.search);
@@ -22,11 +24,17 @@ if (!urlParams.has("topic")) {
 
 const passwordBanner = document.getElementById("password-banner");
 
+const HINTS_TOTAL = 5;
+const QUESTIONS_PER_HINT = 4;
+
 let questionsAsked = 0;
 let gameFinished = false;
 let gameId = null;
 let passwordValid = false;
 const answerHistory = [];
+let hintsUnlocked = 0;   // How many hints the player is eligible to see
+let hintsRevealed = 0;    // How many hints the player has actually clicked to reveal
+const revealedHintIndices = new Set(); // Track which hint indices were revealed (for share)
 
 // Display topic and difficulty in the subtitle.
 const difficultyLabel = difficulty.charAt(0).toUpperCase() + difficulty.slice(1);
@@ -141,6 +149,86 @@ function revealExplanationButtons() {
   }
 }
 
+function updateHintPanel() {
+  const newUnlocked = Math.min(
+    Math.floor(questionsAsked / QUESTIONS_PER_HINT),
+    HINTS_TOTAL,
+  );
+  if (newUnlocked <= hintsUnlocked) return;
+  hintsUnlocked = newUnlocked;
+
+  // Show the panel once at least one hint is available
+  if (hintsUnlocked > 0) {
+    hintPanel.hidden = false;
+  }
+
+  // Add new locked hint items up to hintsUnlocked
+  while (hintList.children.length < hintsUnlocked) {
+    const index = hintList.children.length;
+    const li = document.createElement("li");
+    li.className = "hint-item locked";
+    li.dataset.hintIndex = index;
+
+    const revealBtn = document.createElement("button");
+    revealBtn.className = "hint-reveal-btn";
+    revealBtn.textContent = `Reveal hint ${index + 1}`;
+    // Only allow revealing sequentially
+    if (index > hintsRevealed) {
+      revealBtn.disabled = true;
+    }
+    revealBtn.addEventListener("click", () => fetchAndRevealHint(index));
+    li.appendChild(revealBtn);
+
+    const textSpan = document.createElement("span");
+    textSpan.className = "hint-text";
+    textSpan.hidden = true;
+    li.appendChild(textSpan);
+
+    hintList.appendChild(li);
+  }
+}
+
+async function fetchAndRevealHint(hintIndex) {
+  if (gameId === null) return;
+  const li = hintList.children[hintIndex];
+  const btn = li.querySelector(".hint-reveal-btn");
+  const textSpan = li.querySelector(".hint-text");
+
+  btn.disabled = true;
+  btn.textContent = "Loading...";
+
+  try {
+    const response = await fetch("/api/hint", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ game_id: gameId, hint_index: hintIndex }),
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      btn.textContent = error.detail || "Failed";
+      btn.disabled = false;
+      return;
+    }
+    const data = await response.json();
+    textSpan.textContent = data.hint;
+    textSpan.hidden = false;
+    btn.hidden = true;
+    li.classList.remove("locked");
+    li.classList.add("revealed");
+    hintsRevealed++;
+    revealedHintIndices.add(hintIndex);
+
+    // Enable the next hint button if it exists
+    if (hintList.children.length > hintsRevealed) {
+      const nextBtn = hintList.children[hintsRevealed].querySelector(".hint-reveal-btn");
+      if (nextBtn) nextBtn.disabled = false;
+    }
+  } catch {
+    btn.textContent = "Failed — try again";
+    btn.disabled = false;
+  }
+}
+
 const ANSWER_EMOJI = {
   yes: "\u{1F7E2}",
   no: "\u{1F534}",
@@ -151,11 +239,24 @@ const ANSWER_EMOJI = {
 
 function buildShareText(won) {
   const dateStr = todayDate.textContent;
-  const emojis = answerHistory.map((answer) => ANSWER_EMOJI[answer] || "").join("");
+  let emojis = "";
+  for (let question_index = 0; question_index < answerHistory.length; question_index++) {
+    emojis += ANSWER_EMOJI[answerHistory[question_index]] || "";
+    // Insert hint emoji after every QUESTIONS_PER_HINT answers if that hint was revealed
+    const questionNumber = question_index + 1;
+    if (questionNumber % QUESTIONS_PER_HINT === 0) {
+      const hintIndex = questionNumber / QUESTIONS_PER_HINT - 1;
+      if (revealedHintIndices.has(hintIndex)) {
+        emojis += "\u{1F4A1}";
+      }
+    }
+  }
+  const hintsUsed = revealedHintIndices.size;
   const resultLine = won
     ? `Won in ${questionsAsked}/${MAX_QUESTIONS} questions!`
     : `Lost after ${questionsAsked} questions.`;
-  return `H21 \u2014 ${topicLabel} (${difficultyLabel})\n${dateStr}\n\n${resultLine}\n${emojis}`;
+  const hintsLine = hintsUsed > 0 ? ` (${hintsUsed} hint${hintsUsed === 1 ? "" : "s"} used)` : "";
+  return `H21 \u2014 ${topicLabel} (${difficultyLabel})\n${dateStr}\n\n${resultLine}${hintsLine}\n${emojis}`;
 }
 
 function showShareButton(won) {
@@ -293,6 +394,8 @@ askForm.addEventListener("submit", async (event) => {
       endGame(true);
     } else if (questionsAsked >= MAX_QUESTIONS) {
       endGame(false);
+    } else {
+      updateHintPanel();
     }
   } catch (error) {
     powStatus.textContent = error.message;

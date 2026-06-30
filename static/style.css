@@ -16,7 +16,7 @@ body {
 
 main {
   width: 100%;
-  max-width: 600px;
+  max-width: 800px;
   display: flex;
   flex-direction: column;
 }
@@ -211,13 +211,92 @@ h1 a.home-link:hover {
 
 /* -- Game page -- */
 
+#game-area {
+  display: flex;
+  gap: 1rem;
+  flex: 1;
+  margin-bottom: 1rem;
+  min-height: 0;
+}
+
 #question-log {
   flex: 1;
   overflow-y: auto;
-  margin-bottom: 1rem;
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+  min-width: 0;
+}
+
+/* -- Hint panel -- */
+
+#hint-panel {
+  width: 200px;
+  flex-shrink: 0;
+  background: #16213e;
+  border: 1px solid #333;
+  border-radius: 6px;
+  padding: 0.75rem;
+  overflow-y: auto;
+  align-self: flex-start;
+}
+
+#hint-panel h3 {
+  font-size: 0.9rem;
+  color: #e2b714;
+  margin-bottom: 0.5rem;
+}
+
+#hint-list {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.hint-item {
+  font-size: 0.85rem;
+}
+
+.hint-reveal-btn {
+  background: none;
+  border: 1px solid #444;
+  border-radius: 3px;
+  color: #e2b714;
+  font-size: 0.8rem;
+  padding: 0.25rem 0.5rem;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+}
+
+.hint-reveal-btn:hover:not(:disabled) {
+  border-color: #e2b714;
+  background: rgba(226, 183, 20, 0.1);
+}
+
+.hint-reveal-btn:disabled {
+  color: #555;
+  border-color: #333;
+  cursor: not-allowed;
+}
+
+.hint-text {
+  color: #ccc;
+  line-height: 1.4;
+  display: block;
+}
+
+@media (max-width: 640px) {
+  #game-area {
+    flex-direction: column;
+  }
+
+  #hint-panel {
+    width: 100%;
+    order: -1;
+  }
 }
 
 .log-entry {

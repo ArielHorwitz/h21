@@ -189,6 +189,60 @@ async def generate_solution(
     return solution
 
 
+GENERATE_HINTS_PROMPT_TEMPLATE = """\
+You are helping create hints for a 21-questions trivia game.
+
+The topic is: {topic}.
+The secret solution is: "{solution}".
+
+Generate exactly 5 hints for this subject, ordered from most vague to most \
+specific. The hints will be revealed one at a time as the player progresses \
+through the game, so earlier hints should be subtle and later hints should \
+make the answer much easier to guess.
+
+- Hint 1: A very broad, indirect clue. Could apply to many subjects.
+- Hint 2: Slightly more specific, narrowing the field.
+- Hint 3: A moderately helpful clue that points toward the answer.
+- Hint 4: A strong clue that significantly narrows the possibilities.
+- Hint 5: A very direct clue that makes the answer almost obvious.
+
+Do NOT include the solution's name in any hint. Each hint should be a single \
+sentence.
+
+Reply with exactly 5 lines, one hint per line, numbered 1-5. No other text.\
+"""
+
+
+async def generate_hints(
+    client: LLMClient,
+    topic_name: str,
+    solution: str,
+) -> list[str]:
+    """Generate 5 progressively more helpful hints for a solution."""
+    prompt = GENERATE_HINTS_PROMPT_TEMPLATE.format(
+        topic=topic_name,
+        solution=solution,
+    )
+    response = await client.ask(prompt, "Generate the hints.")
+    hints = []
+    for line in response.strip().splitlines():
+        # Strip leading number and punctuation like "1. " or "1: "
+        cleaned = line.strip()
+        if cleaned and cleaned[0].isdigit():
+            cleaned = cleaned.lstrip("0123456789").lstrip(".):- ").strip()
+        if cleaned:
+            hints.append(cleaned)
+    if len(hints) != 5:
+        logger.warning(
+            "Expected 5 hints but got %d for solution=%r, raw=%r",
+            len(hints), solution, response,
+        )
+        # Pad or truncate to exactly 5
+        hints = (hints + ["No hint available."] * 5)[:5]
+    logger.info("Generated %d hints for solution=%r", len(hints), solution)
+    return hints
+
+
 @dataclass
 class AnswerResult:
     answer: str
