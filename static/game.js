@@ -440,9 +440,18 @@ async function checkPassword() {
 
 async function init() {
   updateCounter();
+  submitBtn.disabled = true;
+  questionInput.disabled = true;
   await checkPassword();
   if (passwordValid) {
+    powStatus.textContent = "Generating today's game...";
     await startGameSession();
+    if (gameId !== null) {
+      powStatus.textContent = "";
+      submitBtn.disabled = false;
+      questionInput.disabled = false;
+      questionInput.focus();
+    }
   }
 }
 
