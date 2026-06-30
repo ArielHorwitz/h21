@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hmac
 import logging
+import logging.handlers
 from contextlib import asynccontextmanager
 from datetime import date
 from pathlib import Path
@@ -64,13 +65,26 @@ bypass_password: Optional[str]
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     global llm_client, proof_of_work, database, bypass_password
 
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
+    config = load_config()
+
+    log_format = logging.Formatter(
+        "%(asctime)s %(levelname)s [%(name)s] %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
     )
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.INFO)
 
-    config = load_config()
+    stderr_handler = logging.StreamHandler()
+    stderr_handler.setFormatter(log_format)
+    root_logger.addHandler(stderr_handler)
+
+    file_handler = logging.handlers.RotatingFileHandler(
+        config.log_path, maxBytes=5 * 1024 * 1024, backupCount=3,
+    )
+    file_handler.setFormatter(log_format)
+    root_logger.addHandler(file_handler)
+
+    logger.info("Logging to %s", config.log_path)
     llm_client = OpenAIClient(config.openai_api_key, model=config.model)
     proof_of_work = ProofOfWork(difficulty=config.pow_difficulty)
     database = GameDatabase(config.db_path)

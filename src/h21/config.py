@@ -29,6 +29,7 @@ class Config:
     openai_api_key: str
     model: str
     db_path: Path
+    log_path: Path
     bypass_password: Optional[str]
 
 
@@ -63,5 +64,6 @@ def load_config() -> Config:
         openai_api_key=openai_api_key,
         model=model,
         db_path=db_path,
+        log_path=data_dir / "h21.log",
         bypass_password=bypass_password,
     )
