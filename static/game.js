@@ -131,7 +131,7 @@ function updateCounter() {
   questionCounter.textContent = `Question ${questionsAsked} / ${MAX_QUESTIONS}`;
 }
 
-function addLogEntry(question, answer, explanation) {
+function addLogEntry(question, answer, explanation, whyLabel) {
   const entry = document.createElement("div");
   entry.className = "log-entry";
 
@@ -161,6 +161,7 @@ function addLogEntry(question, answer, explanation) {
     explanationEl.textContent = explanation;
     explanationEl.hidden = true;
     entry.appendChild(explanationEl);
+    entry.dataset.whyLabel = whyLabel || "why?";
   }
 
   questionLog.appendChild(entry);
@@ -172,13 +173,14 @@ function revealExplanationButtons() {
     const explanationEl = entry.querySelector(".log-explanation");
     if (!explanationEl) continue;
 
+    const whyLabel = entry.dataset.whyLabel || "why?";
     const toggle = document.createElement("button");
     toggle.className = "explanation-toggle";
-    toggle.textContent = "why?";
+    toggle.textContent = whyLabel;
     toggle.addEventListener("click", () => {
       const visible = !explanationEl.hidden;
       explanationEl.hidden = visible;
-      toggle.textContent = visible ? "why?" : "hide";
+      toggle.textContent = visible ? whyLabel : "hide";
     });
 
     entry.querySelector(".log-answer-row").appendChild(toggle);
@@ -380,11 +382,11 @@ askForm.addEventListener("submit", async (event) => {
   statusText.classList.remove("error");
 
   try {
-    const { answer, explanation } = await submitQuestion(question);
+    const { answer, explanation, why_label } = await submitQuestion(question);
     questionsAsked++;
     answerHistory.push(answer);
     updateCounter();
-    addLogEntry(question, answer, explanation);
+    addLogEntry(question, answer, explanation, why_label);
 
     if (answer === "win") {
       endGame(true);

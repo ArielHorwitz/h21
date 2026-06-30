@@ -53,12 +53,19 @@ question to get a more decisive or useful answer. For example, "If you had \
 asked whether they were born in Europe, the answer would be yes" or "Asking \
 about the century rather than the exact year would narrow it down faster."
 
-Keep the explanation concise but substantive (3-6 sentences total). Then, on \
-the LAST line, write ONLY your one-word answer.
+Keep the explanation concise but substantive (3-6 sentences total). Write \
+your explanation in the SAME language the player used for their question.
+
+Then, on the second-to-last line, write ONLY a translation of the word \
+"why?" into the language the player used (e.g. "pourquoi ?" in French, \
+"¿por qué?" in Spanish, "warum?" in German, "why?" in English). This \
+will be used as a button label.
+
+On the LAST line, write ONLY your one-word answer.
 
 The player may ask questions in ANY language. Regardless of what language the \
 question is in, your final answer on the last line MUST always be one of the \
-five English words above. Your explanation may be in any language.\
+five English words above.\
 """
 
 
@@ -247,6 +254,7 @@ async def generate_hints(
 class AnswerResult:
     answer: str
     explanation: str
+    why_label: str
 
 
 async def ask_question(
@@ -275,8 +283,20 @@ async def ask_question(
             answer, question, raw_response,
         )
         return None
-    explanation = "\n".join(lines[:-1]).strip()
-    return AnswerResult(answer=answer, explanation=explanation)
+
+    # The second-to-last line should be the localized "why?" label.
+    why_label = "why?"
+    if len(lines) >= 3:
+        candidate = lines[-2].strip()
+        if len(candidate) <= 30:
+            why_label = candidate
+            explanation = "\n".join(lines[:-2]).strip()
+        else:
+            explanation = "\n".join(lines[:-1]).strip()
+    else:
+        explanation = "\n".join(lines[:-1]).strip()
+
+    return AnswerResult(answer=answer, explanation=explanation, why_label=why_label)
 
 
 NORMALIZE_TOPIC_PROMPT = """\
