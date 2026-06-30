@@ -219,7 +219,11 @@ async def end_game(request: EndGameRequest) -> dict[str, str]:
         raise HTTPException(status_code=404, detail="Game not found")
 
     database.end_game(request.game_id, request.result)
-    return {"status": "ok"}
+
+    solution = database.get_puzzle_solution(
+        date.today(), game["topic_slug"], game["difficulty"],
+    )
+    return {"status": "ok", "solution": solution or ""}
 
 
 @app.post("/api/ask")

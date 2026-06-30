@@ -66,11 +66,17 @@ async function startGameSession() {
 async function endGameSession(result) {
   if (gameId === null) return;
   try {
-    await fetch("/api/game/end", {
+    const response = await fetch("/api/game/end", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ game_id: gameId, result }),
     });
+    if (response.ok) {
+      const data = await response.json();
+      if (data.solution) {
+        showSolution(data.solution);
+      }
+    }
   } catch (error) {
     console.error("Failed to end game session:", error);
   }
@@ -132,6 +138,13 @@ function revealExplanationButtons() {
 
     entry.querySelector(".log-answer-row").appendChild(toggle);
   }
+}
+
+function showSolution(solution) {
+  const solutionEl = document.createElement("div");
+  solutionEl.id = "solution-reveal";
+  solutionEl.textContent = `The answer was: ${solution}`;
+  gameOverMessage.insertAdjacentElement("afterend", solutionEl);
 }
 
 function endGame(won) {
