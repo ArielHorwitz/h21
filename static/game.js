@@ -413,12 +413,10 @@ async function init() {
   updateCounter();
   statusText.textContent = "Generating today's game...";
   submitBtn.disabled = true;
-  questionInput.disabled = true;
   await startGameSession();
   if (gameId !== null) {
     statusText.textContent = "";
     submitBtn.disabled = false;
-    questionInput.disabled = false;
     questionInput.focus();
   }
 }
