@@ -399,12 +399,12 @@ askForm.addEventListener("submit", async (event) => {
     statusText.textContent = error.message;
     statusText.classList.add("error");
   } finally {
+    if (!statusText.classList.contains("error")) {
+      statusText.textContent = "";
+    }
     if (!gameFinished) {
       submitBtn.disabled = false;
       questionInput.focus();
-      if (!statusText.classList.contains("error")) {
-        statusText.textContent = "";
-      }
     }
   }
 });
