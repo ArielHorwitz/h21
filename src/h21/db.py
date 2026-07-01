@@ -48,7 +48,7 @@ class GameDatabase:
             CREATE TABLE IF NOT EXISTS games (
                 game_id         INTEGER PRIMARY KEY AUTOINCREMENT,
                 date            TEXT NOT NULL,
-                topic_slug      TEXT NOT NULL DEFAULT 'western-history',
+                topic_slug      TEXT NOT NULL DEFAULT 'notable-people',
                 difficulty      TEXT NOT NULL DEFAULT 'medium',
                 started_at      TEXT NOT NULL,
                 ended_at        TEXT,
@@ -108,12 +108,16 @@ class GameDatabase:
         self._migrate_add_daily_limits()
         self._migrate_add_user_id_to_topics()
         self._migrate_add_user_id_to_questions()
-        self._seed_default_topic()
+        self._seed_default_topics()
 
-    def _seed_default_topic(self) -> None:
-        self._connection.execute(
+    def _seed_default_topics(self) -> None:
+        default_topics = [
+            ("notable-people", "Notable People"),
+            ("world-geography", "World Geography"),
+        ]
+        self._connection.executemany(
             "INSERT OR IGNORE INTO topics (slug, name) VALUES (?, ?)",
-            ("western-history", "Western History"),
+            default_topics,
         )
         self._connection.commit()
 
@@ -151,7 +155,7 @@ class GameDatabase:
             );
 
             INSERT INTO daily_puzzles (date, topic_slug, difficulty, solution)
-                SELECT date, 'western-history', 'medium', solution
+                SELECT date, 'notable-people', 'medium', solution
                 FROM daily_puzzles_old;
 
             DROP TABLE daily_puzzles_old;
@@ -166,7 +170,7 @@ class GameDatabase:
         ]
         if "topic_slug" not in columns:
             self._connection.execute(
-                "ALTER TABLE games ADD COLUMN topic_slug TEXT NOT NULL DEFAULT 'western-history'"
+                "ALTER TABLE games ADD COLUMN topic_slug TEXT NOT NULL DEFAULT 'notable-people'"
             )
         if "difficulty" not in columns:
             self._connection.execute(

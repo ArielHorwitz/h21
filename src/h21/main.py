@@ -46,7 +46,7 @@ class AskRequest(BaseModel):
 
 
 class NewGameRequest(BaseModel):
-    topic_slug: str = "western-history"
+    topic_slug: str = "notable-people"
     difficulty: str = "medium"
 
 
@@ -511,7 +511,7 @@ async def ask(request_body: AskRequest, request: Request) -> dict[str, str]:
         raise HTTPException(status_code=400, detail="Question must be 1-500 characters")
 
     # Look up topic + difficulty from the game session.
-    topic_slug = "western-history"
+    topic_slug = "notable-people"
     difficulty = "medium"
     if request_body.game_id is not None:
         game = database.get_game(request_body.game_id)
