@@ -67,6 +67,8 @@ Composite primary key: `(date, topic_slug, difficulty)`.
 | `alias` | TEXT | Optional human-readable label |
 | `role` | TEXT | Role granted to registrants |
 | `remaining_uses` | INTEGER | Decremented on each registration |
+| `daily_question_limit` | INTEGER | Default question limit for registrants (nullable, NULL = 105) |
+| `daily_topic_limit` | INTEGER | Default topic limit for registrants (nullable, NULL = 1) |
 | `created_at` | TEXT | UTC ISO timestamp |
 
 ### `daily_usage`
@@ -96,6 +98,7 @@ Current migrations in order:
 10. `_migrate_add_daily_limits` -- adds `daily_question_limit` and `daily_topic_limit` to `accounts`
 11. `_migrate_add_user_id_to_topics` -- adds `user_id` to `topics`
 12. `_migrate_add_user_id_to_questions` -- adds `user_id` to `questions`
+13. `_migrate_add_limits_to_invites` -- adds `daily_question_limit` and `daily_topic_limit` to `invites`
 
 ### Adding a New Migration
 

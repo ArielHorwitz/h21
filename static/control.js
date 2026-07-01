@@ -22,6 +22,7 @@ function renderInvites(invites) {
     <th>Alias</th>
     <th>Role</th>
     <th>Remaining</th>
+    <th>Limits</th>
     <th></th>
   </tr>`;
   table.appendChild(thead);
@@ -49,6 +50,16 @@ function renderInvites(invites) {
     const usesCell = document.createElement("td");
     usesCell.textContent = invite.remaining_uses;
     tr.appendChild(usesCell);
+
+    const limitsCell = document.createElement("td");
+    const questionLimit = invite.daily_question_limit;
+    const topicLimit = invite.daily_topic_limit;
+    if (questionLimit != null || topicLimit != null) {
+      limitsCell.textContent = `Q: ${questionLimit ?? 105} / T: ${topicLimit ?? 1}`;
+    } else {
+      limitsCell.textContent = "default";
+    }
+    tr.appendChild(limitsCell);
 
     const actionCell = document.createElement("td");
     const deleteBtn = document.createElement("button");
@@ -95,12 +106,16 @@ createForm.addEventListener("submit", async (event) => {
   const alias = document.getElementById("invite-alias").value.trim() || null;
   const uses = parseInt(document.getElementById("invite-uses").value, 10);
   const role = document.getElementById("invite-role").value;
+  const questionLimitRaw = document.getElementById("invite-question-limit").value;
+  const topicLimitRaw = document.getElementById("invite-topic-limit").value;
+  const daily_question_limit = questionLimitRaw ? parseInt(questionLimitRaw, 10) : null;
+  const daily_topic_limit = topicLimitRaw ? parseInt(topicLimitRaw, 10) : null;
 
   try {
     const response = await fetch("/api/invites", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ alias, uses, role }),
+      body: JSON.stringify({ alias, uses, role, daily_question_limit, daily_topic_limit }),
     });
     const data = await response.json();
 
@@ -110,6 +125,8 @@ createForm.addEventListener("submit", async (event) => {
       document.getElementById("invite-alias").value = "";
       document.getElementById("invite-uses").value = "1";
       document.getElementById("invite-role").value = "user";
+      document.getElementById("invite-question-limit").value = "";
+      document.getElementById("invite-topic-limit").value = "";
       await loadInvites();
     } else {
       createStatus.textContent = data.detail || "Failed to create invite.";

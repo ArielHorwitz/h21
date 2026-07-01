@@ -85,3 +85,23 @@ Now the client checks for an existing in-progress game before creating one.
 - **Invite codes** — 8-char uppercase hex, generated via CLI with optional alias
   and configurable use count (default 1); accounts record which invite was used
 - Old games (pre-accounts) become orphaned with `user_id = NULL` — acceptable
+
+### Invite-level default limits (follow-up)
+
+Previously, all new accounts received hardcoded default limits (105 questions,
+1 topic suggestion per day) regardless of which invite code was used. Admins had
+to manually adjust limits per-account after registration.
+
+- **`daily_question_limit` and `daily_topic_limit` columns added to `invites`
+  table** — nullable integers; NULL means "use account defaults" (105/1)
+- **`consume_invite()` updated** to return a dict with `role`,
+  `daily_question_limit`, and `daily_topic_limit` (previously returned just the
+  role string)
+- **`create_account()` updated** to accept optional limit overrides, applied when
+  the invite specifies non-NULL values
+- **Registration endpoint** passes invite limits through to account creation
+- **CLI** (`h21-invite`) — added `--question-limit` and `--topic-limit` flags
+- **API** (`POST /api/invites`) — added `daily_question_limit` and
+  `daily_topic_limit` fields to the request body
+- **Control panel** — invite creation form includes limit fields; invites table
+  shows a "Limits" column displaying `Q: N / T: N` or "default"

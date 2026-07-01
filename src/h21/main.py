@@ -254,12 +254,16 @@ async def register(request_body: RegisterRequest) -> JSONResponse:
 
     invite_code = request_body.invite_code.strip().upper()
 
-    role = database.consume_invite(invite_code)
-    if role is None:
+    invite = database.consume_invite(invite_code)
+    if invite is None:
         raise HTTPException(status_code=400, detail="Invalid or exhausted invite code")
 
     try:
-        user_id = database.create_account(username, password, role=role, invite_code=invite_code)
+        user_id = database.create_account(
+            username, password, role=invite["role"], invite_code=invite_code,
+            daily_question_limit=invite["daily_question_limit"],
+            daily_topic_limit=invite["daily_topic_limit"],
+        )
     except sqlite3.IntegrityError:
         raise HTTPException(status_code=409, detail="Username already taken")
 
@@ -311,6 +315,8 @@ class CreateInviteRequest(BaseModel):
     alias: Optional[str] = None
     uses: int = 1
     role: str = "user"
+    daily_question_limit: Optional[int] = None
+    daily_topic_limit: Optional[int] = None
 
 
 @app.get("/api/invites")
@@ -325,7 +331,11 @@ async def create_invite_api(request_body: CreateInviteRequest) -> dict[str, Any]
     if request_body.uses < 1:
         raise HTTPException(status_code=400, detail="Uses must be at least 1")
     alias = request_body.alias.strip() if request_body.alias else None
-    code = database.create_invite(alias=alias, uses=request_body.uses, role=request_body.role)
+    code = database.create_invite(
+        alias=alias, uses=request_body.uses, role=request_body.role,
+        daily_question_limit=request_body.daily_question_limit,
+        daily_topic_limit=request_body.daily_topic_limit,
+    )
     invite = database.get_invite(code)
     return invite
 

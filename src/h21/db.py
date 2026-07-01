@@ -85,6 +85,8 @@ class GameDatabase:
                 alias           TEXT,
                 role            TEXT NOT NULL DEFAULT 'user',
                 remaining_uses  INTEGER NOT NULL DEFAULT 1,
+                daily_question_limit INTEGER,
+                daily_topic_limit    INTEGER,
                 created_at      TEXT NOT NULL
             );
 
@@ -108,6 +110,7 @@ class GameDatabase:
         self._migrate_add_daily_limits()
         self._migrate_add_user_id_to_topics()
         self._migrate_add_user_id_to_questions()
+        self._migrate_add_limits_to_invites()
         self._seed_default_topics()
 
     def _seed_default_topics(self) -> None:
@@ -541,6 +544,21 @@ class GameDatabase:
             )
             self._connection.commit()
 
+    def _migrate_add_limits_to_invites(self) -> None:
+        columns = [
+            row["name"]
+            for row in self._connection.execute("PRAGMA table_info(invites)")
+        ]
+        if "daily_question_limit" not in columns:
+            self._connection.execute(
+                "ALTER TABLE invites ADD COLUMN daily_question_limit INTEGER"
+            )
+        if "daily_topic_limit" not in columns:
+            self._connection.execute(
+                "ALTER TABLE invites ADD COLUMN daily_topic_limit INTEGER"
+            )
+        self._connection.commit()
+
     # -- Accounts --
 
     @staticmethod
@@ -557,13 +575,19 @@ class GameDatabase:
     def create_account(
         self, username: str, password: str,
         role: str = "user", invite_code: Optional[str] = None,
+        daily_question_limit: Optional[int] = None,
+        daily_topic_limit: Optional[int] = None,
     ) -> int:
         now = _utcnow_iso()
         password_hash = self._hash_password(password)
+        question_limit = daily_question_limit if daily_question_limit is not None else 105
+        topic_limit = daily_topic_limit if daily_topic_limit is not None else 1
         cursor = self._connection.execute(
-            "INSERT INTO accounts (username, password_hash, role, invite_code, created_at) "
-            "VALUES (?, ?, ?, ?, ?)",
-            (username, password_hash, role, invite_code, now),
+            "INSERT INTO accounts (username, password_hash, role, invite_code, "
+            "daily_question_limit, daily_topic_limit, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (username, password_hash, role, invite_code,
+             question_limit, topic_limit, now),
         )
         self._connection.commit()
         assert cursor.lastrowid is not None
@@ -630,20 +654,25 @@ class GameDatabase:
 
     def create_invite(
         self, alias: Optional[str] = None, uses: int = 1, role: str = "user",
+        daily_question_limit: Optional[int] = None,
+        daily_topic_limit: Optional[int] = None,
     ) -> str:
         code = secrets.token_hex(4).upper()
         now = _utcnow_iso()
         self._connection.execute(
-            "INSERT INTO invites (code, alias, role, remaining_uses, created_at) "
-            "VALUES (?, ?, ?, ?, ?)",
-            (code, alias, role, uses, now),
+            "INSERT INTO invites (code, alias, role, remaining_uses, "
+            "daily_question_limit, daily_topic_limit, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (code, alias, role, uses, daily_question_limit, daily_topic_limit, now),
         )
         self._connection.commit()
         return code
 
     def get_invite(self, code: str) -> Optional[dict[str, Any]]:
         row = self._connection.execute(
-            "SELECT code, alias, role, remaining_uses, created_at FROM invites WHERE code = ?",
+            "SELECT code, alias, role, remaining_uses, "
+            "daily_question_limit, daily_topic_limit, created_at "
+            "FROM invites WHERE code = ?",
             (code,),
         ).fetchone()
         if row is None:
@@ -652,15 +681,17 @@ class GameDatabase:
 
     def get_all_invites(self) -> list[dict[str, Any]]:
         rows = self._connection.execute(
-            "SELECT code, alias, role, remaining_uses, created_at "
+            "SELECT code, alias, role, remaining_uses, "
+            "daily_question_limit, daily_topic_limit, created_at "
             "FROM invites ORDER BY created_at DESC"
         ).fetchall()
         return [dict(row) for row in rows]
 
-    def consume_invite(self, code: str) -> Optional[str]:
-        """Decrement remaining uses. Returns the invite's role if valid, else None."""
+    def consume_invite(self, code: str) -> Optional[dict[str, Any]]:
+        """Decrement remaining uses. Returns invite details if valid, else None."""
         row = self._connection.execute(
-            "SELECT remaining_uses, role FROM invites WHERE code = ?", (code,)
+            "SELECT remaining_uses, role, daily_question_limit, daily_topic_limit "
+            "FROM invites WHERE code = ?", (code,)
         ).fetchone()
         if row is None:
             return None
@@ -671,7 +702,11 @@ class GameDatabase:
             (code,),
         )
         self._connection.commit()
-        return row["role"]
+        return {
+            "role": row["role"],
+            "daily_question_limit": row["daily_question_limit"],
+            "daily_topic_limit": row["daily_topic_limit"],
+        }
 
     def delete_invite(self, code: str) -> bool:
         cursor = self._connection.execute(
