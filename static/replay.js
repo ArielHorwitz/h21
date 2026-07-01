@@ -37,13 +37,15 @@ function renderGame(game) {
   replayMeta.textContent = formatDate(game.date);
   replayMeta.className = "date";
 
-  const won = game.result === "win";
-  if (won) {
+  if (game.result === "win") {
     replayResult.textContent = `Won in ${game.questions_asked}/21 questions!`;
     replayResult.className = "replay-result win";
-  } else {
+  } else if (game.result === "loss") {
     replayResult.textContent = `Lost after ${game.questions_asked} questions.`;
     replayResult.className = "replay-result loss";
+  } else {
+    replayResult.textContent = `In progress — ${game.questions_asked}/21 questions asked.`;
+    replayResult.className = "replay-result in-progress";
   }
 
   // Build a map of after_question -> list of hint indices for interleaving.
@@ -120,6 +122,11 @@ function renderGame(game) {
   if (game.solution) {
     replaySolution.className = "solution-reveal";
     replaySolution.textContent = `The answer was: ${game.solution}`;
+  }
+
+  if (!game.result) {
+    spoilerGate.querySelector("p").textContent =
+      "This replay contains spoilers including all questions and answers so far.";
   }
 
   replayContent.hidden = false;

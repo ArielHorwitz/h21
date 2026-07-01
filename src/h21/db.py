@@ -432,12 +432,12 @@ class GameDatabase:
         return [dict(row) for row in rows]
 
     def get_game_by_share_code(self, share_code: str) -> Optional[dict[str, Any]]:
-        """Return a finished game by its share code, for public replay."""
+        """Return a game by its share code, for replay."""
         row = self._connection.execute(
             "SELECT game_id, date, topic_slug, difficulty, started_at, "
             "ended_at, result, questions_asked, share_code "
             "FROM games "
-            "WHERE share_code = ? AND ended_at IS NOT NULL "
+            "WHERE share_code = ? "
             "LIMIT 1",
             (share_code,),
         ).fetchone()
@@ -451,17 +451,16 @@ class GameDatabase:
         ).fetchall()
         game["questions"] = [dict(question) for question in questions]
         game["hint_reveals"] = self.get_hint_reveals(game["game_id"])
-        puzzle_date = date.fromisoformat(game["date"])
-        solution = self.get_puzzle_solution(
-            puzzle_date, game["topic_slug"], game["difficulty"],
-        )
-        hints = self.get_puzzle_hints(
-            puzzle_date, game["topic_slug"], game["difficulty"],
-        )
-        game["solution"] = solution
-        game["hints"] = hints
         topic_name = self.get_topic_name(game["topic_slug"])
         game["topic_name"] = topic_name
+        if game["ended_at"] is not None:
+            puzzle_date = date.fromisoformat(game["date"])
+            game["solution"] = self.get_puzzle_solution(
+                puzzle_date, game["topic_slug"], game["difficulty"],
+            )
+            game["hints"] = self.get_puzzle_hints(
+                puzzle_date, game["topic_slug"], game["difficulty"],
+            )
         return game
 
     def get_history(self, user_id: Optional[int] = None) -> list[dict[str, Any]]:
