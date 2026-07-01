@@ -106,6 +106,8 @@ class GameDatabase:
         self._migrate_add_role_columns()
         self._migrate_add_blocked_column()
         self._migrate_add_daily_limits()
+        self._migrate_add_user_id_to_topics()
+        self._migrate_add_user_id_to_questions()
         self._seed_default_topic()
 
     def _seed_default_topic(self) -> None:
@@ -192,10 +194,10 @@ class GameDatabase:
         ).fetchall()
         return [dict(row) for row in rows]
 
-    def add_topic(self, slug: str, name: str) -> None:
+    def add_topic(self, slug: str, name: str, user_id: Optional[int] = None) -> None:
         self._connection.execute(
-            "INSERT OR IGNORE INTO topics (slug, name) VALUES (?, ?)",
-            (slug, name),
+            "INSERT OR IGNORE INTO topics (slug, name, user_id) VALUES (?, ?, ?)",
+            (slug, name, user_id),
         )
         self._connection.commit()
 
@@ -285,15 +287,16 @@ class GameDatabase:
         question: str,
         answer: str,
         explanation: str = "",
+        user_id: Optional[int] = None,
     ) -> None:
         now = _utcnow_iso()
         self._connection.execute(
             """
             INSERT INTO questions
-                (game_id, question_number, question, answer, explanation, asked_at)
-            VALUES (?, ?, ?, ?, ?, ?)
+                (game_id, question_number, question, answer, explanation, asked_at, user_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
-            (game_id, question_number, question, answer, explanation, now),
+            (game_id, question_number, question, answer, explanation, now, user_id),
         )
         self._connection.execute(
             "UPDATE games SET questions_asked = ? WHERE game_id = ?",
@@ -312,12 +315,43 @@ class GameDatabase:
     def get_game(self, game_id: int) -> Optional[dict[str, Any]]:
         row = self._connection.execute(
             "SELECT game_id, date, topic_slug, difficulty, started_at, ended_at, "
-            "result, questions_asked FROM games WHERE game_id = ?",
+            "result, questions_asked, user_id FROM games WHERE game_id = ?",
             (game_id,),
         ).fetchone()
         if row is None:
             return None
         return dict(row)
+
+    def get_existing_game(
+        self, user_id: int, puzzle_date: date, topic_slug: str, difficulty: str,
+    ) -> Optional[dict[str, Any]]:
+        """Return the user's game for a given puzzle, if any."""
+        row = self._connection.execute(
+            "SELECT game_id, date, topic_slug, difficulty, started_at, "
+            "ended_at, result, questions_asked, user_id "
+            "FROM games "
+            "WHERE user_id = ? AND date = ? AND topic_slug = ? "
+            "AND difficulty = ? "
+            "ORDER BY started_at DESC LIMIT 1",
+            (user_id, puzzle_date.isoformat(), topic_slug, difficulty),
+        ).fetchone()
+        if row is None:
+            return None
+        game = dict(row)
+        questions = self._connection.execute(
+            "SELECT question_number, question, answer, explanation "
+            "FROM questions WHERE game_id = ? ORDER BY question_number",
+            (game["game_id"],),
+        ).fetchall()
+        game["questions"] = [dict(question) for question in questions]
+        if game["ended_at"] is not None:
+            solution = self.get_puzzle_solution(
+                puzzle_date, topic_slug, difficulty,
+            )
+            hints = self.get_puzzle_hints(puzzle_date, topic_slug, difficulty)
+            game["solution"] = solution
+            game["hints"] = hints
+        return game
 
     def get_history(self, user_id: Optional[int] = None) -> list[dict[str, Any]]:
         if user_id is not None:
@@ -480,6 +514,28 @@ class GameDatabase:
                 "ALTER TABLE accounts ADD COLUMN daily_topic_limit INTEGER NOT NULL DEFAULT 1"
             )
         self._connection.commit()
+
+    def _migrate_add_user_id_to_topics(self) -> None:
+        columns = [
+            row["name"]
+            for row in self._connection.execute("PRAGMA table_info(topics)")
+        ]
+        if "user_id" not in columns:
+            self._connection.execute(
+                "ALTER TABLE topics ADD COLUMN user_id INTEGER"
+            )
+            self._connection.commit()
+
+    def _migrate_add_user_id_to_questions(self) -> None:
+        columns = [
+            row["name"]
+            for row in self._connection.execute("PRAGMA table_info(questions)")
+        ]
+        if "user_id" not in columns:
+            self._connection.execute(
+                "ALTER TABLE questions ADD COLUMN user_id INTEGER"
+            )
+            self._connection.commit()
 
     # -- Accounts --
 

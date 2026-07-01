@@ -11,7 +11,7 @@ from typing import Any, AsyncIterator, Optional
 logger = logging.getLogger("h21")
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -439,12 +439,22 @@ async def create_topic(request_body: NewTopicRequest, request: Request) -> dict[
     if database.topic_exists(slug):
         raise HTTPException(status_code=409, detail="Topic already exists")
 
-    database.add_topic(slug, name)
+    database.add_topic(slug, name, user_id=user_id)
     database.increment_daily_topic_suggestions(user_id, date.today())
     return {"slug": slug, "name": name}
 
 
 # -- Game endpoints --
+
+@app.get("/api/game/existing")
+async def get_existing_game(request: Request, topic_slug: str, difficulty: str) -> JSONResponse:
+    user_id = request.state.user_id
+    today = date.today()
+    game = database.get_existing_game(user_id, today, topic_slug, difficulty)
+    if game is None:
+        return Response(status_code=204)
+    return JSONResponse(game)
+
 
 @app.post("/api/game/new")
 async def new_game(request_body: NewGameRequest, request: Request) -> dict[str, int]:
@@ -456,21 +466,27 @@ async def new_game(request_body: NewGameRequest, request: Request) -> dict[str, 
     if not database.topic_exists(request_body.topic_slug):
         raise HTTPException(status_code=404, detail="Topic not found")
 
-    await get_today_solution(request_body.topic_slug, request_body.difficulty)
     today = date.today()
     user_id = request.state.user_id
+    existing = database.get_existing_game(user_id, today, request_body.topic_slug, request_body.difficulty)
+    if existing is not None:
+        raise HTTPException(status_code=409, detail="Game already exists for this puzzle")
+
+    await get_today_solution(request_body.topic_slug, request_body.difficulty)
     game_id = database.create_game(today, request_body.topic_slug, request_body.difficulty, user_id=user_id)
     return {"game_id": game_id}
 
 
 @app.post("/api/game/end")
-async def end_game(request_body: EndGameRequest) -> dict[str, Any]:
+async def end_game(request_body: EndGameRequest, request: Request) -> dict[str, Any]:
     if request_body.result not in ("win", "loss"):
         raise HTTPException(status_code=400, detail="Result must be 'win' or 'loss'")
 
     game = database.get_game(request_body.game_id)
     if game is None:
         raise HTTPException(status_code=404, detail="Game not found")
+    if game["user_id"] is not None and game["user_id"] != request.state.user_id:
+        raise HTTPException(status_code=403, detail="Not your game")
 
     database.end_game(request_body.game_id, request_body.result)
 
@@ -500,6 +516,8 @@ async def ask(request_body: AskRequest, request: Request) -> dict[str, str]:
     if request_body.game_id is not None:
         game = database.get_game(request_body.game_id)
         if game is not None:
+            if game["user_id"] is not None and game["user_id"] != user_id:
+                raise HTTPException(status_code=403, detail="Not your game")
             topic_slug = game["topic_slug"]
             difficulty = game["difficulty"]
 
@@ -530,6 +548,7 @@ async def ask(request_body: AskRequest, request: Request) -> dict[str, str]:
                 question,
                 result.answer,
                 result.explanation,
+                user_id=user_id,
             )
 
     return {"answer": result.answer, "explanation": result.explanation}
@@ -541,13 +560,15 @@ class HintRequest(BaseModel):
 
 
 @app.post("/api/hint")
-async def get_hint(request_body: HintRequest) -> dict[str, Any]:
+async def get_hint(request_body: HintRequest, request: Request) -> dict[str, Any]:
     if request_body.hint_index < 0 or request_body.hint_index > 4:
         raise HTTPException(status_code=400, detail="hint_index must be 0-4")
 
     game = database.get_game(request_body.game_id)
     if game is None:
         raise HTTPException(status_code=404, detail="Game not found")
+    if game["user_id"] is not None and game["user_id"] != request.state.user_id:
+        raise HTTPException(status_code=403, detail="Not your game")
 
     required_questions = (request_body.hint_index + 1) * 4
     if game["questions_asked"] < required_questions:

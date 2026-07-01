@@ -47,6 +47,33 @@ accounts. Registration requires a one-time invite code generated via CLI.
 - `style.css` — removed password banner / disabled link styles, added auth/account
   page styles
 
+### User identity tracking (follow-up)
+
+Audited all tables and endpoints to ensure every user action is attributed.
+
+- **`user_id` column added to `topics` table** — tracks who suggested each topic
+  (migration, nullable for pre-existing topics)
+- **`user_id` column added to `questions` table** — direct attribution on each
+  question, avoiding the need to join through `games` (migration, nullable for
+  pre-existing questions)
+- **Game ownership verification** added to `/api/game/end`, `/api/ask`, and
+  `/api/hint` — endpoints now return 403 if the authenticated user doesn't own
+  the game (legacy games with `user_id = NULL` are exempt)
+- **`get_game()` updated** to include `user_id` in its SELECT so ownership
+  checks have the data they need
+
+### Game resume on page refresh (follow-up)
+
+Previously, refreshing the game page lost all progress and started a new game.
+Now the client checks for an existing in-progress game before creating one.
+
+- **`get_active_game()` in `db.py`** — finds the user's unfinished game for a
+  given date+topic+difficulty and returns it with its full question history
+- **`GET /api/game/active`** endpoint — returns the active game or 204 if none
+- **`game.js` updated** — `init()` calls `/api/game/active` first; if a game
+  exists, it restores `gameId`, `questionsAsked`, `answerHistory`, the question
+  log, and the hint panel; only creates a new game if no active game is found
+
 ## Design decisions
 
 - **Signed cookies** over session table — simplest approach, no session revocation

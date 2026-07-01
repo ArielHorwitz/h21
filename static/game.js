@@ -407,11 +407,61 @@ askForm.addEventListener("submit", async (event) => {
   }
 });
 
+async function tryResumeGame() {
+  try {
+    const params = new URLSearchParams({ topic_slug: topicSlug, difficulty });
+    const response = await fetch(`/api/game/existing?${params}`);
+    if (response.status === 204) return false;
+    if (!response.ok) return false;
+    const data = await response.json();
+    gameId = data.game_id;
+    // Replay questions one by one so addLogEntry numbering is correct.
+    for (const question of data.questions) {
+      questionsAsked++;
+      answerHistory.push(question.answer);
+      addLogEntry(question.question, question.answer, question.explanation);
+    }
+    updateCounter();
+    updateHintPanel();
+
+    if (data.result) {
+      const won = data.result === "win";
+      gameFinished = true;
+      submitBtn.disabled = true;
+      if (won) {
+        gameOverMessage.textContent = `You got it in ${questionsAsked} question${questionsAsked === 1 ? "" : "s"}!`;
+        gameOverMessage.className = "win";
+      } else {
+        gameOverMessage.textContent = "Game over — better luck tomorrow!";
+        gameOverMessage.className = "loss";
+      }
+      gameOverMessage.hidden = false;
+      revealExplanationButtons();
+      showShareButton(won);
+      if (data.solution) {
+        showSolution(data.solution);
+      }
+      if (data.hints) {
+        revealAllHints(data.hints);
+      }
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function init() {
   updateCounter();
-  statusText.textContent = "Generating today's game...";
+  statusText.textContent = "Loading...";
   submitBtn.disabled = true;
-  await startGameSession();
+
+  const resumed = await tryResumeGame();
+  if (!resumed) {
+    statusText.textContent = "Generating today's game...";
+    await startGameSession();
+  }
+
   if (gameId !== null) {
     statusText.textContent = "";
     submitBtn.disabled = false;
