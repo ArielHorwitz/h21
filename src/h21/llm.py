@@ -53,12 +53,14 @@ question to get a more decisive or useful answer. For example, "If you had \
 asked whether they were born in Europe, the answer would be yes" or "Asking \
 about the century rather than the exact year would narrow it down faster."
 
-Keep the explanation concise but substantive (3-6 sentences total). Then, on \
-the LAST line, write ONLY your one-word answer.
+Keep the explanation concise but substantive (3-6 sentences total). Write \
+your explanation in the SAME language the player used for their question.
+
+Then, on the LAST line, write ONLY your one-word answer.
 
 The player may ask questions in ANY language. Regardless of what language the \
 question is in, your final answer on the last line MUST always be one of the \
-five English words above. Your explanation may be in any language.\
+five English words above.\
 """
 
 
