@@ -585,4 +585,4 @@ def cli() -> None:
     host = args.host or ("0.0.0.0" if args.public else "127.0.0.1")
     port = args.port or (80 if args.public else 8000)
 
-    uvicorn.run(app, host=host, port=port)
+    uvicorn.run(app, host=host, port=port, log_config=None)
