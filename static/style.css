@@ -659,6 +659,17 @@ h1 a.home-link:hover {
   align-self: flex-start;
 }
 
+.control-section button[type="button"] {
+  padding: 0.6rem 1.2rem;
+  border: 1px solid #444;
+  border-radius: 4px;
+  background: transparent;
+  color: #888;
+  font-size: 1rem;
+  cursor: pointer;
+  align-self: flex-start;
+}
+
 .invites-table {
   width: 100%;
   border-collapse: collapse;
