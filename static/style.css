@@ -112,6 +112,17 @@ h1 a.home-link:hover {
   color: #f44336;
 }
 
+.difficulty-btn.game-in-progress {
+  border-color: #e2b714;
+  color: #e2b714;
+  background: rgba(226, 183, 20, 0.1);
+}
+
+.difficulty-btn.game-played {
+  border-color: #4caf50;
+  color: #4caf50;
+}
+
 #request-topic-section {
   border-top: 1px solid #333;
   padding-top: 1.5rem;

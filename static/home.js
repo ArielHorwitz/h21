@@ -6,6 +6,8 @@ const requestStatus = document.getElementById("request-topic-status");
 
 const DIFFICULTIES = ["normal", "expert"];
 
+let gameStatuses = {};
+
 function renderTopics(topics) {
   topicsList.innerHTML = "";
 
@@ -23,7 +25,15 @@ function renderTopics(topics) {
 
     for (const difficulty of DIFFICULTIES) {
       const link = document.createElement("a");
-      link.className = `difficulty-btn ${difficulty}`;
+      const statusKey = `${topic.slug}:${difficulty}`;
+      const status = gameStatuses[statusKey];
+      let className = `difficulty-btn ${difficulty}`;
+      if (status === "in_progress") {
+        className += " game-in-progress";
+      } else if (status === "win" || status === "loss") {
+        className += " game-played";
+      }
+      link.className = className;
       link.textContent = difficulty.charAt(0).toUpperCase() + difficulty.slice(1);
       link.href = `/game?topic=${encodeURIComponent(topic.slug)}&difficulty=${difficulty}`;
       buttons.appendChild(link);
@@ -34,8 +44,27 @@ function renderTopics(topics) {
   }
 }
 
+async function loadGameStatuses() {
+  try {
+    const response = await fetch("/api/game/statuses");
+    if (response.ok) {
+      const statuses = await response.json();
+      gameStatuses = {};
+      for (const game of statuses) {
+        const key = `${game.topic_slug}:${game.difficulty}`;
+        if (!(key in gameStatuses)) {
+          gameStatuses[key] = game.result || "in_progress";
+        }
+      }
+    }
+  } catch (error) {
+    console.error("Failed to load game statuses:", error);
+  }
+}
+
 async function loadTopics() {
   try {
+    await loadGameStatuses();
     const response = await fetch("/api/topics");
     if (response.ok) {
       const topics = await response.json();

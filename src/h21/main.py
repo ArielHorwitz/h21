@@ -471,6 +471,13 @@ async def get_existing_game(request: Request, topic_slug: str, difficulty: str) 
     return JSONResponse(game)
 
 
+@app.get("/api/game/statuses")
+async def get_game_statuses(request: Request) -> list[dict[str, Any]]:
+    user_id = request.state.user_id
+    today = date.today()
+    return database.get_game_statuses(user_id, today)
+
+
 @app.post("/api/game/new")
 async def new_game(request_body: NewGameRequest, request: Request) -> dict[str, Any]:
     if request_body.difficulty not in VALID_DIFFICULTIES:

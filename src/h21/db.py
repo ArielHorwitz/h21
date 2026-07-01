@@ -417,6 +417,20 @@ class GameDatabase:
             game["hints"] = hints
         return game
 
+    def get_game_statuses(
+        self, user_id: int, puzzle_date: date,
+    ) -> list[dict[str, Any]]:
+        """Return summary status of all games for a user on a given date."""
+        rows = self._connection.execute(
+            "SELECT topic_slug, difficulty, result, questions_asked "
+            "FROM games "
+            "WHERE user_id = ? AND date = ? "
+            "AND (result IS NOT NULL OR questions_asked > 0) "
+            "ORDER BY started_at DESC",
+            (user_id, puzzle_date.isoformat()),
+        ).fetchall()
+        return [dict(row) for row in rows]
+
     def get_game_by_share_code(self, share_code: str) -> Optional[dict[str, Any]]:
         """Return a finished game by its share code, for public replay."""
         row = self._connection.execute(
