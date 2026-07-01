@@ -928,6 +928,10 @@ h1 a.home-link:hover {
   outline: none;
 }
 
+#replay-code-input::placeholder {
+  text-transform: none;
+}
+
 #replay-code-input:focus {
   border-color: #e2b714;
 }
