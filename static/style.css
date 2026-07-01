@@ -465,8 +465,8 @@ h1 a.home-link:hover {
 .nav-bar a {
   color: #ccc;
   text-decoration: none;
-  font-size: 1.3rem;
   line-height: 1;
+  display: flex;
   transition: color 0.15s;
 }
 
