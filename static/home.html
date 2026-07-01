@@ -20,21 +20,6 @@
 
     <div id="topics-list"></div>
 
-    <div id="replay-section">
-      <h2>Replay a Game</h2>
-      <form id="replay-form">
-        <input
-          type="text"
-          id="replay-code-input"
-          placeholder="Enter game ID..."
-          autocomplete="off"
-          maxlength="6"
-          required
-        >
-        <button type="submit" id="replay-btn">View</button>
-      </form>
-    </div>
-
     <div id="request-topic-section">
       <h2>Request a Topic</h2>
       <form id="request-topic-form">
@@ -49,6 +34,21 @@
         <button type="submit" id="request-topic-btn">Request</button>
       </form>
       <p id="request-topic-status" hidden></p>
+    </div>
+
+    <div id="replay-section">
+      <h2>Replay a Game</h2>
+      <form id="replay-form">
+        <input
+          type="text"
+          id="replay-code-input"
+          placeholder="Enter game ID..."
+          autocomplete="off"
+          maxlength="6"
+          required
+        >
+        <button type="submit" id="replay-btn">View</button>
+      </form>
     </div>
   </main>
   <script src="/static/home.js"></script>
