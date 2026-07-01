@@ -478,6 +478,7 @@ class GameDatabase:
                     AND g.difficulty = dp.difficulty
                 LEFT JOIN topics t ON g.topic_slug = t.slug
                 WHERE g.user_id = ?
+                AND (g.result IS NOT NULL OR g.questions_asked > 0)
                 ORDER BY g.started_at DESC
                 """,
                 (user_id,),
