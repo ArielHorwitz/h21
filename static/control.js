@@ -352,5 +352,11 @@ document.getElementById("tables-btn").addEventListener("click", () => {
   queryForm.requestSubmit();
 });
 
+document.getElementById("select-btn").addEventListener("click", () => {
+  queryInput.value = "select\n    *\nfrom table\nlimit 1000";
+  queryInput.focus();
+  queryInput.setSelectionRange(18, 23);
+});
+
 loadInvites();
 loadUsers();
