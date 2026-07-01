@@ -528,7 +528,7 @@ async def ask(request_body: AskRequest, request: Request) -> dict[str, str]:
                 result.explanation,
             )
 
-    return {"answer": result.answer, "explanation": result.explanation, "why_label": result.why_label}
+    return {"answer": result.answer, "explanation": result.explanation}
 
 
 class HintRequest(BaseModel):
