@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Optional, Protocol
+from typing import Any, Optional, Protocol
 
 from openai import APIConnectionError, APIStatusError, AsyncOpenAI
 
@@ -81,9 +81,15 @@ class LLMError(Exception):
 
 
 class OpenAIClient:
-    def __init__(self, api_key: str, model: str = "gpt-4o") -> None:
+    def __init__(
+        self,
+        api_key: str,
+        model: str = "gpt-5.4-nano",
+        reasoning_effort: Optional[str] = None,
+    ) -> None:
         self._client = AsyncOpenAI(api_key=api_key)
         self._model = model
+        self._reasoning_effort = reasoning_effort
 
     async def ask(
         self,
@@ -91,21 +97,25 @@ class OpenAIClient:
         user_message: str,
     ) -> str:
         logger.info(
-            "LLM request: model=%s user_message=%r",
-            self._model, user_message[:200],
+            "LLM request: model=%s reasoning_effort=%s user_message=%r",
+            self._model, self._reasoning_effort, user_message[:200],
         )
         logger.debug(
             "LLM request system_prompt: %s", system_prompt[:500],
         )
 
+        kwargs: dict[str, Any] = {
+            "model": self._model,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_message},
+            ],
+        }
+        if self._reasoning_effort is not None:
+            kwargs["reasoning_effort"] = self._reasoning_effort
+
         try:
-            response = await self._client.chat.completions.create(
-                model=self._model,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_message},
-                ],
-            )
+            response = await self._client.chat.completions.create(**kwargs)
         except APIConnectionError:
             logger.exception("LLM connection error")
             raise LLMError(

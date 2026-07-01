@@ -4,6 +4,7 @@ import os
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Optional
 APP_NAME = "h21"
 
 
@@ -25,6 +26,7 @@ def _data_dir() -> Path:
 class Config:
     openai_api_key: str
     model: str
+    reasoning_effort: Optional[str]
     db_path: Path
     log_path: Path
 
@@ -49,11 +51,13 @@ def load_config() -> Config:
     data_dir.mkdir(parents=True, exist_ok=True)
     db_path = data_dir / "h21.db"
 
-    model = raw.get("model", "gpt-4o")
+    model = raw.get("model", "gpt-5.4-nano")
+    reasoning_effort = raw.get("reasoning_effort", "high")
 
     return Config(
         openai_api_key=openai_api_key,
         model=model,
+        reasoning_effort=reasoning_effort,
         db_path=db_path,
         log_path=data_dir / "h21.log",
     )

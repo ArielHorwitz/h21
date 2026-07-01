@@ -101,7 +101,11 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     root_logger.addHandler(file_handler)
 
     logger.info("Logging to %s", config.log_path)
-    llm_client = OpenAIClient(config.openai_api_key, model=config.model)
+    llm_client = OpenAIClient(
+        config.openai_api_key,
+        model=config.model,
+        reasoning_effort=config.reasoning_effort,
+    )
     database = GameDatabase(config.db_path)
     signing_secret = _ensure_signing_secret(_data_dir())
     database.ensure_schema()
