@@ -300,6 +300,7 @@ queryForm.addEventListener("submit", async (event) => {
     if (!response.ok) {
       queryResult.textContent = data.detail || "Query failed.";
       queryResult.className = "status-error";
+      queryResult.scrollIntoView({ behavior: "smooth", block: "start" });
       return;
     }
 
@@ -307,6 +308,7 @@ queryForm.addEventListener("submit", async (event) => {
 
     if (data.columns.length === 0) {
       queryResult.textContent = "Query returned no columns.";
+      queryResult.scrollIntoView({ behavior: "smooth", block: "start" });
       return;
     }
 
@@ -341,9 +343,11 @@ queryForm.addEventListener("submit", async (event) => {
     count.textContent = `${data.rows.length} row${data.rows.length === 1 ? "" : "s"}`;
     queryResult.appendChild(count);
     queryResult.appendChild(table);
+    queryResult.scrollIntoView({ behavior: "smooth", block: "start" });
   } catch {
     queryResult.textContent = "Network error.";
     queryResult.className = "status-error";
+    queryResult.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 });
 
