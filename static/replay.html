@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='15' fill='%231a1a2e'/><text x='50' y='76' font-size='80' font-weight='bold' font-family='sans-serif' fill='%23e2b714' text-anchor='middle'>H</text></svg>">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>H21 — Replay</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <nav class="nav-bar">
+    <a href="/" title="Home">&#8962;</a>
+    <a href="/help" title="Help">?</a>
+    <a href="/account" title="Account">&#9881;</a>
+  </nav>
+  <main>
+    <h1><a href="/" class="home-link">H21</a></h1>
+    <p class="subtitle" id="replay-subtitle">Game Replay</p>
+
+    <div id="replay-error" hidden></div>
+
+    <div id="replay-content" hidden>
+      <div id="replay-meta"></div>
+
+      <div id="spoiler-gate">
+        <p>This replay contains spoilers including all questions, answers, and the solution.</p>
+        <button id="reveal-btn">Reveal Game</button>
+      </div>
+
+      <div id="replay-details" hidden>
+        <div id="replay-result"></div>
+        <div id="replay-question-log"></div>
+
+        <aside id="replay-hints">
+          <h3>Hints</h3>
+          <ol id="replay-hint-list"></ol>
+        </aside>
+
+        <div id="replay-solution"></div>
+      </div>
+    </div>
+  </main>
+  <script src="/static/replay.js"></script>
+</body>
+</html>

@@ -28,6 +28,7 @@ const QUESTIONS_PER_HINT = 4;
 let questionsAsked = 0;
 let gameFinished = false;
 let gameId = null;
+let shareCode = null;
 const answerHistory = [];
 let hintsUnlocked = 0;
 let hintsRevealed = 0;
@@ -58,6 +59,7 @@ async function startGameSession() {
     if (response.ok) {
       const data = await response.json();
       gameId = data.game_id;
+      shareCode = data.share_code;
     } else {
       const error = await response.json().catch(() => ({}));
       statusText.textContent = error.detail || "Failed to start game session.";
@@ -287,7 +289,8 @@ function buildShareText(won) {
     ? `Won in ${questionsAsked}/${MAX_QUESTIONS} questions!`
     : `Lost after ${questionsAsked} questions.`;
   const hintsLine = hintsUsed > 0 ? ` (${hintsUsed} hint${hintsUsed === 1 ? "" : "s"} used)` : "";
-  return `H21 \u2014 ${topicLabel} (${difficultyLabel})\n${dateStr}\n\n${resultLine}${hintsLine}\n${emojis}`;
+  const shareCodeLine = shareCode ? `\nGame ID: ${shareCode}` : "";
+  return `H21 \u2014 ${topicLabel} (${difficultyLabel})\n${dateStr}\n\n${resultLine}${hintsLine}\n${emojis}${shareCodeLine}`;
 }
 
 function showShareButton(won) {
@@ -415,6 +418,7 @@ async function tryResumeGame() {
     if (!response.ok) return false;
     const data = await response.json();
     gameId = data.game_id;
+    shareCode = data.share_code;
     // Replay questions one by one so addLogEntry numbering is correct.
     for (const question of data.questions) {
       questionsAsked++;

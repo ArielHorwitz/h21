@@ -111,6 +111,7 @@ class GameDatabase:
         self._migrate_add_user_id_to_topics()
         self._migrate_add_user_id_to_questions()
         self._migrate_add_limits_to_invites()
+        self._migrate_add_share_code_to_games()
         self._seed_default_topics()
 
     def _seed_default_topics(self) -> None:
@@ -191,6 +192,27 @@ class GameDatabase:
             self._connection.execute(
                 "ALTER TABLE daily_puzzles ADD COLUMN hints TEXT NOT NULL DEFAULT '[]'"
             )
+            self._connection.commit()
+
+    def _migrate_add_share_code_to_games(self) -> None:
+        columns = [
+            row["name"]
+            for row in self._connection.execute("PRAGMA table_info(games)")
+        ]
+        if "share_code" not in columns:
+            self._connection.execute(
+                "ALTER TABLE games ADD COLUMN share_code TEXT"
+            )
+            # Backfill existing games with random share codes.
+            rows = self._connection.execute(
+                "SELECT game_id FROM games WHERE share_code IS NULL"
+            ).fetchall()
+            for row in rows:
+                code = secrets.token_hex(3).upper()
+                self._connection.execute(
+                    "UPDATE games SET share_code = ? WHERE game_id = ?",
+                    (code, row["game_id"]),
+                )
             self._connection.commit()
 
     # -- Topics --
@@ -276,16 +298,17 @@ class GameDatabase:
     def create_game(
         self, puzzle_date: date, topic_slug: str, difficulty: str,
         user_id: Optional[int] = None,
-    ) -> int:
+    ) -> dict[str, Any]:
         now = _utcnow_iso()
+        share_code = secrets.token_hex(3).upper()
         cursor = self._connection.execute(
-            "INSERT INTO games (date, topic_slug, difficulty, started_at, user_id) "
-            "VALUES (?, ?, ?, ?, ?)",
-            (puzzle_date.isoformat(), topic_slug, difficulty, now, user_id),
+            "INSERT INTO games (date, topic_slug, difficulty, started_at, user_id, share_code) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (puzzle_date.isoformat(), topic_slug, difficulty, now, user_id, share_code),
         )
         self._connection.commit()
         assert cursor.lastrowid is not None
-        return cursor.lastrowid
+        return {"game_id": cursor.lastrowid, "share_code": share_code}
 
     def record_question(
         self,
@@ -322,7 +345,7 @@ class GameDatabase:
     def get_game(self, game_id: int) -> Optional[dict[str, Any]]:
         row = self._connection.execute(
             "SELECT game_id, date, topic_slug, difficulty, started_at, ended_at, "
-            "result, questions_asked, user_id FROM games WHERE game_id = ?",
+            "result, questions_asked, user_id, share_code FROM games WHERE game_id = ?",
             (game_id,),
         ).fetchone()
         if row is None:
@@ -335,7 +358,7 @@ class GameDatabase:
         """Return the user's game for a given puzzle, if any."""
         row = self._connection.execute(
             "SELECT game_id, date, topic_slug, difficulty, started_at, "
-            "ended_at, result, questions_asked, user_id "
+            "ended_at, result, questions_asked, user_id, share_code "
             "FROM games "
             "WHERE user_id = ? AND date = ? AND topic_slug = ? "
             "AND difficulty = ? "
@@ -358,6 +381,38 @@ class GameDatabase:
             hints = self.get_puzzle_hints(puzzle_date, topic_slug, difficulty)
             game["solution"] = solution
             game["hints"] = hints
+        return game
+
+    def get_game_by_share_code(self, share_code: str) -> Optional[dict[str, Any]]:
+        """Return a finished game by its share code, for public replay."""
+        row = self._connection.execute(
+            "SELECT game_id, date, topic_slug, difficulty, started_at, "
+            "ended_at, result, questions_asked, share_code "
+            "FROM games "
+            "WHERE share_code = ? AND ended_at IS NOT NULL "
+            "LIMIT 1",
+            (share_code,),
+        ).fetchone()
+        if row is None:
+            return None
+        game = dict(row)
+        questions = self._connection.execute(
+            "SELECT question_number, question, answer, explanation "
+            "FROM questions WHERE game_id = ? ORDER BY question_number",
+            (game["game_id"],),
+        ).fetchall()
+        game["questions"] = [dict(question) for question in questions]
+        puzzle_date = date.fromisoformat(game["date"])
+        solution = self.get_puzzle_solution(
+            puzzle_date, game["topic_slug"], game["difficulty"],
+        )
+        hints = self.get_puzzle_hints(
+            puzzle_date, game["topic_slug"], game["difficulty"],
+        )
+        game["solution"] = solution
+        game["hints"] = hints
+        topic_name = self.get_topic_name(game["topic_slug"])
+        game["topic_name"] = topic_name
         return game
 
     def get_history(self, user_id: Optional[int] = None) -> list[dict[str, Any]]:

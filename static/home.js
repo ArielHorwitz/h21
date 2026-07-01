@@ -84,4 +84,14 @@ requestForm.addEventListener("submit", async (event) => {
   }
 });
 
+const replayForm = document.getElementById("replay-form");
+const replayCodeInput = document.getElementById("replay-code-input");
+
+replayForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const code = replayCodeInput.value.trim();
+  if (!code) return;
+  window.location.href = `/replay?code=${encodeURIComponent(code)}`;
+});
+
 loadTopics();

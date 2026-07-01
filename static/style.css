@@ -416,7 +416,8 @@ h1 a.home-link:hover {
   color: #1a1a2e;
 }
 
-#solution-reveal {
+#solution-reveal,
+.solution-reveal {
   text-align: center;
   font-size: 1.1rem;
   margin-top: 0.5rem;
@@ -827,4 +828,143 @@ h1 a.home-link:hover {
 
 .emoji-example {
   margin-right: 0.4rem;
+}
+
+/* -- Replay section (home page) -- */
+
+#replay-section {
+  border-top: 1px solid #333;
+  padding-top: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+#replay-section h2 {
+  font-size: 1.1rem;
+  color: #ccc;
+  margin-bottom: 0.75rem;
+}
+
+#replay-form {
+  display: flex;
+  gap: 0.5rem;
+}
+
+#replay-code-input {
+  flex: 1;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid #333;
+  border-radius: 4px;
+  background: #16213e;
+  color: #e0e0e0;
+  font-size: 1rem;
+  font-family: monospace;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  outline: none;
+}
+
+#replay-code-input:focus {
+  border-color: #e2b714;
+}
+
+#replay-btn {
+  padding: 0.6rem 1.2rem;
+  border: none;
+  border-radius: 4px;
+  background: #e2b714;
+  color: #1a1a2e;
+  font-weight: bold;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+/* -- Replay page -- */
+
+#replay-error {
+  text-align: center;
+  color: #f44336;
+  margin-top: 1.5rem;
+  font-size: 1rem;
+}
+
+#replay-meta {
+  margin-bottom: 1rem;
+}
+
+#spoiler-gate {
+  text-align: center;
+  margin-top: 1.5rem;
+  padding: 1.5rem;
+  background: #16213e;
+  border: 1px solid #333;
+  border-radius: 6px;
+}
+
+#spoiler-gate p {
+  color: #999;
+  margin-bottom: 1rem;
+}
+
+#reveal-btn {
+  padding: 0.6rem 1.5rem;
+  border: 1px solid #e2b714;
+  border-radius: 4px;
+  background: transparent;
+  color: #e2b714;
+  font-size: 1rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+#reveal-btn:hover {
+  background: #e2b714;
+  color: #1a1a2e;
+}
+
+.replay-result {
+  text-align: center;
+  font-size: 1.2rem;
+  margin-bottom: 1rem;
+  padding: 1rem;
+  border-radius: 4px;
+}
+
+.replay-result.win {
+  background: #1b3a1b;
+  color: #4caf50;
+}
+
+.replay-result.loss {
+  background: #3a1b1b;
+  color: #f44336;
+}
+
+#replay-question-log {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+#replay-hints {
+  background: #16213e;
+  border: 1px solid #333;
+  border-radius: 6px;
+  padding: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+#replay-hints h3 {
+  font-size: 0.9rem;
+  color: #e2b714;
+  margin-bottom: 0.5rem;
+}
+
+#replay-hint-list {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
 }

@@ -235,6 +235,11 @@ async def control_page() -> FileResponse:
     return FileResponse(STATIC_DIR / "control.html")
 
 
+@app.get("/replay")
+async def replay_page() -> FileResponse:
+    return FileResponse(STATIC_DIR / "replay.html")
+
+
 @app.get("/login")
 async def login_page() -> FileResponse:
     return FileResponse(STATIC_DIR / "login.html")
@@ -467,7 +472,7 @@ async def get_existing_game(request: Request, topic_slug: str, difficulty: str) 
 
 
 @app.post("/api/game/new")
-async def new_game(request_body: NewGameRequest, request: Request) -> dict[str, int]:
+async def new_game(request_body: NewGameRequest, request: Request) -> dict[str, Any]:
     if request_body.difficulty not in VALID_DIFFICULTIES:
         raise HTTPException(
             status_code=400,
@@ -483,8 +488,8 @@ async def new_game(request_body: NewGameRequest, request: Request) -> dict[str, 
         raise HTTPException(status_code=409, detail="Game already exists for this puzzle")
 
     await get_today_solution(request_body.topic_slug, request_body.difficulty)
-    game_id = database.create_game(today, request_body.topic_slug, request_body.difficulty, user_id=user_id)
-    return {"game_id": game_id}
+    game = database.create_game(today, request_body.topic_slug, request_body.difficulty, user_id=user_id)
+    return {"game_id": game["game_id"], "share_code": game["share_code"]}
 
 
 @app.post("/api/game/end")
@@ -593,6 +598,18 @@ async def get_hint(request_body: HintRequest, request: Request) -> dict[str, Any
         raise HTTPException(status_code=404, detail="Hint not available")
 
     return {"hint": hints[request_body.hint_index], "hint_index": request_body.hint_index}
+
+
+@app.get("/api/replay/{share_code}")
+async def get_replay(share_code: str) -> dict[str, Any]:
+    game = database.get_game_by_share_code(share_code.upper())
+    if game is None:
+        raise HTTPException(status_code=404, detail="Game not found")
+    # Strip internal fields the client doesn't need.
+    game.pop("game_id", None)
+    game.pop("started_at", None)
+    game.pop("ended_at", None)
+    return game
 
 
 @app.get("/api/history")
