@@ -460,7 +460,7 @@ async def new_game(request_body: NewGameRequest, request: Request) -> dict[str, 
 
 
 @app.post("/api/game/end")
-async def end_game(request_body: EndGameRequest) -> dict[str, str]:
+async def end_game(request_body: EndGameRequest) -> dict[str, Any]:
     if request_body.result not in ("win", "loss"):
         raise HTTPException(status_code=400, detail="Result must be 'win' or 'loss'")
 
