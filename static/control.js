@@ -353,9 +353,9 @@ document.getElementById("tables-btn").addEventListener("click", () => {
 });
 
 document.getElementById("select-btn").addEventListener("click", () => {
-  queryInput.value = "select\n    *\nfrom table\nlimit 1000";
+  queryInput.value = "select *\nfrom table\nlimit 1000";
   queryInput.focus();
-  queryInput.setSelectionRange(18, 23);
+  queryInput.setSelectionRange(14, 19);
 });
 
 loadInvites();
