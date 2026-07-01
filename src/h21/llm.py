@@ -95,7 +95,7 @@ guess.
 - Hint 3: A moderately helpful clue that points toward the answer.
 - Hint 4: A strong clue that significantly narrows the possibilities.
 - Hint 5: A very direct clue that makes the answer almost obvious without \
-naming the subject.
+naming the subject or explicitly giving away the answer.
 
 Do NOT include the solution's name in any hint. Each hint should be a single \
 sentence.
