@@ -597,7 +597,15 @@ async def get_hint(request_body: HintRequest, request: Request) -> dict[str, Any
     if request_body.hint_index >= len(hints):
         raise HTTPException(status_code=404, detail="Hint not available")
 
-    return {"hint": hints[request_body.hint_index], "hint_index": request_body.hint_index}
+    database.record_hint_reveal(
+        request_body.game_id, request_body.hint_index, game["questions_asked"],
+    )
+
+    return {
+        "hint": hints[request_body.hint_index],
+        "hint_index": request_body.hint_index,
+        "after_question": game["questions_asked"],
+    }
 
 
 @app.get("/api/replay/{share_code}")

@@ -33,6 +33,7 @@ const answerHistory = [];
 let hintsUnlocked = 0;
 let hintsRevealed = 0;
 const revealedHintIndices = new Set();
+const hintRevealAfterQuestion = new Map(); // hint_index -> after_question
 
 // Display topic and difficulty in the subtitle.
 const difficultyLabel = difficulty.charAt(0).toUpperCase() + difficulty.slice(1);
@@ -169,6 +170,17 @@ function addLogEntry(question, answer, explanation) {
   questionLog.scrollTop = questionLog.scrollHeight;
 }
 
+function addHintLogEntry(hintIndex) {
+  const entry = document.createElement("div");
+  entry.className = "log-entry hint-log-entry";
+  const label = document.createElement("div");
+  label.className = "hint-log-label";
+  label.textContent = `Opened hint ${hintIndex + 1}`;
+  entry.appendChild(label);
+  questionLog.appendChild(entry);
+  questionLog.scrollTop = questionLog.scrollHeight;
+}
+
 function revealExplanationButtons() {
   for (const entry of questionLog.querySelectorAll(".log-entry")) {
     const explanationEl = entry.querySelector(".log-explanation");
@@ -252,6 +264,8 @@ async function fetchAndRevealHint(hintIndex) {
     li.classList.add("revealed");
     hintsRevealed++;
     revealedHintIndices.add(hintIndex);
+    hintRevealAfterQuestion.set(hintIndex, data.after_question);
+    addHintLogEntry(hintIndex);
 
     if (hintList.children.length > hintsRevealed) {
       const nextBtn = hintList.children[hintsRevealed].querySelector(".hint-reveal-btn");
@@ -273,13 +287,21 @@ const ANSWER_EMOJI = {
 
 function buildShareText(won) {
   const dateStr = todayDate.textContent;
+  // Build a map of after_question -> list of hint indices revealed at that point.
+  const hintsAfterQuestion = new Map();
+  for (const [hintIndex, afterQuestion] of hintRevealAfterQuestion) {
+    if (!hintsAfterQuestion.has(afterQuestion)) {
+      hintsAfterQuestion.set(afterQuestion, []);
+    }
+    hintsAfterQuestion.get(afterQuestion).push(hintIndex);
+  }
   let emojis = "";
   for (let question_index = 0; question_index < answerHistory.length; question_index++) {
     emojis += ANSWER_EMOJI[answerHistory[question_index]] || "";
     const questionNumber = question_index + 1;
-    if (questionNumber % QUESTIONS_PER_HINT === 0) {
-      const hintIndex = questionNumber / QUESTIONS_PER_HINT - 1;
-      if (revealedHintIndices.has(hintIndex)) {
+    const hintsHere = hintsAfterQuestion.get(questionNumber);
+    if (hintsHere) {
+      for (const _hintIndex of hintsHere) {
         emojis += "\u{1F4A1}";
       }
     }
@@ -419,11 +441,31 @@ async function tryResumeGame() {
     const data = await response.json();
     gameId = data.game_id;
     shareCode = data.share_code;
+    // Build a map of after_question -> list of hint reveals for interleaving.
+    const hintRevealsAtQuestion = new Map();
+    if (data.hint_reveals) {
+      for (const reveal of data.hint_reveals) {
+        revealedHintIndices.add(reveal.hint_index);
+        hintRevealAfterQuestion.set(reveal.hint_index, reveal.after_question);
+        hintsRevealed++;
+        if (!hintRevealsAtQuestion.has(reveal.after_question)) {
+          hintRevealsAtQuestion.set(reveal.after_question, []);
+        }
+        hintRevealsAtQuestion.get(reveal.after_question).push(reveal.hint_index);
+      }
+    }
     // Replay questions one by one so addLogEntry numbering is correct.
     for (const question of data.questions) {
       questionsAsked++;
       answerHistory.push(question.answer);
       addLogEntry(question.question, question.answer, question.explanation);
+      // Insert any hint reveals that happened after this question.
+      const hintsHere = hintRevealsAtQuestion.get(questionsAsked);
+      if (hintsHere) {
+        for (const hintIndex of hintsHere) {
+          addHintLogEntry(hintIndex);
+        }
+      }
     }
     updateCounter();
     updateHintPanel();

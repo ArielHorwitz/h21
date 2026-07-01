@@ -46,6 +46,17 @@ function renderGame(game) {
     replayResult.className = "replay-result loss";
   }
 
+  // Build a map of after_question -> list of hint indices for interleaving.
+  const hintRevealsAtQuestion = new Map();
+  if (game.hint_reveals) {
+    for (const reveal of game.hint_reveals) {
+      if (!hintRevealsAtQuestion.has(reveal.after_question)) {
+        hintRevealsAtQuestion.set(reveal.after_question, []);
+      }
+      hintRevealsAtQuestion.get(reveal.after_question).push(reveal.hint_index);
+    }
+  }
+
   for (const question of game.questions) {
     const entry = document.createElement("div");
     entry.className = "log-entry";
@@ -78,6 +89,20 @@ function renderGame(game) {
     }
 
     replayQuestionLog.appendChild(entry);
+
+    // Insert any hint reveals that happened after this question.
+    const hintsHere = hintRevealsAtQuestion.get(question.question_number);
+    if (hintsHere) {
+      for (const hintIndex of hintsHere) {
+        const hintEntry = document.createElement("div");
+        hintEntry.className = "log-entry hint-log-entry";
+        const label = document.createElement("div");
+        label.className = "hint-log-label";
+        label.textContent = `Opened hint ${hintIndex + 1}`;
+        hintEntry.appendChild(label);
+        replayQuestionLog.appendChild(hintEntry);
+      }
+    }
   }
 
   if (game.hints && game.hints.length > 0) {

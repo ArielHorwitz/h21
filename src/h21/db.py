@@ -112,6 +112,7 @@ class GameDatabase:
         self._migrate_add_user_id_to_questions()
         self._migrate_add_limits_to_invites()
         self._migrate_add_share_code_to_games()
+        self._migrate_add_hint_reveals_table()
         self._seed_default_topics()
 
     def _seed_default_topics(self) -> None:
@@ -214,6 +215,19 @@ class GameDatabase:
                     (code, row["game_id"]),
                 )
             self._connection.commit()
+
+    def _migrate_add_hint_reveals_table(self) -> None:
+        self._connection.execute("""
+            CREATE TABLE IF NOT EXISTS hint_reveals (
+                game_id         INTEGER NOT NULL,
+                hint_index      INTEGER NOT NULL,
+                after_question  INTEGER NOT NULL,
+                revealed_at     TEXT NOT NULL,
+                PRIMARY KEY (game_id, hint_index),
+                FOREIGN KEY (game_id) REFERENCES games(game_id)
+            )
+        """)
+        self._connection.commit()
 
     # -- Topics --
 
@@ -342,6 +356,25 @@ class GameDatabase:
         )
         self._connection.commit()
 
+    def record_hint_reveal(
+        self, game_id: int, hint_index: int, after_question: int,
+    ) -> None:
+        now = _utcnow_iso()
+        self._connection.execute(
+            "INSERT OR IGNORE INTO hint_reveals (game_id, hint_index, after_question, revealed_at) "
+            "VALUES (?, ?, ?, ?)",
+            (game_id, hint_index, after_question, now),
+        )
+        self._connection.commit()
+
+    def get_hint_reveals(self, game_id: int) -> list[dict[str, Any]]:
+        rows = self._connection.execute(
+            "SELECT hint_index, after_question FROM hint_reveals "
+            "WHERE game_id = ? ORDER BY hint_index",
+            (game_id,),
+        ).fetchall()
+        return [dict(row) for row in rows]
+
     def get_game(self, game_id: int) -> Optional[dict[str, Any]]:
         row = self._connection.execute(
             "SELECT game_id, date, topic_slug, difficulty, started_at, ended_at, "
@@ -374,6 +407,7 @@ class GameDatabase:
             (game["game_id"],),
         ).fetchall()
         game["questions"] = [dict(question) for question in questions]
+        game["hint_reveals"] = self.get_hint_reveals(game["game_id"])
         if game["ended_at"] is not None:
             solution = self.get_puzzle_solution(
                 puzzle_date, topic_slug, difficulty,
@@ -402,6 +436,7 @@ class GameDatabase:
             (game["game_id"],),
         ).fetchall()
         game["questions"] = [dict(question) for question in questions]
+        game["hint_reveals"] = self.get_hint_reveals(game["game_id"])
         puzzle_date = date.fromisoformat(game["date"])
         solution = self.get_puzzle_solution(
             puzzle_date, game["topic_slug"], game["difficulty"],
