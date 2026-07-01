@@ -15,7 +15,7 @@ const hintList = document.getElementById("hint-list");
 // Parse topic and difficulty from URL query params.
 const urlParams = new URLSearchParams(window.location.search);
 const topicSlug = urlParams.get("topic") || "notable-people";
-const difficulty = urlParams.get("difficulty") || "medium";
+const difficulty = urlParams.get("difficulty") || "normal";
 
 // Redirect to home if no topic specified in URL.
 if (!urlParams.has("topic")) {

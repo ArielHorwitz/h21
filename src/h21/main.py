@@ -47,7 +47,7 @@ class AskRequest(BaseModel):
 
 class NewGameRequest(BaseModel):
     topic_slug: str = "notable-people"
-    difficulty: str = "medium"
+    difficulty: str = "normal"
 
 
 class EndGameRequest(BaseModel):
@@ -522,7 +522,7 @@ async def ask(request_body: AskRequest, request: Request) -> dict[str, str]:
 
     # Look up topic + difficulty from the game session.
     topic_slug = "notable-people"
-    difficulty = "medium"
+    difficulty = "normal"
     if request_body.game_id is not None:
         game = database.get_game(request_body.game_id)
         if game is not None:

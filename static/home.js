@@ -4,7 +4,7 @@ const topicNameInput = document.getElementById("topic-name-input");
 const requestTopicBtn = document.getElementById("request-topic-btn");
 const requestStatus = document.getElementById("request-topic-status");
 
-const DIFFICULTIES = ["easy", "medium", "hard"];
+const DIFFICULTIES = ["normal", "expert"];
 
 function renderTopics(topics) {
   topicsList.innerHTML = "";

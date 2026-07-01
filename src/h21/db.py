@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 
-VALID_DIFFICULTIES = frozenset({"easy", "medium", "hard"})
+VALID_DIFFICULTIES = frozenset({"normal", "expert"})
 
 
 def slugify(name: str) -> str:

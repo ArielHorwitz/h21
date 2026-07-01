@@ -11,15 +11,11 @@ logger = logging.getLogger("h21.llm")
 LEGAL_RESPONSES = frozenset({"yes", "no", "partially", "depends", "win"})
 
 DIFFICULTY_GUIDANCE = {
-    "easy": (
-        "The subject should be very well-known — something that someone with "
-        "only basic familiarity with the topic would recognize immediately."
+    "normal": (
+        "The subject should be well-known — someone with casual familiarity "
+        "with the topic should be able to guess it."
     ),
-    "medium": (
-        "The subject should require moderate familiarity with the topic. "
-        "Someone who has studied it casually should be able to guess it."
-    ),
-    "hard": (
+    "expert": (
         "The subject should be obscure — something that only someone "
         "intimately familiar with the topic would know."
     ),
@@ -219,7 +215,7 @@ async def generate_solution(
     difficulty: str,
 ) -> str:
     """Ask the LLM to generate a new daily solution, avoiding repeats."""
-    guidance = DIFFICULTY_GUIDANCE.get(difficulty, DIFFICULTY_GUIDANCE["medium"])
+    guidance = DIFFICULTY_GUIDANCE.get(difficulty, DIFFICULTY_GUIDANCE["normal"])
     prompt = GENERATE_SOLUTION_PROMPT_TEMPLATE.format(
         topic=topic_name,
         difficulty_guidance=guidance,
