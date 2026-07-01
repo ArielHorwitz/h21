@@ -1,7 +1,7 @@
 [project]
 name = "h21"
 version = "0.1.0"
-description = "History-themed 21 questions game powered by an LLM"
+description = "AI-powered 21 questions trivia game"
 requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.115",
