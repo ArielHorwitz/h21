@@ -468,14 +468,15 @@ class GameDatabase:
         if user_id is not None:
             games = self._connection.execute(
                 """
-                SELECT g.game_id, g.date, g.topic_slug, g.difficulty,
-                       dp.solution, g.started_at, g.ended_at,
-                       g.result, g.questions_asked
+                SELECT g.game_id, g.date, g.topic_slug, t.name AS topic_name,
+                       g.difficulty, dp.solution, g.started_at, g.ended_at,
+                       g.result, g.questions_asked, g.share_code
                 FROM games g
                 JOIN daily_puzzles dp
                     ON g.date = dp.date
                     AND g.topic_slug = dp.topic_slug
                     AND g.difficulty = dp.difficulty
+                LEFT JOIN topics t ON g.topic_slug = t.slug
                 WHERE g.user_id = ?
                 ORDER BY g.started_at DESC
                 """,
@@ -484,14 +485,15 @@ class GameDatabase:
         else:
             games = self._connection.execute(
                 """
-                SELECT g.game_id, g.date, g.topic_slug, g.difficulty,
-                       dp.solution, g.started_at, g.ended_at,
-                       g.result, g.questions_asked
+                SELECT g.game_id, g.date, g.topic_slug, t.name AS topic_name,
+                       g.difficulty, dp.solution, g.started_at, g.ended_at,
+                       g.result, g.questions_asked, g.share_code
                 FROM games g
                 JOIN daily_puzzles dp
                     ON g.date = dp.date
                     AND g.topic_slug = dp.topic_slug
                     AND g.difficulty = dp.difficulty
+                LEFT JOIN topics t ON g.topic_slug = t.slug
                 ORDER BY g.started_at DESC
                 """
             ).fetchall()
@@ -512,8 +514,10 @@ class GameDatabase:
                 "game_id": game["game_id"],
                 "date": game["date"],
                 "topic_slug": game["topic_slug"],
+                "topic_name": game["topic_name"] or game["topic_slug"],
                 "difficulty": game["difficulty"],
                 "solution": game["solution"],
+                "share_code": game["share_code"],
                 "started_at": game["started_at"],
                 "ended_at": game["ended_at"],
                 "result": game["result"],

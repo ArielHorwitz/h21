@@ -608,6 +608,45 @@ h1 a.home-link:hover {
   color: #1a1a2e;
 }
 
+/* -- Game history table -- */
+
+.history-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+  margin-top: 0.75rem;
+}
+
+.history-table th {
+  text-align: left;
+  color: #999;
+  font-weight: normal;
+  font-size: 0.8rem;
+  padding: 0.4rem 0.5rem;
+  border-bottom: 1px solid #333;
+}
+
+.history-table td {
+  padding: 0.5rem;
+  border-bottom: 1px solid #262640;
+  color: #ccc;
+}
+
+.result-win { color: #4caf50; }
+.result-loss { color: #f44336; }
+.result-in-progress { color: #e2b714; }
+
+.history-replay-link {
+  color: #e2b714;
+  text-decoration: none;
+  font-size: 0.85rem;
+}
+
+.history-replay-link:hover {
+  text-decoration: underline;
+  color: #fff;
+}
+
 /* -- Control panel -- */
 
 .control-section {
