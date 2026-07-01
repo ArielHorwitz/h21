@@ -407,9 +407,14 @@ h1 a.home-link:hover {
   color: #f44336;
 }
 
-#share-btn {
-  display: block;
-  margin: 0.75rem auto 0;
+#share-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.share-btn {
   padding: 0.5rem 1.5rem;
   border: 1px solid #e2b714;
   border-radius: 4px;
@@ -421,7 +426,7 @@ h1 a.home-link:hover {
   transition: background 0.15s, color 0.15s;
 }
 
-#share-btn:hover {
+.share-btn:hover {
   background: #e2b714;
   color: #1a1a2e;
 }

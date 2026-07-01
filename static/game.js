@@ -311,45 +311,60 @@ function buildShareText(won) {
     ? `Won in ${questionsAsked}/${MAX_QUESTIONS} questions!`
     : `Lost after ${questionsAsked} questions.`;
   const hintsLine = hintsUsed > 0 ? ` (${hintsUsed} hint${hintsUsed === 1 ? "" : "s"} used)` : "";
-  const shareCodeLine = shareCode ? `\nGame ID: ${shareCode}` : "";
-  return `H21 \u2014 ${topicLabel} (${difficultyLabel})\n${dateStr}\n\n${resultLine}${hintsLine}\n${emojis}${shareCodeLine}`;
+  return `H21 \u2014 ${topicLabel} (${difficultyLabel})\n${dateStr}\n\n${resultLine}${hintsLine}\n${emojis}`;
 }
 
-function showShareButton(won) {
-  const shareBtn = document.createElement("button");
-  shareBtn.id = "share-btn";
-  shareBtn.textContent = "Share";
-  shareBtn.addEventListener("click", async () => {
-    const text = buildShareText(won);
-    let copied = false;
-    if (navigator.clipboard && window.isSecureContext) {
-      try {
-        await navigator.clipboard.writeText(text);
-        copied = true;
-      } catch { /* fall through to execCommand fallback */ }
-    }
-    if (!copied) {
-      const textarea = document.createElement("textarea");
-      textarea.value = text;
-      textarea.style.position = "fixed";
-      textarea.style.opacity = "0";
-      document.body.appendChild(textarea);
-      textarea.select();
-      copied = document.execCommand("copy");
-      document.body.removeChild(textarea);
-    }
-    shareBtn.textContent = copied ? "Copied!" : "Failed to copy";
-    setTimeout(() => { shareBtn.textContent = "Share"; }, 2000);
+async function copyToClipboard(text) {
+  if (navigator.clipboard && window.isSecureContext) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch { /* fall through to execCommand fallback */ }
+  }
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.style.position = "fixed";
+  textarea.style.opacity = "0";
+  document.body.appendChild(textarea);
+  textarea.select();
+  const copied = document.execCommand("copy");
+  document.body.removeChild(textarea);
+  return copied;
+}
+
+function createShareButton(label, text) {
+  const btn = document.createElement("button");
+  btn.className = "share-btn";
+  btn.textContent = label;
+  btn.addEventListener("click", async () => {
+    const copied = await copyToClipboard(text);
+    btn.textContent = copied ? "Copied!" : "Failed to copy";
+    setTimeout(() => { btn.textContent = label; }, 2000);
   });
-  gameOverMessage.insertAdjacentElement("afterend", shareBtn);
+  return btn;
+}
+
+function showShareButtons(won) {
+  const container = document.createElement("div");
+  container.id = "share-buttons";
+
+  const baseText = buildShareText(won);
+  container.appendChild(createShareButton("Share", baseText));
+
+  if (shareCode) {
+    const spoilerText = baseText + `\nGame ID: ${shareCode}`;
+    container.appendChild(createShareButton("Share (with spoilers)", spoilerText));
+  }
+
+  gameOverMessage.insertAdjacentElement("afterend", container);
 }
 
 function showSolution(solution) {
   const solutionEl = document.createElement("div");
   solutionEl.id = "solution-reveal";
   solutionEl.textContent = `The answer was: ${solution}`;
-  const shareBtn = document.getElementById("share-btn");
-  const anchor = shareBtn || gameOverMessage;
+  const shareButtons = document.getElementById("share-buttons");
+  const anchor = shareButtons || gameOverMessage;
   anchor.insertAdjacentElement("afterend", solutionEl);
 }
 
@@ -367,7 +382,7 @@ function endGame(won) {
   gameOverMessage.hidden = false;
 
   revealExplanationButtons();
-  showShareButton(won);
+  showShareButtons(won);
   endGameSession(won ? "win" : "loss");
 }
 
@@ -483,7 +498,7 @@ async function tryResumeGame() {
       }
       gameOverMessage.hidden = false;
       revealExplanationButtons();
-      showShareButton(won);
+      showShareButtons(won);
       if (data.solution) {
         showSolution(data.solution);
       }
