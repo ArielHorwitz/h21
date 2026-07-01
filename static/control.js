@@ -347,5 +347,10 @@ queryForm.addEventListener("submit", async (event) => {
   }
 });
 
+document.getElementById("tables-btn").addEventListener("click", () => {
+  queryInput.value = "SELECT name FROM sqlite_master WHERE type='table'";
+  queryForm.requestSubmit();
+});
+
 loadInvites();
 loadUsers();
