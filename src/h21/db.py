@@ -77,7 +77,19 @@ class GameDatabase:
                 daily_question_limit INTEGER NOT NULL,
                 daily_topic_limit    INTEGER NOT NULL,
                 invite_code TEXT,
+                display_name TEXT,
+                player_code  TEXT UNIQUE,
+                anonymous    INTEGER NOT NULL DEFAULT 0,
                 created_at  TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS friends (
+                user_id    INTEGER NOT NULL,
+                friend_id  INTEGER NOT NULL,
+                created_at TEXT NOT NULL,
+                PRIMARY KEY (user_id, friend_id),
+                FOREIGN KEY (user_id) REFERENCES accounts(user_id),
+                FOREIGN KEY (friend_id) REFERENCES accounts(user_id)
             );
 
             CREATE TABLE IF NOT EXISTS invites (
@@ -119,6 +131,8 @@ class GameDatabase:
         self._migrate_add_limits_to_invites()
         self._migrate_add_share_code_to_games()
         self._migrate_add_hint_reveals_table()
+        self._migrate_add_profile_columns()
+        self._migrate_add_friends_table()
         self._seed_default_topics()
 
     def _seed_default_topics(self) -> None:
@@ -231,6 +245,70 @@ class GameDatabase:
                 revealed_at     TEXT NOT NULL,
                 PRIMARY KEY (game_id, hint_index),
                 FOREIGN KEY (game_id) REFERENCES games(game_id)
+            )
+        """)
+        self._connection.commit()
+
+    def _migrate_add_profile_columns(self) -> None:
+        columns = [
+            row["name"]
+            for row in self._connection.execute("PRAGMA table_info(accounts)")
+        ]
+        if "display_name" not in columns:
+            self._connection.execute(
+                "ALTER TABLE accounts ADD COLUMN display_name TEXT"
+            )
+        if "player_code" not in columns:
+            self._connection.execute(
+                "ALTER TABLE accounts ADD COLUMN player_code TEXT"
+            )
+            self._connection.execute(
+                "CREATE UNIQUE INDEX IF NOT EXISTS idx_accounts_player_code "
+                "ON accounts(player_code)"
+            )
+        if "anonymous" not in columns:
+            self._connection.execute(
+                "ALTER TABLE accounts ADD COLUMN anonymous INTEGER NOT NULL DEFAULT 0"
+            )
+        self._connection.commit()
+        # Backfill player codes for existing accounts that don't have one.
+        rows = self._connection.execute(
+            "SELECT user_id FROM accounts WHERE player_code IS NULL"
+        ).fetchall()
+        for row in rows:
+            self._generate_and_set_player_code(row["user_id"])
+
+    def _generate_player_code(self, hex_bytes: int = 2) -> str:
+        """Generate a unique player code. Starts at 4 hex chars, grows on exhaustion."""
+        max_retries = 10
+        for attempt in range(max_retries):
+            code = secrets.token_hex(hex_bytes).upper()
+            existing = self._connection.execute(
+                "SELECT 1 FROM accounts WHERE player_code = ?", (code,)
+            ).fetchone()
+            if existing is None:
+                return code
+        # If we exhausted retries, bump length.
+        return self._generate_player_code(hex_bytes + 1)
+
+    def _generate_and_set_player_code(self, user_id: int) -> str:
+        code = self._generate_player_code()
+        self._connection.execute(
+            "UPDATE accounts SET player_code = ? WHERE user_id = ?",
+            (code, user_id),
+        )
+        self._connection.commit()
+        return code
+
+    def _migrate_add_friends_table(self) -> None:
+        self._connection.execute("""
+            CREATE TABLE IF NOT EXISTS friends (
+                user_id    INTEGER NOT NULL,
+                friend_id  INTEGER NOT NULL,
+                created_at TEXT NOT NULL,
+                PRIMARY KEY (user_id, friend_id),
+                FOREIGN KEY (user_id) REFERENCES accounts(user_id),
+                FOREIGN KEY (friend_id) REFERENCES accounts(user_id)
             )
         """)
         self._connection.commit()
@@ -714,12 +792,13 @@ class GameDatabase:
     ) -> int:
         now = _utcnow_iso()
         password_hash = self._hash_password(password)
+        player_code = self._generate_player_code()
         cursor = self._connection.execute(
             "INSERT INTO accounts (username, password_hash, role, invite_code, "
-            "daily_question_limit, daily_topic_limit, created_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            "daily_question_limit, daily_topic_limit, player_code, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             (username, password_hash, role, invite_code,
-             daily_question_limit, daily_topic_limit, now),
+             daily_question_limit, daily_topic_limit, player_code, now),
         )
         self._connection.commit()
         assert cursor.lastrowid is not None
@@ -727,7 +806,8 @@ class GameDatabase:
 
     def get_account_by_username(self, username: str) -> Optional[dict[str, Any]]:
         row = self._connection.execute(
-            "SELECT user_id, username, password_hash, role, blocked, created_at "
+            "SELECT user_id, username, password_hash, role, blocked, "
+            "player_code, created_at "
             "FROM accounts WHERE username = ?",
             (username,),
         ).fetchone()
@@ -738,7 +818,8 @@ class GameDatabase:
     def get_account_by_id(self, user_id: int) -> Optional[dict[str, Any]]:
         row = self._connection.execute(
             "SELECT user_id, username, role, blocked, "
-            "daily_question_limit, daily_topic_limit, invite_code, created_at "
+            "daily_question_limit, daily_topic_limit, invite_code, "
+            "display_name, player_code, anonymous, created_at "
             "FROM accounts WHERE user_id = ?",
             (user_id,),
         ).fetchone()
@@ -749,7 +830,8 @@ class GameDatabase:
     def get_all_accounts(self) -> list[dict[str, Any]]:
         rows = self._connection.execute(
             "SELECT user_id, username, role, blocked, "
-            "daily_question_limit, daily_topic_limit, invite_code, created_at "
+            "daily_question_limit, daily_topic_limit, invite_code, "
+            "display_name, player_code, anonymous, created_at "
             "FROM accounts ORDER BY created_at DESC"
         ).fetchall()
         return [dict(row) for row in rows]
@@ -781,6 +863,81 @@ class GameDatabase:
         if not self._verify_password(password, account["password_hash"]):
             return None
         return account["user_id"]
+
+    # -- Profiles & Friends --
+
+    def update_profile(
+        self, user_id: int, display_name: Optional[str], anonymous: bool,
+    ) -> bool:
+        """Update display_name and anonymous flag. Returns True if the row was updated."""
+        cursor = self._connection.execute(
+            "UPDATE accounts SET display_name = ?, anonymous = ? WHERE user_id = ?",
+            (display_name, 1 if anonymous else 0, user_id),
+        )
+        self._connection.commit()
+        return cursor.rowcount > 0
+
+    def get_account_by_player_code(self, player_code: str) -> Optional[dict[str, Any]]:
+        """Look up an account by player_code. Returns None if not found."""
+        row = self._connection.execute(
+            "SELECT user_id, username, display_name, player_code, anonymous "
+            "FROM accounts WHERE player_code = ?",
+            (player_code,),
+        ).fetchone()
+        if row is None:
+            return None
+        return dict(row)
+
+    def search_players(self, query: str, exclude_user_id: int) -> list[dict[str, Any]]:
+        """Search non-anonymous accounts by username or display_name (LIKE match).
+        Excludes the searching user and anonymous players. Returns up to 20 results."""
+        pattern = f"%{query}%"
+        rows = self._connection.execute(
+            "SELECT user_id, username, display_name, player_code "
+            "FROM accounts "
+            "WHERE anonymous = 0 AND user_id != ? "
+            "AND (username LIKE ? OR display_name LIKE ?) "
+            "LIMIT 20",
+            (exclude_user_id, pattern, pattern),
+        ).fetchall()
+        return [dict(row) for row in rows]
+
+    def add_friend(self, user_id: int, friend_id: int) -> bool:
+        """Add a follow relationship. Returns True if created, False if already exists."""
+        if user_id == friend_id:
+            return False
+        now = _utcnow_iso()
+        try:
+            self._connection.execute(
+                "INSERT INTO friends (user_id, friend_id, created_at) VALUES (?, ?, ?)",
+                (user_id, friend_id, now),
+            )
+            self._connection.commit()
+            return True
+        except sqlite3.IntegrityError:
+            return False
+
+    def remove_friend(self, user_id: int, friend_id: int) -> bool:
+        """Remove a follow relationship. Returns True if a row was deleted."""
+        cursor = self._connection.execute(
+            "DELETE FROM friends WHERE user_id = ? AND friend_id = ?",
+            (user_id, friend_id),
+        )
+        self._connection.commit()
+        return cursor.rowcount > 0
+
+    def get_friends(self, user_id: int) -> list[dict[str, Any]]:
+        """Return all friends (accounts the user follows). Does NOT filter by
+        anonymous — the API layer gates access."""
+        rows = self._connection.execute(
+            "SELECT a.user_id, a.username, a.display_name, a.player_code, a.anonymous "
+            "FROM friends f "
+            "JOIN accounts a ON a.user_id = f.friend_id "
+            "WHERE f.user_id = ? "
+            "ORDER BY f.created_at",
+            (user_id,),
+        ).fetchall()
+        return [dict(row) for row in rows]
 
     # -- Invites --
 

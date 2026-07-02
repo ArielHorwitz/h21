@@ -592,6 +592,97 @@ h1 a.home-link:hover {
   font-size: 1rem;
 }
 
+/* -- Profile & Friends -- */
+
+.profile-inline-edit {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.profile-inline-edit input {
+  flex: 1;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid #333;
+  border-radius: 4px;
+  background: #16213e;
+  color: #e0e0e0;
+  font-size: 1rem;
+  outline: none;
+}
+
+.profile-inline-edit input:focus {
+  border-color: #e2b714;
+}
+
+.player-code-text {
+  font-family: monospace;
+  font-size: 1.1rem;
+  letter-spacing: 0.1em;
+  color: #e2b714;
+}
+
+.toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  font-size: 0.95rem;
+  color: #e0e0e0;
+}
+
+.toggle-label input[type="checkbox"] {
+  width: 1rem;
+  height: 1rem;
+  accent-color: #e2b714;
+}
+
+.field-hint {
+  font-size: 0.8rem;
+  color: #888;
+  margin-top: 0.2rem;
+}
+
+.field-status {
+  font-size: 0.85rem;
+  margin-top: 0.2rem;
+  min-height: 1.2em;
+}
+
+.search-result-row,
+.friend-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid #262640;
+}
+
+.search-result-info,
+.friend-info {
+  font-size: 0.9rem;
+  color: #ccc;
+}
+
+.friend-anonymous {
+  color: #666;
+  font-style: italic;
+}
+
+.search-follow-btn {
+  padding: 0.2rem 0.6rem;
+  font-size: 0.8rem;
+}
+
+#friends-list-container {
+  margin-top: 0.75rem;
+}
+
+#friends-list-container > label {
+  font-size: 0.85rem;
+  color: #999;
+}
+
 #logout-btn {
   padding: 0.6rem 1.2rem;
   border: 1px solid #f44336;

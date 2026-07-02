@@ -57,6 +57,37 @@ Build the social foundation that all comparison features depend on:
 - Personal trajectory, head-to-head rivalry, skill profiles
 - Category-based recognition
 
+## Implementation Status
+
+### Phase 1 — Complete
+
+All components implemented and tested:
+
+**Database** (`src/h21/db.py`):
+- New columns on `accounts`: `display_name`, `player_code`, `anonymous`
+- New `friends` table with `(user_id, friend_id)` primary key
+- Two migrations (`_migrate_add_profile_columns`, `_migrate_add_friends_table`)
+  with player code backfill for existing accounts
+- Six new methods: `update_profile`, `get_account_by_player_code`,
+  `search_players`, `add_friend`, `remove_friend`, `get_friends`
+- Four modified methods: `create_account` (generates player code),
+  `get_account_by_id`, `get_account_by_username`, `get_all_accounts`
+
+**API** (`src/h21/main.py`):
+- `GET /api/me` extended with `display_name`, `player_code`, `anonymous`
+- `PATCH /api/me` — update display name and anonymous flag
+- `GET /api/players/search?q=...` — name search (403 if anonymous)
+- `GET /api/players/{code}` — code lookup (403 if anonymous, 404 if target anonymous)
+- `GET /api/friends` — list follows (empty if anonymous)
+- `POST /api/friends/{code}` — follow (403 if anonymous)
+- `DELETE /api/friends/{code}` — unfollow (always allowed)
+
+**Frontend** (`static/account.html`, `static/account.js`, `static/style.css`):
+- Profile section: display name editor, player code with copy, anonymous toggle
+- Friends section: add by code, debounced search with follow buttons, friends
+  list with remove buttons
+- Friends section auto-disables when anonymous mode is toggled on
+
 ## Key Design Decisions
 
 | Decision | Rationale |

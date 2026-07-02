@@ -22,10 +22,58 @@
         <label>Username</label>
         <p id="account-username" class="account-value"></p>
       </div>
+      <div class="settings-field">
+        <label>Display Name</label>
+        <div class="profile-inline-edit">
+          <input type="text" id="display-name-input" maxlength="40" placeholder="(same as username)">
+          <button type="button" id="save-display-name-btn" class="secondary-btn">Save</button>
+        </div>
+        <p id="display-name-status" class="field-status"></p>
+      </div>
+      <div class="settings-field">
+        <label>Player Code</label>
+        <div class="profile-inline-edit">
+          <span id="player-code-value" class="account-value player-code-text"></span>
+          <button type="button" id="copy-code-btn" class="secondary-btn">Copy</button>
+        </div>
+      </div>
+      <div class="settings-field">
+        <label class="toggle-label">
+          <input type="checkbox" id="anonymous-toggle">
+          <span>Anonymous mode</span>
+        </label>
+        <p class="field-hint">Hides you from others and disables social features.</p>
+      </div>
       <div class="settings-actions">
         <a href="/control" id="control-link" class="secondary-btn" hidden>Control Panel</a>
         <button type="button" id="logout-btn">Log out</button>
         <button type="button" id="back-btn" class="secondary-btn">Back</button>
+      </div>
+    </div>
+
+    <div id="friends-section" class="auth-section" style="margin-top: 1.5rem;">
+      <h2>Friends</h2>
+      <div id="friends-disabled-message" hidden>
+        <p class="field-hint">Social features are disabled while anonymous mode is on.</p>
+      </div>
+      <div id="friends-controls">
+        <div class="settings-field">
+          <label>Add by player code</label>
+          <div class="profile-inline-edit">
+            <input type="text" id="add-friend-input" placeholder="e.g. A1B2" style="text-transform: uppercase; font-family: monospace;">
+            <button type="button" id="add-friend-btn">Add</button>
+          </div>
+          <p id="add-friend-status" class="field-status"></p>
+        </div>
+        <div class="settings-field">
+          <label>Search players</label>
+          <input type="text" id="search-players-input" placeholder="Search by name...">
+          <div id="search-results"></div>
+        </div>
+        <div id="friends-list-container">
+          <label>Following</label>
+          <div id="friends-list"></div>
+        </div>
       </div>
     </div>
 

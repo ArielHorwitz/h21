@@ -325,7 +325,119 @@ async def get_me(request: Request) -> dict[str, Any]:
         "daily_topic_limit": account["daily_topic_limit"],
         "questions_used_today": usage["questions_used"],
         "topic_suggestions_used_today": usage["topic_suggestions_used"],
+        "display_name": account["display_name"],
+        "player_code": account["player_code"],
+        "anonymous": bool(account["anonymous"]),
     }
+
+
+# -- Profile & Friends endpoints --
+
+class UpdateProfileRequest(BaseModel):
+    display_name: Optional[str] = None
+    anonymous: Optional[bool] = None
+
+
+@app.patch("/api/me")
+async def update_me(request_body: UpdateProfileRequest, request: Request) -> dict[str, str]:
+    user_id = request.state.user_id
+    account = database.get_account_by_id(user_id)
+    if account is None:
+        raise HTTPException(status_code=404, detail="Account not found")
+
+    # Resolve current values for fields not provided.
+    display_name = account["display_name"]
+    anonymous = bool(account["anonymous"])
+
+    if request_body.display_name is not None:
+        display_name = request_body.display_name.strip() or None
+        if display_name is not None and len(display_name) > 40:
+            raise HTTPException(
+                status_code=400, detail="Display name must be 1-40 characters"
+            )
+    elif "display_name" in (request_body.model_fields_set or set()):
+        # Explicitly set to null.
+        display_name = None
+
+    if request_body.anonymous is not None:
+        anonymous = request_body.anonymous
+
+    database.update_profile(user_id, display_name, anonymous)
+    return {"status": "ok"}
+
+
+@app.get("/api/players/search")
+async def search_players(request: Request, q: str = "") -> list[dict[str, Any]]:
+    user_id = request.state.user_id
+    account = database.get_account_by_id(user_id)
+    if account and account["anonymous"]:
+        raise HTTPException(status_code=403, detail="Social features are disabled in anonymous mode")
+    if len(q) < 1:
+        raise HTTPException(status_code=400, detail="Query must be at least 1 character")
+    results = database.search_players(q, exclude_user_id=user_id)
+    return [
+        {"username": row["username"], "display_name": row["display_name"],
+         "player_code": row["player_code"]}
+        for row in results
+    ]
+
+
+@app.get("/api/players/{player_code}")
+async def get_player(player_code: str, request: Request) -> dict[str, Any]:
+    user_id = request.state.user_id
+    account = database.get_account_by_id(user_id)
+    if account and account["anonymous"]:
+        raise HTTPException(status_code=403, detail="Social features are disabled in anonymous mode")
+    target = database.get_account_by_player_code(player_code.upper())
+    if target is None or target["anonymous"]:
+        raise HTTPException(status_code=404, detail="Player not found")
+    return {
+        "username": target["username"],
+        "display_name": target["display_name"],
+        "player_code": target["player_code"],
+    }
+
+
+@app.get("/api/friends")
+async def list_friends(request: Request) -> list[dict[str, Any]]:
+    user_id = request.state.user_id
+    account = database.get_account_by_id(user_id)
+    if account and account["anonymous"]:
+        return []
+    friends = database.get_friends(user_id)
+    return [
+        {"username": friend["username"], "display_name": friend["display_name"],
+         "player_code": friend["player_code"],
+         "anonymous": bool(friend["anonymous"])}
+        for friend in friends
+    ]
+
+
+@app.post("/api/friends/{player_code}")
+async def follow_player(player_code: str, request: Request) -> dict[str, str]:
+    user_id = request.state.user_id
+    account = database.get_account_by_id(user_id)
+    if account and account["anonymous"]:
+        raise HTTPException(status_code=403, detail="Social features are disabled in anonymous mode")
+    target = database.get_account_by_player_code(player_code.upper())
+    if target is None:
+        raise HTTPException(status_code=404, detail="Player not found")
+    if target["user_id"] == user_id:
+        raise HTTPException(status_code=400, detail="Cannot follow yourself")
+    if not database.add_friend(user_id, target["user_id"]):
+        raise HTTPException(status_code=409, detail="Already following this player")
+    return {"status": "ok"}
+
+
+@app.delete("/api/friends/{player_code}")
+async def unfollow_player(player_code: str, request: Request) -> dict[str, str]:
+    target = database.get_account_by_player_code(player_code.upper())
+    if target is None:
+        raise HTTPException(status_code=404, detail="Player not found")
+    user_id = request.state.user_id
+    if not database.remove_friend(user_id, target["user_id"]):
+        raise HTTPException(status_code=404, detail="Not following this player")
+    return {"status": "ok"}
 
 
 # -- Invite management (dev only, protected by middleware) --
