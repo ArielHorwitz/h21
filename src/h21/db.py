@@ -373,6 +373,15 @@ class GameDatabase:
         )
         self._connection.commit()
 
+    def get_game_history(self, game_id: int) -> list[dict[str, Any]]:
+        """Fetch Q&A pairs for a game, ordered by question number."""
+        rows = self._connection.execute(
+            "SELECT question_number, question, answer "
+            "FROM questions WHERE game_id = ? ORDER BY question_number",
+            (game_id,),
+        ).fetchall()
+        return [dict(row) for row in rows]
+
     def get_hint_reveals(self, game_id: int) -> list[dict[str, Any]]:
         rows = self._connection.execute(
             "SELECT hint_index, after_question FROM hint_reveals "

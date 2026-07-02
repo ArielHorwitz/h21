@@ -24,6 +24,8 @@ from h21.auth import (
 from h21.config import load_config, _data_dir
 from h21.db import GameDatabase, VALID_DIFFICULTIES, slugify
 from h21.llm import (
+    GameHistoryEntry,
+    HintReveal,
     LLMError,
     OpenAIClient,
     ask_question,
@@ -588,8 +590,43 @@ async def ask(request_body: AskRequest, request: Request) -> dict[str, str]:
     secret_solution = await get_today_solution(topic_slug, difficulty)
     topic_name = database.get_topic_name(topic_slug) or topic_slug
 
+    # Build conversation history so the LLM interprets follow-up questions
+    # in context of what the player has already asked and been told.
+    history: list[GameHistoryEntry] = []
+    hint_reveal_context: list[HintReveal] = []
+    question_number = request_body.question_number or 1
+    if request_body.game_id is not None:
+        past_questions = database.get_game_history(request_body.game_id)
+        history = [
+            GameHistoryEntry(
+                question_number=row["question_number"],
+                question=row["question"],
+                answer=row["answer"],
+            )
+            for row in past_questions
+        ]
+        hint_reveals = database.get_hint_reveals(request_body.game_id)
+        if hint_reveals:
+            today = date.today()
+            hints = database.get_puzzle_hints(
+                today, topic_slug, difficulty,
+            )
+            hint_reveal_context = [
+                HintReveal(
+                    after_question=reveal["after_question"],
+                    hint_text=hints[reveal["hint_index"]],
+                )
+                for reveal in hint_reveals
+                if reveal["hint_index"] < len(hints)
+            ]
+
     try:
-        result = await ask_question(llm_client, question, secret_solution, topic_name)
+        result = await ask_question(
+            llm_client, question, secret_solution, topic_name,
+            question_number=question_number,
+            history=history,
+            hint_reveals=hint_reveal_context,
+        )
     except LLMError as exc:
         logger.error("Failed to answer question: %s", exc)
         raise HTTPException(status_code=502, detail=exc.detail)

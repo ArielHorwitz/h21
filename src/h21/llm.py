@@ -36,6 +36,12 @@ one answer — one of: yes, no, partially, depends, win.
 - "depends" if the answer varies based on interpretation or framing.
 - "win" ONLY if the player has correctly identified the secret solution.
 
+The player can see the topic, all previous answers, and any revealed hints. \
+They may ask follow-up questions that build on this context. \
+Interpret their questions accordingly — for example, if the topic is \
+"Famous Physicists" and the player asks "German?", they are asking whether \
+the physicist is German, not whether the answer is the country Germany.
+
 Before giving your answer, write a detailed explanation covering the following.
 
 1. Explain why you chose this answer. What facts about the subject led you to \
@@ -275,11 +281,63 @@ class AnswerResult:
     explanation: str
 
 
+@dataclass
+class GameHistoryEntry:
+    """A past question/answer or a hint reveal, for building prompt context."""
+    question_number: int
+    question: str
+    answer: str
+
+
+@dataclass
+class HintReveal:
+    """A hint that was revealed to the player during the game."""
+    after_question: int
+    hint_text: str
+
+
+def _build_question_context(
+    question: str,
+    question_number: int,
+    history: list[GameHistoryEntry],
+    hint_reveals: list[HintReveal],
+) -> str:
+    """Build a user message that includes Q&A history and revealed hints."""
+    if not history and not hint_reveals:
+        return question
+
+    # Build a chronological transcript interleaving Q&A and hints.
+    # Hints are shown after the question number they were revealed at.
+    hints_by_after_question: dict[int, list[str]] = {}
+    for reveal in hint_reveals:
+        hints_by_after_question.setdefault(reveal.after_question, []).append(
+            reveal.hint_text,
+        )
+
+    lines = ["Game so far:"]
+
+    # Hints revealed before any questions (after_question=0)
+    for hint_text in hints_by_after_question.get(0, []):
+        lines.append(f"[Hint revealed] {hint_text}")
+
+    for entry in history:
+        lines.append(f"Q{entry.question_number}: \"{entry.question}\" → {entry.answer}")
+        for hint_text in hints_by_after_question.get(entry.question_number, []):
+            lines.append(f"[Hint revealed] {hint_text}")
+
+    lines.append("")
+    lines.append(f"Current question (Q{question_number}): {question}")
+    return "\n".join(lines)
+
+
 async def ask_question(
     client: LLMClient,
     question: str,
     secret_solution: str,
     topic_name: str,
+    question_number: int = 1,
+    history: Optional[list[GameHistoryEntry]] = None,
+    hint_reveals: Optional[list[HintReveal]] = None,
 ) -> Optional[AnswerResult]:
     """Ask the LLM a question about the secret solution.
 
@@ -289,7 +347,10 @@ async def ask_question(
     system_prompt = SYSTEM_PROMPT_TEMPLATE.format(
         solution=secret_solution, topic=topic_name,
     )
-    raw_response = await client.ask(system_prompt, question)
+    user_message = _build_question_context(
+        question, question_number, history or [], hint_reveals or [],
+    )
+    raw_response = await client.ask(system_prompt, user_message)
     lines = raw_response.strip().splitlines()
     if not lines:
         logger.warning("LLM response had no lines after stripping for question=%r", question)
