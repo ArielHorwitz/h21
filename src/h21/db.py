@@ -74,8 +74,8 @@ class GameDatabase:
                 password_hash TEXT NOT NULL,
                 role        TEXT NOT NULL DEFAULT 'user',
                 blocked     INTEGER NOT NULL DEFAULT 0,
-                daily_question_limit INTEGER NOT NULL DEFAULT 105,
-                daily_topic_limit    INTEGER NOT NULL DEFAULT 1,
+                daily_question_limit INTEGER NOT NULL,
+                daily_topic_limit    INTEGER NOT NULL,
                 invite_code TEXT,
                 created_at  TEXT NOT NULL
             );
@@ -710,19 +710,16 @@ class GameDatabase:
     def create_account(
         self, username: str, password: str,
         role: str = "user", invite_code: Optional[str] = None,
-        daily_question_limit: Optional[int] = None,
-        daily_topic_limit: Optional[int] = None,
+        *, daily_question_limit: int, daily_topic_limit: int,
     ) -> int:
         now = _utcnow_iso()
         password_hash = self._hash_password(password)
-        question_limit = daily_question_limit if daily_question_limit is not None else 105
-        topic_limit = daily_topic_limit if daily_topic_limit is not None else 1
         cursor = self._connection.execute(
             "INSERT INTO accounts (username, password_hash, role, invite_code, "
             "daily_question_limit, daily_topic_limit, created_at) "
             "VALUES (?, ?, ?, ?, ?, ?, ?)",
             (username, password_hash, role, invite_code,
-             question_limit, topic_limit, now),
+             daily_question_limit, daily_topic_limit, now),
         )
         self._connection.commit()
         assert cursor.lastrowid is not None

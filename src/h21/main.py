@@ -79,12 +79,15 @@ llm_client: OpenAIClient
 database: GameDatabase
 signing_secret: str
 invite_request_hint: str
+default_daily_question_limit: int
+default_daily_topic_limit: int
 log_path: Path
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
-    global llm_client, database, signing_secret, invite_request_hint, log_path
+    global llm_client, database, signing_secret, invite_request_hint
+    global default_daily_question_limit, default_daily_topic_limit, log_path
 
     config = load_config()
 
@@ -114,6 +117,8 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     database = GameDatabase(config.db_path)
     signing_secret = _ensure_signing_secret(_data_dir())
     invite_request_hint = config.invite_request_hint
+    default_daily_question_limit = config.default_daily_question_limit
+    default_daily_topic_limit = config.default_daily_topic_limit
     log_path = config.log_path
     database.ensure_schema()
     yield
@@ -271,10 +276,12 @@ async def register(request_body: RegisterRequest) -> JSONResponse:
         raise HTTPException(status_code=400, detail="Invalid or exhausted invite code")
 
     try:
+        question_limit = invite["daily_question_limit"] if invite["daily_question_limit"] is not None else default_daily_question_limit
+        topic_limit = invite["daily_topic_limit"] if invite["daily_topic_limit"] is not None else default_daily_topic_limit
         user_id = database.create_account(
             username, password, role=invite["role"], invite_code=invite_code,
-            daily_question_limit=invite["daily_question_limit"],
-            daily_topic_limit=invite["daily_topic_limit"],
+            daily_question_limit=question_limit,
+            daily_topic_limit=topic_limit,
         )
     except sqlite3.IntegrityError:
         raise HTTPException(status_code=409, detail="Username already taken")

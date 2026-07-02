@@ -15,9 +15,9 @@ def main() -> None:
     parser.add_argument("--role", default="user", choices=["user", "dev"],
                         help="Role granted to accounts using this invite (default: user)")
     parser.add_argument("--question-limit", type=int, default=None,
-                        help="Daily question limit for accounts using this invite (default: 105)")
+                        help="Daily question limit for accounts using this invite")
     parser.add_argument("--topic-limit", type=int, default=None,
-                        help="Daily topic suggestion limit for accounts using this invite (default: 1)")
+                        help="Daily topic suggestion limit for accounts using this invite")
     args = parser.parse_args()
 
     config = load_config()

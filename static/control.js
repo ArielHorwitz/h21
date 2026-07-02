@@ -55,7 +55,7 @@ function renderInvites(invites) {
     const questionLimit = invite.daily_question_limit;
     const topicLimit = invite.daily_topic_limit;
     if (questionLimit != null || topicLimit != null) {
-      limitsCell.textContent = `Q: ${questionLimit ?? 105} / T: ${topicLimit ?? 1}`;
+      limitsCell.textContent = `Q: ${questionLimit ?? "default"} / T: ${topicLimit ?? "default"}`;
     } else {
       limitsCell.textContent = "default";
     }
