@@ -140,6 +140,79 @@ createForm.addEventListener("submit", async (event) => {
   }
 });
 
+// -- Invite Requests --
+
+const inviteRequestsList = document.getElementById("invite-requests-list");
+
+function renderInviteRequests(requests) {
+  inviteRequestsList.innerHTML = "";
+
+  if (requests.length === 0) {
+    inviteRequestsList.textContent = "No invite requests.";
+    return;
+  }
+
+  const table = document.createElement("table");
+  table.className = "invites-table";
+
+  const thead = document.createElement("thead");
+  thead.innerHTML = `<tr>
+    <th>Contact</th>
+    <th>Submitted</th>
+    <th></th>
+  </tr>`;
+  table.appendChild(thead);
+
+  const tbody = document.createElement("tbody");
+  for (const request of requests) {
+    const tr = document.createElement("tr");
+
+    const contactCell = document.createElement("td");
+    contactCell.textContent = request.contact_info;
+    tr.appendChild(contactCell);
+
+    const timeCell = document.createElement("td");
+    timeCell.textContent = new Date(request.created_at).toLocaleString();
+    tr.appendChild(timeCell);
+
+    const actionCell = document.createElement("td");
+    const deleteBtn = document.createElement("button");
+    deleteBtn.className = "delete-invite-btn";
+    deleteBtn.textContent = "Delete";
+    deleteBtn.addEventListener("click", () => deleteInviteRequest(request.request_id));
+    actionCell.appendChild(deleteBtn);
+    tr.appendChild(actionCell);
+
+    tbody.appendChild(tr);
+  }
+
+  table.appendChild(tbody);
+  inviteRequestsList.appendChild(table);
+}
+
+async function loadInviteRequests() {
+  try {
+    const response = await fetch("/api/invite-requests");
+    if (response.ok) {
+      const requests = await response.json();
+      renderInviteRequests(requests);
+    }
+  } catch (error) {
+    console.error("Failed to load invite requests:", error);
+  }
+}
+
+async function deleteInviteRequest(requestId) {
+  try {
+    const response = await fetch(`/api/invite-requests/${requestId}`, { method: "DELETE" });
+    if (response.ok) {
+      await loadInviteRequests();
+    }
+  } catch (error) {
+    console.error("Failed to delete invite request:", error);
+  }
+}
+
 // -- Users --
 
 function renderUsers(users) {
@@ -380,4 +453,5 @@ document.getElementById("select-btn").addEventListener("click", () => {
 });
 
 loadInvites();
+loadInviteRequests();
 loadUsers();

@@ -97,6 +97,12 @@ class GameDatabase:
                 topic_suggestions_used INTEGER NOT NULL DEFAULT 0,
                 PRIMARY KEY (user_id, date)
             );
+
+            CREATE TABLE IF NOT EXISTS invite_requests (
+                request_id   INTEGER PRIMARY KEY AUTOINCREMENT,
+                contact_info TEXT NOT NULL,
+                created_at   TEXT NOT NULL
+            );
         """)
         self._migrate_add_explanation_column()
         self._migrate_daily_puzzles_composite_key()
@@ -869,6 +875,41 @@ class GameDatabase:
             (user_id, usage_date.isoformat()),
         )
         self._connection.commit()
+
+    # -- Invite requests --
+
+    def get_latest_invite_request_time(self) -> Optional[str]:
+        """Return the created_at of the most recent invite request, or None."""
+        row = self._connection.execute(
+            "SELECT created_at FROM invite_requests ORDER BY request_id DESC LIMIT 1"
+        ).fetchone()
+        if row is None:
+            return None
+        return row["created_at"]
+
+    def create_invite_request(self, contact_info: str) -> int:
+        now = _utcnow_iso()
+        cursor = self._connection.execute(
+            "INSERT INTO invite_requests (contact_info, created_at) VALUES (?, ?)",
+            (contact_info, now),
+        )
+        self._connection.commit()
+        assert cursor.lastrowid is not None
+        return cursor.lastrowid
+
+    def get_all_invite_requests(self) -> list[dict[str, Any]]:
+        rows = self._connection.execute(
+            "SELECT request_id, contact_info, created_at "
+            "FROM invite_requests ORDER BY created_at DESC"
+        ).fetchall()
+        return [dict(row) for row in rows]
+
+    def delete_invite_request(self, request_id: int) -> bool:
+        cursor = self._connection.execute(
+            "DELETE FROM invite_requests WHERE request_id = ?", (request_id,),
+        )
+        self._connection.commit()
+        return cursor.rowcount > 0
 
     # -- Query --
 

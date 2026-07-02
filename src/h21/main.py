@@ -4,7 +4,7 @@ import logging
 import logging.handlers
 import sqlite3
 from contextlib import asynccontextmanager
-from datetime import date
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any, AsyncIterator, Optional
 
@@ -35,7 +35,7 @@ from h21.llm import (
 STATIC_DIR = Path(__file__).resolve().parent.parent.parent / "static"
 
 # Routes that don't require authentication.
-PUBLIC_PATHS = frozenset({"/login", "/api/login", "/api/register"})
+PUBLIC_PATHS = frozenset({"/login", "/api/login", "/api/register", "/api/invite-request"})
 PUBLIC_PREFIXES = ("/static/",)
 
 
@@ -126,7 +126,7 @@ async def no_cache_static(request: Request, call_next):
     return response
 
 
-DEV_PATHS = ("/control", "/api/invites", "/api/accounts", "/api/query")
+DEV_PATHS = ("/control", "/api/invites", "/api/accounts", "/api/query", "/api/invite-requests")
 
 
 @app.middleware("http")
@@ -419,6 +419,48 @@ async def run_query(request_body: QueryRequest) -> dict[str, Any]:
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     return result
+
+
+# -- Invite requests --
+
+INVITE_REQUEST_COOLDOWN_SECONDS = 300  # 5 minutes
+
+
+class InviteRequestBody(BaseModel):
+    contact_info: str
+
+
+@app.post("/api/invite-request")
+async def request_invite(request_body: InviteRequestBody) -> dict[str, str]:
+    contact_info = request_body.contact_info.strip()
+    if not contact_info or len(contact_info) > 200:
+        raise HTTPException(status_code=400, detail="Contact info must be 1-200 characters")
+
+    latest_time = database.get_latest_invite_request_time()
+    if latest_time is not None:
+        latest_dt = datetime.fromisoformat(latest_time)
+        elapsed = (datetime.now(timezone.utc) - latest_dt).total_seconds()
+        if elapsed < INVITE_REQUEST_COOLDOWN_SECONDS:
+            remaining = int(INVITE_REQUEST_COOLDOWN_SECONDS - elapsed)
+            raise HTTPException(
+                status_code=429,
+                detail=f"Please wait {remaining} seconds before submitting another request",
+            )
+
+    database.create_invite_request(contact_info)
+    return {"status": "ok"}
+
+
+@app.get("/api/invite-requests")
+async def list_invite_requests() -> list[dict[str, Any]]:
+    return database.get_all_invite_requests()
+
+
+@app.delete("/api/invite-requests/{request_id}")
+async def delete_invite_request(request_id: int) -> dict[str, str]:
+    if not database.delete_invite_request(request_id):
+        raise HTTPException(status_code=404, detail="Request not found")
+    return {"status": "ok"}
 
 
 # -- Topic endpoints --

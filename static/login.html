@@ -47,6 +47,18 @@
         <p id="register-status" hidden></p>
       </form>
     </div>
+
+    <div id="invite-request-section" class="auth-section">
+      <h2>Request an Invite</h2>
+      <form id="invite-request-form">
+        <div class="settings-field">
+          <label for="invite-request-contact">Email or phone number</label>
+          <input type="text" id="invite-request-contact" autocomplete="off" maxlength="200" required>
+        </div>
+        <button type="submit" id="invite-request-btn">Request</button>
+        <p id="invite-request-status" hidden></p>
+      </form>
+    </div>
   </main>
   <script src="/static/login.js"></script>
 </body>
