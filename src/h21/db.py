@@ -407,7 +407,8 @@ class GameDatabase:
             (game["game_id"],),
         ).fetchall()
         game["questions"] = [dict(question) for question in questions]
-        game["hint_reveals"] = self.get_hint_reveals(game["game_id"])
+        hint_reveals = self.get_hint_reveals(game["game_id"])
+        game["hint_reveals"] = hint_reveals
         if game["ended_at"] is not None:
             solution = self.get_puzzle_solution(
                 puzzle_date, topic_slug, difficulty,
@@ -415,6 +416,15 @@ class GameDatabase:
             hints = self.get_puzzle_hints(puzzle_date, topic_slug, difficulty)
             game["solution"] = solution
             game["hints"] = hints
+        elif hint_reveals:
+            # Include revealed hint texts so in-progress games can restore them.
+            all_hints = self.get_puzzle_hints(puzzle_date, topic_slug, difficulty)
+            revealed_hints = {}
+            for reveal in hint_reveals:
+                index = reveal["hint_index"]
+                if index < len(all_hints):
+                    revealed_hints[index] = all_hints[index]
+            game["revealed_hints"] = revealed_hints
         return game
 
     def get_game_statuses(

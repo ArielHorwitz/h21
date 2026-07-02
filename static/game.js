@@ -34,6 +34,7 @@ let hintsUnlocked = 0;
 let hintsRevealed = 0;
 const revealedHintIndices = new Set();
 const hintRevealAfterQuestion = new Map(); // hint_index -> after_question
+const revealedHintTexts = new Map(); // hint_index -> hint text (for restoring on resume)
 
 // Display topic and difficulty in the subtitle.
 const difficultyLabel = difficulty.charAt(0).toUpperCase() + difficulty.slice(1);
@@ -214,22 +215,31 @@ function updateHintPanel() {
   while (hintList.children.length < hintsUnlocked) {
     const index = hintList.children.length;
     const li = document.createElement("li");
-    li.className = "hint-item locked";
     li.dataset.hintIndex = index;
 
     const revealBtn = document.createElement("button");
     revealBtn.className = "hint-reveal-btn";
     revealBtn.textContent = `Reveal hint ${index + 1}`;
-    if (index > hintsRevealed) {
-      revealBtn.disabled = true;
-    }
-    revealBtn.addEventListener("click", () => fetchAndRevealHint(index));
     li.appendChild(revealBtn);
 
     const textSpan = document.createElement("span");
     textSpan.className = "hint-text";
-    textSpan.hidden = true;
     li.appendChild(textSpan);
+
+    // If this hint was already revealed (e.g. on resume), show it directly.
+    if (revealedHintTexts.has(index)) {
+      textSpan.textContent = revealedHintTexts.get(index);
+      textSpan.hidden = false;
+      revealBtn.hidden = true;
+      li.className = "hint-item revealed";
+    } else {
+      textSpan.hidden = true;
+      li.className = "hint-item locked";
+      if (index > hintsRevealed) {
+        revealBtn.disabled = true;
+      }
+      revealBtn.addEventListener("click", () => fetchAndRevealHint(index));
+    }
 
     hintList.appendChild(li);
   }
@@ -467,6 +477,20 @@ async function tryResumeGame() {
           hintRevealsAtQuestion.set(reveal.after_question, []);
         }
         hintRevealsAtQuestion.get(reveal.after_question).push(reveal.hint_index);
+      }
+    }
+    // Store revealed hint texts so updateHintPanel can show them.
+    if (data.revealed_hints) {
+      for (const [index, text] of Object.entries(data.revealed_hints)) {
+        revealedHintTexts.set(Number(index), text);
+      }
+    }
+    // For completed games, hint texts come via data.hints — populate for revealed indices.
+    if (data.hints) {
+      for (const index of revealedHintIndices) {
+        if (index < data.hints.length) {
+          revealedHintTexts.set(index, data.hints[index]);
+        }
       }
     }
     // Replay questions one by one so addLogEntry numbering is correct.
