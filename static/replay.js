@@ -34,8 +34,25 @@ function renderGame(game) {
   const difficultyLabel = game.difficulty.charAt(0).toUpperCase() + game.difficulty.slice(1);
 
   replaySubtitle.textContent = `${topicName} — ${difficultyLabel}`;
-  replayMeta.textContent = formatDate(game.date);
-  replayMeta.className = "date";
+
+  const dateLine = document.createElement("div");
+  dateLine.className = "date";
+  dateLine.textContent = formatDate(game.date);
+  replayMeta.appendChild(dateLine);
+
+  if (game.username) {
+    const playerLine = document.createElement("div");
+    playerLine.className = "replay-player";
+    playerLine.textContent = `Played by ${game.username}`;
+    replayMeta.appendChild(playerLine);
+  }
+
+  if (game.share_code) {
+    const codeLine = document.createElement("div");
+    codeLine.className = "replay-code";
+    codeLine.textContent = `Code: ${game.share_code}`;
+    replayMeta.appendChild(codeLine);
+  }
 
   if (game.result === "win") {
     replayResult.textContent = `Won in ${game.questions_asked}/21 questions!`;
