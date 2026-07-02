@@ -620,6 +620,14 @@ async def ask(request_body: AskRequest, request: Request) -> dict[str, str]:
                 if reveal["hint_index"] < len(hints)
             ]
 
+    username = account["username"] if account else f"user:{user_id}"
+    game_id = request_body.game_id
+
+    logger.info(
+        "User %s asked question #%d in game %s: %r",
+        username, question_number, game_id, question,
+    )
+
     try:
         result = await ask_question(
             llm_client, question, secret_solution, topic_name,
@@ -636,6 +644,11 @@ async def ask(request_body: AskRequest, request: Request) -> dict[str, str]:
             status_code=502,
             detail="AI returned an unparseable response. Please try again.",
         )
+
+    logger.info(
+        "User %s got response to question #%d in game %s: %s",
+        username, question_number, game_id, result.answer,
+    )
 
     database.increment_daily_questions(user_id, date.today())
 

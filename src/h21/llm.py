@@ -155,13 +155,12 @@ class OpenAIClient:
         system_prompt: str,
         user_message: str,
     ) -> str:
-        logger.info(
-            "LLM request: model=%s reasoning_effort=%s user_message=%r",
-            self._model, self._reasoning_effort, user_message[:200],
-        )
         logger.debug(
-            "LLM request system_prompt: %s", system_prompt[:500],
+            "LLM request: model=%s reasoning_effort=%s",
+            self._model, self._reasoning_effort,
         )
+        logger.debug("LLM request system_prompt: %s", system_prompt)
+        logger.debug("LLM request user_message: %s", user_message)
 
         kwargs: dict[str, Any] = {
             "model": self._model,
@@ -199,10 +198,11 @@ class OpenAIClient:
         content = response.choices[0].message.content or ""
         finish_reason = response.choices[0].finish_reason
 
-        logger.info(
-            "LLM response: finish_reason=%s length=%d content=%r",
-            finish_reason, len(content), content[:300],
+        logger.debug(
+            "LLM response: finish_reason=%s length=%d",
+            finish_reason, len(content),
         )
+        logger.debug("LLM response content: %s", content)
 
         if not content.strip():
             logger.warning("LLM returned empty response")
