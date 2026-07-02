@@ -42,6 +42,7 @@ All API endpoints are defined in `src/h21/main.py`. JSON request/response bodies
 | POST | `/api/accounts/{user_id}/limits` | Dev | Update daily question and topic limits. |
 | POST | `/api/accounts/{user_id}/reset-usage` | Dev | Reset daily usage counters. |
 | POST | `/api/query` | Dev | Execute a read-only SQL query against the database. |
+| GET | `/api/logs` | Dev | Read log file lines. Query params: `mode` (`head`\|`tail`, default `tail`), `lines` (1-10000, default 100). |
 
 ## Page Routes
 

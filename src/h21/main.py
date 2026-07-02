@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import collections
 import logging
 import logging.handlers
 import sqlite3
@@ -78,11 +79,12 @@ llm_client: OpenAIClient
 database: GameDatabase
 signing_secret: str
 invite_request_hint: str
+log_path: Path
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
-    global llm_client, database, signing_secret, invite_request_hint
+    global llm_client, database, signing_secret, invite_request_hint, log_path
 
     config = load_config()
 
@@ -112,6 +114,7 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     database = GameDatabase(config.db_path)
     signing_secret = _ensure_signing_secret(_data_dir())
     invite_request_hint = config.invite_request_hint
+    log_path = config.log_path
     database.ensure_schema()
     yield
     database.close()
@@ -130,7 +133,7 @@ async def no_cache_static(request: Request, call_next):
     return response
 
 
-DEV_PATHS = ("/control", "/api/invites", "/api/accounts", "/api/query", "/api/invite-requests")
+DEV_PATHS = ("/control", "/api/invites", "/api/accounts", "/api/query", "/api/invite-requests", "/api/logs")
 
 
 @app.middleware("http")
@@ -423,6 +426,34 @@ async def run_query(request_body: QueryRequest) -> dict[str, Any]:
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     return result
+
+
+# -- Logs (dev only) --
+
+@app.get("/api/logs")
+async def get_logs(mode: str = "tail", lines: int = 100) -> dict[str, Any]:
+    if mode not in ("head", "tail"):
+        raise HTTPException(status_code=400, detail="mode must be 'head' or 'tail'")
+    if lines < 1 or lines > 10000:
+        raise HTTPException(status_code=400, detail="lines must be between 1 and 10000")
+
+    if not log_path.exists():
+        return {"lines": [], "mode": mode}
+
+    with open(log_path, "r", errors="replace") as log_file:
+        if mode == "head":
+            result_lines = []
+            for line_number, line in enumerate(log_file):
+                if line_number >= lines:
+                    break
+                result_lines.append(line.rstrip("\n"))
+        else:
+            result_lines = [
+                line.rstrip("\n")
+                for line in collections.deque(log_file, maxlen=lines)
+            ]
+
+    return {"lines": result_lines, "mode": mode}
 
 
 # -- Invite requests --

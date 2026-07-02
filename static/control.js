@@ -452,6 +452,32 @@ document.getElementById("select-btn").addEventListener("click", () => {
   queryInput.setSelectionRange(14, 19);
 });
 
+// -- Logs --
+
+const logOutput = document.getElementById("log-output");
+const loadLogsBtn = document.getElementById("load-logs-btn");
+
+loadLogsBtn.addEventListener("click", async () => {
+  const mode = document.getElementById("log-mode").value;
+  const lines = parseInt(document.getElementById("log-lines").value, 10);
+
+  logOutput.hidden = false;
+  logOutput.textContent = "Loading...";
+
+  try {
+    const response = await fetch(`/api/logs?mode=${mode}&lines=${lines}`);
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      logOutput.textContent = data.detail || "Failed to load logs.";
+      return;
+    }
+    const data = await response.json();
+    logOutput.textContent = data.lines.length > 0 ? data.lines.join("\n") : "(empty)";
+  } catch {
+    logOutput.textContent = "Network error.";
+  }
+});
+
 loadInvites();
 loadInviteRequests();
 loadUsers();

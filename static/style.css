@@ -822,6 +822,21 @@ h1 a.home-link:hover {
   margin-bottom: 0.4rem;
 }
 
+.log-output {
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  background: #0d0d1a;
+  border: 1px solid #333;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  overflow-x: auto;
+  max-height: 60vh;
+  overflow-y: auto;
+  white-space: pre;
+  color: #ccc;
+}
+
 @media (max-width: 640px) {
   .control-row {
     flex-direction: column;
