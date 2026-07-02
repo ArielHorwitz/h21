@@ -37,7 +37,7 @@ from h21.llm import (
 STATIC_DIR = Path(__file__).resolve().parent.parent.parent / "static"
 
 # Routes that don't require authentication.
-PUBLIC_PATHS = frozenset({"/login", "/api/login", "/api/register", "/api/invite-request"})
+PUBLIC_PATHS = frozenset({"/login", "/api/login", "/api/register", "/api/invite-request", "/api/invite-request-hint"})
 PUBLIC_PREFIXES = ("/static/",)
 
 
@@ -77,11 +77,12 @@ class RegisterRequest(BaseModel):
 llm_client: OpenAIClient
 database: GameDatabase
 signing_secret: str
+invite_request_hint: str
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
-    global llm_client, database, signing_secret
+    global llm_client, database, signing_secret, invite_request_hint
 
     config = load_config()
 
@@ -110,6 +111,7 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     )
     database = GameDatabase(config.db_path)
     signing_secret = _ensure_signing_secret(_data_dir())
+    invite_request_hint = config.invite_request_hint
     database.ensure_schema()
     yield
     database.close()
@@ -430,6 +432,11 @@ INVITE_REQUEST_COOLDOWN_SECONDS = 300  # 5 minutes
 
 class InviteRequestBody(BaseModel):
     contact_info: str
+
+
+@app.get("/api/invite-request-hint")
+async def get_invite_request_hint() -> dict[str, str]:
+    return {"hint": invite_request_hint}
 
 
 @app.post("/api/invite-request")

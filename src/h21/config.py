@@ -29,6 +29,7 @@ class Config:
     reasoning_effort: Optional[str]
     db_path: Path
     log_path: Path
+    invite_request_hint: str
 
 
 def load_config() -> Config:
@@ -53,6 +54,7 @@ def load_config() -> Config:
 
     model = raw.get("model", "gpt-5.4-nano")
     reasoning_effort = raw.get("reasoning_effort", "high")
+    invite_request_hint = raw.get("invite_request_hint", "Email")
 
     return Config(
         openai_api_key=openai_api_key,
@@ -60,4 +62,5 @@ def load_config() -> Config:
         reasoning_effort=reasoning_effort,
         db_path=db_path,
         log_path=data_dir / "h21.log",
+        invite_request_hint=invite_request_hint,
     )

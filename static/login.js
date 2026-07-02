@@ -64,6 +64,15 @@ registerForm.addEventListener("submit", async (event) => {
   }
 });
 
+fetch("/api/invite-request-hint")
+  .then((response) => response.json())
+  .then((data) => {
+    if (data.hint) {
+      document.getElementById("invite-request-label").textContent = data.hint;
+    }
+  })
+  .catch(() => {});
+
 inviteRequestForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   inviteRequestStatus.hidden = true;
