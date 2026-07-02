@@ -627,6 +627,15 @@ async def ask(request_body: AskRequest, request: Request) -> dict[str, str]:
                 if reveal["hint_index"] < len(hints)
             ]
 
+    # Reject questions that were already asked verbatim in this game.
+    question_lower = question.casefold()
+    for entry in history:
+        if entry.question.casefold() == question_lower:
+            raise HTTPException(
+                status_code=409,
+                detail="You already asked this question.",
+            )
+
     username = account["username"] if account else f"user:{user_id}"
     game_id = request_body.game_id
 
