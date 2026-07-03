@@ -217,6 +217,13 @@ function renderRecap(recapData) {
     }
 
     card.appendChild(rankingList);
+
+    const compareLink = document.createElement("a");
+    compareLink.className = "recap-compare-link";
+    compareLink.href = `/compare?topic=${encodeURIComponent(game.topic_slug)}&difficulty=${encodeURIComponent(game.difficulty)}&date=${encodeURIComponent(game.date)}`;
+    compareLink.textContent = "View full leaderboard";
+    card.appendChild(compareLink);
+
     recapSection.appendChild(card);
   }
 }

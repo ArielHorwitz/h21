@@ -141,6 +141,18 @@ function renderGame(game) {
     replaySolution.textContent = `The answer was: ${game.solution}`;
   }
 
+  if (game.result === "win" || game.result === "loss") {
+    const compareWrapper = document.createElement("div");
+    compareWrapper.style.textAlign = "center";
+    compareWrapper.style.marginTop = "0.75rem";
+    const compareLink = document.createElement("a");
+    compareLink.className = "share-btn";
+    compareLink.href = `/compare?topic=${encodeURIComponent(game.topic_slug)}&difficulty=${encodeURIComponent(game.difficulty)}&date=${encodeURIComponent(game.date)}`;
+    compareLink.textContent = "View Leaderboard";
+    compareWrapper.appendChild(compareLink);
+    replayDetails.appendChild(compareWrapper);
+  }
+
   if (!game.result) {
     spoilerGate.querySelector("p").textContent =
       "This replay contains spoilers including all questions and answers so far.";

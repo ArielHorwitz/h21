@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='15' fill='%231a1a2e'/><text x='50' y='76' font-size='80' font-weight='bold' font-family='sans-serif' fill='%23e2b714' text-anchor='middle'>H</text></svg>">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>H21 — Compare</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <nav class="nav-bar">
+    <a href="/" title="Home"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12L12 3l9 9"/><path d="M5 10v9a1 1 0 001 1h4v-5h4v5h4a1 1 0 001-1v-9"/></svg></a>
+    <a href="/help" title="Help"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9 9a3 3 0 115.12 2.12C13.24 12 12 12.5 12 14"/><circle cx="12" cy="18" r="0.5" fill="currentColor"/></svg></a>
+    <a href="/account" title="Account"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.418 3.582-7 8-7s8 2.582 8 7"/></svg></a>
+  </nav>
+  <main>
+    <h1><a href="/" class="home-link">H21</a></h1>
+    <p class="subtitle" id="compare-subtitle">Leaderboard</p>
+
+    <div id="compare-error" hidden></div>
+
+    <div id="compare-content" hidden>
+      <div id="compare-meta"></div>
+
+      <div id="compare-controls">
+        <button id="filter-btn" class="secondary-btn">Friends only</button>
+      </div>
+
+      <table class="compare-table" id="compare-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Player</th>
+            <th>Questions</th>
+            <th>Hints</th>
+          </tr>
+        </thead>
+        <tbody id="compare-body"></tbody>
+      </table>
+
+      <p id="compare-empty" hidden>No winners to show.</p>
+    </div>
+  </main>
+  <script src="/static/compare.js"></script>
+</body>
+</html>

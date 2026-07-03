@@ -5,7 +5,7 @@ import logging
 import logging.handlers
 import sqlite3
 from contextlib import asynccontextmanager
-from datetime import date, datetime, timedelta, timezone
+from datetime import date as date_type, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, AsyncIterator, Optional
 
@@ -173,7 +173,7 @@ async def require_auth(request: Request, call_next):
 
 async def get_today_solution(topic_slug: str, difficulty: str) -> str:
     """Return today's solution for a given topic+difficulty, generating via LLM if needed."""
-    today = date.today()
+    today = date_type.today()
     existing = database.get_puzzle_solution(today, topic_slug, difficulty)
     if existing is not None:
         await ensure_hints_exist(today, topic_slug, difficulty, existing)
@@ -203,7 +203,7 @@ async def get_today_solution(topic_slug: str, difficulty: str) -> str:
 
 
 async def ensure_hints_exist(
-    puzzle_date: date, topic_slug: str, difficulty: str, solution: str
+    puzzle_date: date_type, topic_slug: str, difficulty: str, solution: str
 ) -> None:
     """Backfill hints for puzzles that were created before the hints feature."""
     existing_hints = database.get_puzzle_hints(puzzle_date, topic_slug, difficulty)
@@ -250,6 +250,11 @@ async def control_page() -> FileResponse:
 @app.get("/replay")
 async def replay_page() -> FileResponse:
     return FileResponse(STATIC_DIR / "replay.html")
+
+
+@app.get("/compare")
+async def compare_page() -> FileResponse:
+    return FileResponse(STATIC_DIR / "compare.html")
 
 
 @app.get("/login")
@@ -316,7 +321,7 @@ async def get_me(request: Request) -> dict[str, Any]:
     account = database.get_account_by_id(user_id)
     if account is None:
         raise HTTPException(status_code=404, detail="Account not found")
-    usage = database.get_daily_usage(user_id, date.today())
+    usage = database.get_daily_usage(user_id, date_type.today())
     return {
         "user_id": account["user_id"],
         "username": account["username"],
@@ -489,7 +494,7 @@ def _select_friends_for_recap(
 @app.get("/api/recap")
 async def get_recap(request: Request) -> list[dict[str, Any]]:
     user_id = request.state.user_id
-    yesterday = date.today() - timedelta(days=1)
+    yesterday = date_type.today() - timedelta(days=1)
     recap_data = database.get_recap(user_id, yesterday)
 
     result = []
@@ -510,6 +515,7 @@ async def get_recap(request: Request) -> list[dict[str, Any]]:
 
         result.append({
             "topic_name": game["topic_name"],
+            "topic_slug": game["topic_slug"],
             "difficulty": game["difficulty"],
             "date": game["date"],
             "my_result": {
@@ -520,6 +526,60 @@ async def get_recap(request: Request) -> list[dict[str, Any]]:
         })
 
     return result
+
+
+@app.get("/api/compare")
+async def get_compare(
+    request: Request, topic_slug: str, difficulty: str, date: str,
+) -> dict[str, Any]:
+    try:
+        puzzle_date = date_type.fromisoformat(date)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid date format")
+
+    if difficulty not in VALID_DIFFICULTIES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Difficulty must be one of: {', '.join(sorted(VALID_DIFFICULTIES))}",
+        )
+
+    topic_name = database.get_topic_name(topic_slug)
+    if topic_name is None:
+        raise HTTPException(status_code=404, detail="Topic not found")
+
+    user_id = request.state.user_id
+    winners = database.get_puzzle_winners(puzzle_date, topic_slug, difficulty, user_id)
+
+    # Score, sort, and rank.
+    scored = []
+    for winner in winners:
+        score = _compute_score(winner["questions_asked"], winner["hints_used"])
+        scored.append((score, winner))
+    scored.sort(key=lambda entry: (entry[0], entry[1]["username"] or ""))
+
+    players = []
+    current_rank = 0
+    previous_score = None
+    for position, (score, winner) in enumerate(scored, start=1):
+        if score != previous_score:
+            current_rank = position
+            previous_score = score
+        players.append({
+            "rank": current_rank,
+            "display_name": winner["display_name"] or winner["username"],
+            "questions_asked": winner["questions_asked"],
+            "hints_used": winner["hints_used"],
+            "is_self": winner["user_id"] == user_id,
+            "is_friend": bool(winner["is_friend"]),
+        })
+
+    return {
+        "topic_name": topic_name,
+        "topic_slug": topic_slug,
+        "difficulty": difficulty,
+        "date": date,
+        "players": players,
+    }
 
 
 # -- Invite management (dev only, protected by middleware) --
@@ -565,7 +625,7 @@ async def delete_invite_api(code: str) -> dict[str, str]:
 @app.get("/api/accounts")
 async def list_accounts() -> list[dict[str, Any]]:
     accounts = database.get_all_accounts()
-    today = date.today()
+    today = date_type.today()
     for account in accounts:
         usage = database.get_daily_usage(account["user_id"], today)
         account["questions_used_today"] = usage["questions_used"]
@@ -607,7 +667,7 @@ async def update_limits(user_id: int, request_body: UpdateLimitsRequest) -> dict
 
 @app.post("/api/accounts/{user_id}/reset-usage")
 async def reset_usage(user_id: int) -> dict[str, str]:
-    database.reset_daily_usage(user_id, date.today())
+    database.reset_daily_usage(user_id, date_type.today())
     return {"status": "ok"}
 
 
@@ -715,7 +775,7 @@ async def get_topics() -> list[dict[str, str]]:
 async def create_topic(request_body: NewTopicRequest, request: Request) -> dict[str, str]:
     user_id = request.state.user_id
     account = database.get_account_by_id(user_id)
-    usage = database.get_daily_usage(user_id, date.today())
+    usage = database.get_daily_usage(user_id, date_type.today())
     if account and usage["topic_suggestions_used"] >= account["daily_topic_limit"]:
         raise HTTPException(status_code=429, detail="Daily topic suggestion limit reached")
 
@@ -738,7 +798,7 @@ async def create_topic(request_body: NewTopicRequest, request: Request) -> dict[
         raise HTTPException(status_code=409, detail="Topic already exists")
 
     database.add_topic(slug, name, user_id=user_id)
-    database.increment_daily_topic_suggestions(user_id, date.today())
+    database.increment_daily_topic_suggestions(user_id, date_type.today())
     return {"slug": slug, "name": name}
 
 
@@ -747,7 +807,7 @@ async def create_topic(request_body: NewTopicRequest, request: Request) -> dict[
 @app.get("/api/game/existing")
 async def get_existing_game(request: Request, topic_slug: str, difficulty: str) -> JSONResponse:
     user_id = request.state.user_id
-    today = date.today()
+    today = date_type.today()
     game = database.get_existing_game(user_id, today, topic_slug, difficulty)
     if game is None:
         return Response(status_code=204)
@@ -757,7 +817,7 @@ async def get_existing_game(request: Request, topic_slug: str, difficulty: str) 
 @app.get("/api/game/statuses")
 async def get_game_statuses(request: Request) -> list[dict[str, Any]]:
     user_id = request.state.user_id
-    today = date.today()
+    today = date_type.today()
     return database.get_game_statuses(user_id, today)
 
 
@@ -771,7 +831,7 @@ async def new_game(request_body: NewGameRequest, request: Request) -> dict[str, 
     if not database.topic_exists(request_body.topic_slug):
         raise HTTPException(status_code=404, detail="Topic not found")
 
-    today = date.today()
+    today = date_type.today()
     user_id = request.state.user_id
     existing = database.get_existing_game(user_id, today, request_body.topic_slug, request_body.difficulty)
     if existing is not None:
@@ -795,7 +855,7 @@ async def end_game(request_body: EndGameRequest, request: Request) -> dict[str, 
 
     database.end_game(request_body.game_id, request_body.result)
 
-    today = date.today()
+    today = date_type.today()
     solution = database.get_puzzle_solution(
         today, game["topic_slug"], game["difficulty"],
     )
@@ -807,7 +867,7 @@ async def end_game(request_body: EndGameRequest, request: Request) -> dict[str, 
 async def ask(request_body: AskRequest, request: Request) -> dict[str, str]:
     user_id = request.state.user_id
     account = database.get_account_by_id(user_id)
-    usage = database.get_daily_usage(user_id, date.today())
+    usage = database.get_daily_usage(user_id, date_type.today())
     if account and usage["questions_used"] >= account["daily_question_limit"]:
         raise HTTPException(status_code=429, detail="Daily question limit reached")
 
@@ -846,7 +906,7 @@ async def ask(request_body: AskRequest, request: Request) -> dict[str, str]:
         ]
         hint_reveals = database.get_hint_reveals(request_body.game_id)
         if hint_reveals:
-            today = date.today()
+            today = date_type.today()
             hints = database.get_puzzle_hints(
                 today, topic_slug, difficulty,
             )
@@ -898,7 +958,7 @@ async def ask(request_body: AskRequest, request: Request) -> dict[str, str]:
         username, question_number, game_id, result.answer,
     )
 
-    database.increment_daily_questions(user_id, date.today())
+    database.increment_daily_questions(user_id, date_type.today())
 
     # Record the Q&A if a game session is active.
     if request_body.game_id is not None and request_body.question_number is not None:
@@ -939,7 +999,7 @@ async def get_hint(request_body: HintRequest, request: Request) -> dict[str, Any
             detail=f"Must have asked at least {required_questions} questions to unlock this hint",
         )
 
-    today = date.today()
+    today = date_type.today()
     hints = database.get_puzzle_hints(today, game["topic_slug"], game["difficulty"])
     if request_body.hint_index >= len(hints):
         raise HTTPException(status_code=404, detail="Hint not available")

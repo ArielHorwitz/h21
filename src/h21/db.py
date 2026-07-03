@@ -1005,6 +1005,30 @@ class GameDatabase:
 
         return recap
 
+    def get_puzzle_winners(
+        self, puzzle_date: date, topic_slug: str, difficulty: str,
+        requesting_user_id: int,
+    ) -> list[dict[str, Any]]:
+        """Return all non-anonymous accounts that won a specific puzzle.
+
+        Each row includes is_friend (whether the requesting user follows them).
+        Scoring and sorting are left to the caller.
+        """
+        rows = self._connection.execute(
+            "SELECT a.user_id, a.username, a.display_name, "
+            "g.questions_asked, "
+            "(SELECT COUNT(*) FROM hint_reveals h "
+            " WHERE h.game_id = g.game_id) AS hints_used, "
+            "CASE WHEN f.friend_id IS NOT NULL THEN 1 ELSE 0 END AS is_friend "
+            "FROM games g "
+            "JOIN accounts a ON g.user_id = a.user_id "
+            "LEFT JOIN friends f ON f.user_id = ? AND f.friend_id = a.user_id "
+            "WHERE g.date = ? AND g.topic_slug = ? AND g.difficulty = ? "
+            "AND g.result = 'win' AND a.anonymous = 0",
+            (requesting_user_id, puzzle_date.isoformat(), topic_slug, difficulty),
+        ).fetchall()
+        return [dict(row) for row in rows]
+
     # -- Invites --
 
     def create_invite(

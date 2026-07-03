@@ -112,6 +112,35 @@ page.
   friends sorted by score, with empty slots shown as dashes
 - Player's own row highlighted in gold
 - Hidden when recap is empty (no won games yesterday, anonymous user)
+- Each recap card links to the full comparison page
+
+### Phase 3 — Complete
+
+Dedicated comparison page showing all non-anonymous winners of a specific
+puzzle, ranked by performance score.
+
+**Database** (`src/h21/db.py`):
+- New method `get_puzzle_winners(puzzle_date, topic_slug, difficulty,
+  requesting_user_id)` — returns all non-anonymous winners with `is_friend`
+  annotation via LEFT JOIN on friends table
+
+**API** (`src/h21/main.py`):
+- `GET /api/compare?topic_slug=...&difficulty=...&date=...` — returns ranked
+  list of all non-anonymous winners with competition ranking, `is_self` and
+  `is_friend` flags for client-side filtering
+- `GET /api/recap` now includes `topic_slug` in response (needed for compare
+  links)
+
+**Frontend** (`static/compare.html`, `static/compare.js`, `static/style.css`):
+- Table showing rank, player name, questions asked, hints used
+- Player's own row highlighted in gold with "(you)" label
+- "Friends only" toggle filters client-side without re-fetching
+- Error handling for missing/invalid parameters
+
+**Entry points**:
+- Recap cards (`static/home.js`) — "View full leaderboard" link
+- Replay page (`static/replay.js`) — "View Leaderboard" button for completed
+  games
 
 ## Key Design Decisions
 
