@@ -5,7 +5,7 @@ import logging
 import logging.handlers
 import sqlite3
 from contextlib import asynccontextmanager
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, AsyncIterator, Optional
 
@@ -438,6 +438,88 @@ async def unfollow_player(player_code: str, request: Request) -> dict[str, str]:
     if not database.remove_friend(user_id, target["user_id"]):
         raise HTTPException(status_code=404, detail="Not following this player")
     return {"status": "ok"}
+
+
+# -- Recap --
+
+def _compute_score(questions_asked: int, hints_used: int) -> int:
+    return questions_asked + hints_used * 50
+
+
+def _select_friends_for_recap(
+    player_score: int, friends: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Select up to 3 friends for a recap game entry.
+
+    If the player is NOT the top performer: show the top performer + 2 closest.
+    If the player IS the top performer: show the 3 closest below.
+    """
+    if not friends:
+        return []
+
+    # Compute scores and sort friends by score (best first).
+    scored_friends = []
+    for friend in friends:
+        friend_score = _compute_score(friend["questions_asked"], friend["hints_used"])
+        scored_friends.append((friend_score, friend))
+    scored_friends.sort(key=lambda entry: (entry[0], entry[1].get("username", "")))
+
+    best_friend_score = scored_friends[0][0]
+    player_is_top = player_score <= best_friend_score
+
+    if player_is_top:
+        # Show 3 closest to player's score (all are below or equal).
+        by_distance = sorted(
+            scored_friends,
+            key=lambda entry: (abs(entry[0] - player_score), entry[1].get("username", "")),
+        )
+        return [entry[1] for entry in by_distance[:3]]
+    else:
+        # Top performer + 2 closest to player's score (excluding top performer).
+        top_friend = scored_friends[0][1]
+        remaining = scored_friends[1:]
+        by_distance = sorted(
+            remaining,
+            key=lambda entry: (abs(entry[0] - player_score), entry[1].get("username", "")),
+        )
+        closest = [entry[1] for entry in by_distance[:2]]
+        return [top_friend] + closest
+
+
+@app.get("/api/recap")
+async def get_recap(request: Request) -> list[dict[str, Any]]:
+    user_id = request.state.user_id
+    yesterday = date.today() - timedelta(days=1)
+    recap_data = database.get_recap(user_id, yesterday)
+
+    result = []
+    for game in recap_data:
+        player_score = _compute_score(game["questions_asked"], game["hints_used"])
+
+        selected_friends = _select_friends_for_recap(player_score, game["friends"])
+
+        # Build friend response objects with display_name fallback.
+        friend_entries = []
+        for friend in selected_friends:
+            friend_entries.append({
+                "display_name": friend["display_name"] or friend["username"],
+                "player_code": friend["player_code"],
+                "questions_asked": friend["questions_asked"],
+                "hints_used": friend["hints_used"],
+            })
+
+        result.append({
+            "topic_name": game["topic_name"],
+            "difficulty": game["difficulty"],
+            "date": game["date"],
+            "my_result": {
+                "questions_asked": game["questions_asked"],
+                "hints_used": game["hints_used"],
+            },
+            "friends": friend_entries,
+        })
+
+    return result
 
 
 # -- Invite management (dev only, protected by middleware) --

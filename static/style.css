@@ -123,6 +123,87 @@ h1 a.home-link:hover {
   color: #4caf50;
 }
 
+/* -- Recap -- */
+
+#recap-section {
+  margin-bottom: 2rem;
+}
+
+.recap-heading {
+  font-size: 1.1rem;
+  color: #ccc;
+  margin-bottom: 0.75rem;
+}
+
+.recap-card {
+  background: #16213e;
+  border: 1px solid #333;
+  border-radius: 6px;
+  padding: 0.8rem 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.recap-card-title {
+  font-size: 1rem;
+  color: #e0e0e0;
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+}
+
+.recap-ranking {
+  list-style: none;
+  padding: 0;
+  counter-reset: recap-rank;
+}
+
+.recap-rank-entry {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.3rem 0;
+  border-bottom: 1px solid #262640;
+  font-size: 0.9rem;
+  color: #ccc;
+  counter-increment: recap-rank;
+}
+
+.recap-rank-entry:last-child {
+  border-bottom: none;
+}
+
+.recap-rank-entry::before {
+  content: counter(recap-rank) ".";
+  color: #888;
+  margin-right: 0.5rem;
+  min-width: 1.5em;
+}
+
+.recap-rank-self {
+  color: #e2b714;
+  font-weight: bold;
+}
+
+.recap-rank-name {
+  flex: 1;
+}
+
+.recap-rank-result {
+  color: #999;
+  font-size: 0.85rem;
+}
+
+.recap-rank-self .recap-rank-result {
+  color: #c9a512;
+}
+
+.recap-rank-empty {
+  color: #444;
+}
+
+.recap-rank-empty::before {
+  color: #444;
+}
+
 #request-topic-section {
   border-top: 1px solid #333;
   padding-top: 1.5rem;

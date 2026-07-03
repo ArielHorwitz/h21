@@ -939,6 +939,72 @@ class GameDatabase:
         ).fetchall()
         return [dict(row) for row in rows]
 
+    # -- Recap --
+
+    def get_recap(self, user_id: int, recap_date: date) -> list[dict[str, Any]]:
+        """Get recap data for a user on a given date.
+
+        Returns a list of the user's won games on recap_date, each with the
+        user's own result and ALL friends who also won the same puzzle.
+        The API layer handles friend selection/filtering.
+
+        Returns empty list if the user is anonymous.
+        """
+        # Check if user is anonymous.
+        account = self._connection.execute(
+            "SELECT anonymous FROM accounts WHERE user_id = ?", (user_id,)
+        ).fetchone()
+        if account is None or account["anonymous"]:
+            return []
+
+        # Get all of the user's won games on recap_date.
+        user_games = self._connection.execute(
+            "SELECT g.game_id, g.topic_slug, t.name AS topic_name, "
+            "g.difficulty, g.date, g.questions_asked "
+            "FROM games g "
+            "LEFT JOIN topics t ON g.topic_slug = t.slug "
+            "WHERE g.user_id = ? AND g.date = ? AND g.result = 'win'",
+            (user_id, recap_date.isoformat()),
+        ).fetchall()
+
+        if not user_games:
+            return []
+
+        recap = []
+        for game_row in user_games:
+            game = dict(game_row)
+            game["topic_name"] = game["topic_name"] or game["topic_slug"]
+
+            # Count hints for this game.
+            hint_count = self._connection.execute(
+                "SELECT COUNT(*) AS cnt FROM hint_reveals WHERE game_id = ?",
+                (game["game_id"],),
+            ).fetchone()["cnt"]
+            game["hints_used"] = hint_count
+
+            # Get friends' won games on the same puzzle.
+            friend_games = self._connection.execute(
+                "SELECT a.display_name, a.username, a.player_code, "
+                "g.questions_asked, "
+                "(SELECT COUNT(*) FROM hint_reveals h "
+                " WHERE h.game_id = g.game_id) AS hints_used "
+                "FROM friends f "
+                "JOIN accounts a ON f.friend_id = a.user_id "
+                "JOIN games g ON g.user_id = a.user_id "
+                "  AND g.date = ? "
+                "  AND g.topic_slug = ? "
+                "  AND g.difficulty = ? "
+                "  AND g.result = 'win' "
+                "WHERE f.user_id = ? AND a.anonymous = 0",
+                (recap_date.isoformat(), game["topic_slug"],
+                 game["difficulty"], user_id),
+            ).fetchall()
+
+            game["friends"] = [dict(friend) for friend in friend_games]
+            recap.append(game)
+
+        return recap
+
     # -- Invites --
 
     def create_invite(

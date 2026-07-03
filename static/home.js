@@ -3,6 +3,7 @@ const requestForm = document.getElementById("request-topic-form");
 const topicNameInput = document.getElementById("topic-name-input");
 const requestTopicBtn = document.getElementById("request-topic-btn");
 const requestStatus = document.getElementById("request-topic-status");
+const recapSection = document.getElementById("recap-section");
 
 const DIFFICULTIES = ["normal", "expert"];
 
@@ -123,4 +124,114 @@ replayForm.addEventListener("submit", (event) => {
   window.location.href = `/replay?code=${encodeURIComponent(code)}`;
 });
 
+function formatResult(questionsAsked, hintsUsed) {
+  let text = `${questionsAsked} question${questionsAsked !== 1 ? "s" : ""}`;
+  if (hintsUsed > 0) {
+    text += ` + ${hintsUsed} hint${hintsUsed !== 1 ? "s" : ""}`;
+  }
+  return text;
+}
+
+function computeScore(questionsAsked, hintsUsed) {
+  return questionsAsked + hintsUsed * 50;
+}
+
+function renderRecap(recapData) {
+  if (!recapData || recapData.length === 0) {
+    recapSection.hidden = true;
+    return;
+  }
+
+  recapSection.hidden = false;
+  recapSection.innerHTML = "";
+
+  const heading = document.createElement("h2");
+  heading.className = "recap-heading";
+  heading.textContent = "Yesterday's Recap";
+  recapSection.appendChild(heading);
+
+  for (const game of recapData) {
+    const card = document.createElement("div");
+    card.className = "recap-card";
+
+    const title = document.createElement("div");
+    title.className = "recap-card-title";
+    const difficulty = game.difficulty.charAt(0).toUpperCase() + game.difficulty.slice(1);
+    title.textContent = `${game.topic_name} (${difficulty})`;
+    card.appendChild(title);
+
+    // Build ranking: player + friends, sorted by score.
+    const playerScore = computeScore(game.my_result.questions_asked, game.my_result.hints_used);
+    const entries = [];
+    entries.push({
+      name: "You",
+      questionsAsked: game.my_result.questions_asked,
+      hintsUsed: game.my_result.hints_used,
+      score: playerScore,
+      isPlayer: true,
+    });
+    for (const friend of game.friends) {
+      entries.push({
+        name: friend.display_name,
+        questionsAsked: friend.questions_asked,
+        hintsUsed: friend.hints_used,
+        score: computeScore(friend.questions_asked, friend.hints_used),
+        isPlayer: false,
+      });
+    }
+    entries.sort((a, b) => a.score - b.score);
+
+    const rankingList = document.createElement("ol");
+    rankingList.className = "recap-ranking";
+
+    for (const entry of entries) {
+      const li = document.createElement("li");
+      li.className = "recap-rank-entry";
+      if (entry.isPlayer) {
+        li.classList.add("recap-rank-self");
+      }
+
+      const nameSpan = document.createElement("span");
+      nameSpan.className = "recap-rank-name";
+      nameSpan.textContent = entry.name;
+      li.appendChild(nameSpan);
+
+      const resultSpan = document.createElement("span");
+      resultSpan.className = "recap-rank-result";
+      resultSpan.textContent = formatResult(entry.questionsAsked, entry.hintsUsed);
+      li.appendChild(resultSpan);
+
+      rankingList.appendChild(li);
+    }
+
+    // Add empty slots if fewer than 4 total entries (player + up to 3 friends).
+    const emptySlots = 4 - entries.length;
+    for (let slotIndex = 0; slotIndex < emptySlots; slotIndex++) {
+      const li = document.createElement("li");
+      li.className = "recap-rank-entry recap-rank-empty";
+      const dash = document.createElement("span");
+      dash.className = "recap-rank-name";
+      dash.textContent = "\u2014";
+      li.appendChild(dash);
+      rankingList.appendChild(li);
+    }
+
+    card.appendChild(rankingList);
+    recapSection.appendChild(card);
+  }
+}
+
+async function loadRecap() {
+  try {
+    const response = await fetch("/api/recap");
+    if (response.ok) {
+      const data = await response.json();
+      renderRecap(data);
+    }
+  } catch (error) {
+    console.error("Failed to load recap:", error);
+  }
+}
+
+loadRecap();
 loadTopics();

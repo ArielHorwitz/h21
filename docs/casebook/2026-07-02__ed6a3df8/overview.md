@@ -88,6 +88,31 @@ All components implemented and tested:
   list with remove buttons
 - Friends section auto-disables when anonymous mode is toggled on
 
+### Phase 2 — Complete
+
+Daily recap of yesterday's games with friend comparisons, displayed on the home
+page.
+
+**Database** (`src/h21/db.py`):
+- New method `get_recap(user_id, recap_date)` — returns the user's won games on
+  a given date with all friends who played the same puzzles. Excludes anonymous
+  users. API layer handles friend selection.
+
+**API** (`src/h21/main.py`):
+- `GET /api/recap` — returns yesterday's recap for the authenticated user
+- Helper `_compute_score(questions_asked, hints_used)` — internal scoring
+  formula: `questions_asked + hints_used * 50`
+- Helper `_select_friends_for_recap(player_score, friends)` — selects up to 3
+  friends per game: top performer + 2 closest if player is not top, or 3
+  closest if player is top
+
+**Frontend** (`static/home.html`, `static/home.js`, `static/style.css`):
+- Recap section above topic picker, fetched on page load
+- Each game card shows topic/difficulty, ranked list of player + up to 3
+  friends sorted by score, with empty slots shown as dashes
+- Player's own row highlighted in gold
+- Hidden when recap is empty (no won games yesterday, anonymous user)
+
 ## Key Design Decisions
 
 | Decision | Rationale |
