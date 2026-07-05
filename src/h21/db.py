@@ -80,6 +80,10 @@ class GameDatabase:
                 display_name TEXT,
                 player_code  TEXT UNIQUE,
                 anonymous    INTEGER NOT NULL DEFAULT 0,
+                avatar_version INTEGER NOT NULL DEFAULT 0,
+                avatar_generations_used INTEGER NOT NULL DEFAULT 0,
+                avatar_generation_reset TEXT,
+                monthly_avatar_limit INTEGER NOT NULL DEFAULT 3,
                 created_at  TEXT NOT NULL
             );
 
@@ -99,6 +103,7 @@ class GameDatabase:
                 remaining_uses  INTEGER NOT NULL DEFAULT 1,
                 daily_question_limit INTEGER,
                 daily_topic_limit    INTEGER,
+                monthly_avatar_limit INTEGER,
                 created_at      TEXT NOT NULL
             );
 
@@ -133,6 +138,8 @@ class GameDatabase:
         self._migrate_add_hint_reveals_table()
         self._migrate_add_profile_columns()
         self._migrate_add_friends_table()
+        self._migrate_add_avatar_columns()
+        self._migrate_add_avatar_limit_to_invites()
         self._seed_default_topics()
 
     def _seed_default_topics(self) -> None:
@@ -312,6 +319,40 @@ class GameDatabase:
             )
         """)
         self._connection.commit()
+
+    def _migrate_add_avatar_columns(self) -> None:
+        columns = [
+            row["name"]
+            for row in self._connection.execute("PRAGMA table_info(accounts)")
+        ]
+        if "avatar_version" not in columns:
+            self._connection.execute(
+                "ALTER TABLE accounts ADD COLUMN avatar_version INTEGER NOT NULL DEFAULT 0"
+            )
+        if "avatar_generations_used" not in columns:
+            self._connection.execute(
+                "ALTER TABLE accounts ADD COLUMN avatar_generations_used INTEGER NOT NULL DEFAULT 0"
+            )
+        if "avatar_generation_reset" not in columns:
+            self._connection.execute(
+                "ALTER TABLE accounts ADD COLUMN avatar_generation_reset TEXT"
+            )
+        if "monthly_avatar_limit" not in columns:
+            self._connection.execute(
+                "ALTER TABLE accounts ADD COLUMN monthly_avatar_limit INTEGER NOT NULL DEFAULT 3"
+            )
+        self._connection.commit()
+
+    def _migrate_add_avatar_limit_to_invites(self) -> None:
+        columns = [
+            row["name"]
+            for row in self._connection.execute("PRAGMA table_info(invites)")
+        ]
+        if "monthly_avatar_limit" not in columns:
+            self._connection.execute(
+                "ALTER TABLE invites ADD COLUMN monthly_avatar_limit INTEGER"
+            )
+            self._connection.commit()
 
     # -- Topics --
 
@@ -801,16 +842,19 @@ class GameDatabase:
         self, username: str, password: str,
         role: str = "user", invite_code: Optional[str] = None,
         *, daily_question_limit: int, daily_topic_limit: int,
+        monthly_avatar_limit: int = 3,
     ) -> int:
         now = _utcnow_iso()
         password_hash = self._hash_password(password)
         player_code = self._generate_player_code()
         cursor = self._connection.execute(
             "INSERT INTO accounts (username, password_hash, role, invite_code, "
-            "daily_question_limit, daily_topic_limit, player_code, created_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            "daily_question_limit, daily_topic_limit, monthly_avatar_limit, "
+            "player_code, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (username, password_hash, role, invite_code,
-             daily_question_limit, daily_topic_limit, player_code, now),
+             daily_question_limit, daily_topic_limit, monthly_avatar_limit,
+             player_code, now),
         )
         self._connection.commit()
         assert cursor.lastrowid is not None
@@ -831,7 +875,9 @@ class GameDatabase:
         row = self._connection.execute(
             "SELECT user_id, username, role, blocked, "
             "daily_question_limit, daily_topic_limit, invite_code, "
-            "display_name, player_code, anonymous, created_at "
+            "display_name, player_code, anonymous, "
+            "avatar_version, avatar_generations_used, "
+            "avatar_generation_reset, monthly_avatar_limit, created_at "
             "FROM accounts WHERE user_id = ?",
             (user_id,),
         ).fetchone()
@@ -843,7 +889,8 @@ class GameDatabase:
         rows = self._connection.execute(
             "SELECT user_id, username, role, blocked, "
             "daily_question_limit, daily_topic_limit, invite_code, "
-            "display_name, player_code, anonymous, created_at "
+            "display_name, player_code, anonymous, "
+            "avatar_version, monthly_avatar_limit, created_at "
             "FROM accounts ORDER BY created_at DESC"
         ).fetchall()
         return [dict(row) for row in rows]
@@ -888,6 +935,53 @@ class GameDatabase:
         )
         self._connection.commit()
         return cursor.rowcount > 0
+
+    def get_avatar_usage(self, user_id: int, today: date) -> dict[str, Any]:
+        """Return avatar generation usage, resetting the counter if a new month started."""
+        row = self._connection.execute(
+            "SELECT avatar_generations_used, avatar_generation_reset, monthly_avatar_limit "
+            "FROM accounts WHERE user_id = ?",
+            (user_id,),
+        ).fetchone()
+        if row is None:
+            return {"used": 0, "limit": 3}
+        reset_date_str = row["avatar_generation_reset"]
+        used = row["avatar_generations_used"]
+        if reset_date_str is not None:
+            reset_date = date.fromisoformat(reset_date_str)
+            # Reset if we're in a different month.
+            if today.year != reset_date.year or today.month != reset_date.month:
+                self._connection.execute(
+                    "UPDATE accounts SET avatar_generations_used = 0, "
+                    "avatar_generation_reset = ? WHERE user_id = ?",
+                    (today.isoformat(), user_id),
+                )
+                self._connection.commit()
+                used = 0
+        return {"used": used, "limit": row["monthly_avatar_limit"]}
+
+    def increment_avatar_generation(self, user_id: int, today: date) -> None:
+        """Increment the avatar generation counter and set the reset date if unset."""
+        self._connection.execute(
+            "UPDATE accounts SET avatar_generations_used = avatar_generations_used + 1, "
+            "avatar_generation_reset = COALESCE(avatar_generation_reset, ?) "
+            "WHERE user_id = ?",
+            (today.isoformat(), user_id),
+        )
+        self._connection.commit()
+
+    def bump_avatar_version(self, user_id: int) -> int:
+        """Increment avatar_version and return the new value."""
+        self._connection.execute(
+            "UPDATE accounts SET avatar_version = avatar_version + 1 WHERE user_id = ?",
+            (user_id,),
+        )
+        self._connection.commit()
+        row = self._connection.execute(
+            "SELECT avatar_version FROM accounts WHERE user_id = ?",
+            (user_id,),
+        ).fetchone()
+        return row["avatar_version"] if row else 0
 
     def get_account_by_player_code(self, player_code: str) -> Optional[dict[str, Any]]:
         """Look up an account by player_code. Returns None if not found."""
@@ -1110,14 +1204,16 @@ class GameDatabase:
         self, alias: Optional[str] = None, uses: int = 1, role: str = "user",
         daily_question_limit: Optional[int] = None,
         daily_topic_limit: Optional[int] = None,
+        monthly_avatar_limit: Optional[int] = None,
     ) -> str:
         code = secrets.token_hex(4).upper()
         now = _utcnow_iso()
         self._connection.execute(
             "INSERT INTO invites (code, alias, role, remaining_uses, "
-            "daily_question_limit, daily_topic_limit, created_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (code, alias, role, uses, daily_question_limit, daily_topic_limit, now),
+            "daily_question_limit, daily_topic_limit, monthly_avatar_limit, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (code, alias, role, uses, daily_question_limit, daily_topic_limit,
+             monthly_avatar_limit, now),
         )
         self._connection.commit()
         return code
@@ -1125,7 +1221,8 @@ class GameDatabase:
     def get_invite(self, code: str) -> Optional[dict[str, Any]]:
         row = self._connection.execute(
             "SELECT code, alias, role, remaining_uses, "
-            "daily_question_limit, daily_topic_limit, created_at "
+            "daily_question_limit, daily_topic_limit, "
+            "monthly_avatar_limit, created_at "
             "FROM invites WHERE code = ?",
             (code,),
         ).fetchone()
@@ -1136,7 +1233,8 @@ class GameDatabase:
     def get_all_invites(self) -> list[dict[str, Any]]:
         rows = self._connection.execute(
             "SELECT code, alias, role, remaining_uses, "
-            "daily_question_limit, daily_topic_limit, created_at "
+            "daily_question_limit, daily_topic_limit, "
+            "monthly_avatar_limit, created_at "
             "FROM invites ORDER BY created_at DESC"
         ).fetchall()
         return [dict(row) for row in rows]
@@ -1144,7 +1242,8 @@ class GameDatabase:
     def consume_invite(self, code: str) -> Optional[dict[str, Any]]:
         """Decrement remaining uses. Returns invite details if valid, else None."""
         row = self._connection.execute(
-            "SELECT remaining_uses, role, daily_question_limit, daily_topic_limit "
+            "SELECT remaining_uses, role, daily_question_limit, daily_topic_limit, "
+            "monthly_avatar_limit "
             "FROM invites WHERE code = ?", (code,)
         ).fetchone()
         if row is None:
@@ -1160,6 +1259,7 @@ class GameDatabase:
             "role": row["role"],
             "daily_question_limit": row["daily_question_limit"],
             "daily_topic_limit": row["daily_topic_limit"],
+            "monthly_avatar_limit": row["monthly_avatar_limit"],
         }
 
     def delete_invite(self, code: str) -> bool:
