@@ -132,7 +132,7 @@ function revealAllHints(hints) {
 }
 
 function updateCounter() {
-  questionCounter.textContent = `Question ${questionsAsked} / ${MAX_QUESTIONS}`;
+  questionCounter.textContent = `Question ${Math.min(questionsAsked + 1, MAX_QUESTIONS)} / ${MAX_QUESTIONS}`;
 }
 
 function addLogEntry(question, answer, explanation) {
