@@ -99,24 +99,25 @@ page.
   users. API layer handles friend selection.
 
 **API** (`src/h21/main.py`):
-- `GET /api/recap` — returns yesterday's recap for the authenticated user
+- `GET /api/recent-results` — returns the player's most recent 3 won games
+  where at least one friend also played (not date-anchored)
 - Helper `_compute_score(questions_asked, hints_used)` — internal scoring
   formula: `questions_asked + hints_used * 50`
-- Helper `_select_friends_for_recap(player_score, friends)` — selects up to 3
+- Helper `_select_friends_for_result(player_score, friends)` — selects up to 3
   friends per game: top performer + 2 closest if player is not top, or 3
   closest if player is top
 
 **Frontend** (`static/home.html`, `static/home.js`, `static/style.css`):
-- Recap section above topic picker, fetched on page load
+- Recent results section above topic picker, fetched on page load
 - Each game card shows topic/difficulty, ranked list of player + up to 3
   friends sorted by score, with empty slots shown as dashes
 - Player's own row highlighted in gold
-- Hidden when recap is empty (no won games yesterday, anonymous user)
-- Each recap card links to the full comparison page
+- Hidden when empty (no recent wins with friend overlap, anonymous user)
+- Each card links to the full leaderboard page
 
 ### Phase 3 — Complete
 
-Dedicated comparison page showing all non-anonymous winners of a specific
+Dedicated leaderboard page showing all non-anonymous winners of a specific
 puzzle, ranked by performance score.
 
 **Database** (`src/h21/db.py`):
@@ -125,22 +126,43 @@ puzzle, ranked by performance score.
   annotation via LEFT JOIN on friends table
 
 **API** (`src/h21/main.py`):
-- `GET /api/compare?topic_slug=...&difficulty=...&date=...` — returns ranked
-  list of all non-anonymous winners with competition ranking, `is_self` and
-  `is_friend` flags for client-side filtering
-- `GET /api/recap` now includes `topic_slug` in response (needed for compare
-  links)
+- `GET /api/leaderboard?topic_slug=...&difficulty=...&date=...` — returns
+  ranked list of all non-anonymous winners with competition ranking, `is_self`
+  and `is_friend` flags for client-side filtering
 
-**Frontend** (`static/compare.html`, `static/compare.js`, `static/style.css`):
+**Frontend** (`static/leaderboard.html`, `static/leaderboard.js`,
+`static/style.css`):
 - Table showing rank, player name, questions asked, hints used
 - Player's own row highlighted in gold with "(you)" label
 - "Friends only" toggle filters client-side without re-fetching
 - Error handling for missing/invalid parameters
 
 **Entry points**:
-- Recap cards (`static/home.js`) — "View full leaderboard" link
+- Recent results cards (`static/home.js`) — "View full leaderboard" link
 - Replay page (`static/replay.js`) — "View Leaderboard" button for completed
   games
+- Account game history (`static/account.js`) — "Leaderboard" link for won games
+
+### Phase 4 — Complete
+
+Social engagement features: play-next discovery and leaderboard access from
+game history.
+
+**Database** (`src/h21/db.py`):
+- New method `get_play_next(user_id, today)` — finds today's puzzles where
+  friends have won but the user hasn't played, with friend counts
+
+**API** (`src/h21/main.py`):
+- `GET /api/play-next` — returns today's unplayed puzzles with friend activity
+
+**Frontend** (`static/home.html`, `static/home.js`, `static/style.css`):
+- "Friends Are Playing" section between recent results and topic picker
+- Each entry shows topic/difficulty and "N friends played this"
+- Clicking starts the game
+- Hidden when empty
+
+**Account page** (`static/account.js`):
+- Game history now shows "Leaderboard" link alongside "Replay" for won games
 
 ## Key Design Decisions
 
@@ -149,8 +171,9 @@ puzzle, ranked by performance score.
 | Unidirectional follows, no confirmation | Simpler, matches "I choose who to compare against" |
 | Anonymous as bidirectional social opt-out | Clean semantics — one toggle disables all social features in both directions |
 | Preserve friend rows when anonymous | Toggling off restores everything, no re-adding needed |
-| Yesterday not today | Everyone sees the same recap regardless of play order |
+| Recent results not date-anchored | Shows last 3 wins with friend overlap; avoids empty results when players skip days |
 | Extend `/api/me` rather than new `/api/profile` | Avoids endpoint proliferation for own-account data |
 | Player codes start at 4 chars | ~65k space, plenty for current scale, grow on exhaustion |
 | Profile pictures deferred | High effort, not blocking for social comparisons |
-| Recap on home page | Ship fast, iterate UI/UX later |
+| Play-next for today only | Discovery section shows only today's puzzles; keeps it fresh and actionable |
+| Per-puzzle leaderboards, no global ranking | Avoids fragmentation and gaming; comparison is contextual |
