@@ -722,6 +722,48 @@ async def get_play_next(request: Request) -> list[dict[str, Any]]:
     return database.get_play_next(user_id, today)
 
 
+@app.get("/api/friend-suggestions")
+async def get_friend_suggestions(request: Request) -> list[dict[str, Any]]:
+    user_id = request.state.user_id
+    pool = database.get_friend_suggestions(user_id)
+    if not pool:
+        return []
+
+    today_days = (date_type.today() - date_type(2000, 1, 1)).days
+    cadence_by_tier = {1: 1, 2: 2, 3: 3}
+
+    # Group pool by tier.
+    tiers: dict[int, list[dict[str, Any]]] = {}
+    for candidate in pool:
+        tiers.setdefault(candidate["tier"], []).append(candidate)
+
+    # Select up to 3 suggestions, preferring higher-priority tiers.
+    suggestions: list[dict[str, Any]] = []
+    remaining = 3
+    for tier_number in (1, 2, 3):
+        tier_pool = tiers.get(tier_number, [])
+        if not tier_pool:
+            continue
+        cadence = cadence_by_tier[tier_number]
+        offset = (today_days // cadence + user_id) % len(tier_pool)
+        # Take up to `remaining` items starting at offset, wrapping around.
+        for i in range(min(remaining, len(tier_pool))):
+            index = (offset + i) % len(tier_pool)
+            candidate = tier_pool[index]
+            suggestions.append({
+                "player_code": candidate["player_code"],
+                "username": candidate["username"],
+                "display_name": candidate["display_name"],
+                "avatar_version": candidate["avatar_version"],
+                "reason": candidate["reason"],
+            })
+        remaining -= min(remaining, len(tier_pool))
+        if remaining <= 0:
+            break
+
+    return suggestions
+
+
 def _truncate_leaderboard(
     players: list[dict[str, Any]], limit: int,
 ) -> list[dict[str, Any]]:

@@ -258,6 +258,98 @@ h1 a.home-link:hover {
   margin-bottom: 0.75rem;
 }
 
+.friend-suggestions-heading {
+  font-size: 1.1rem;
+  color: #ccc;
+  margin-bottom: 0.75rem;
+}
+
+.friend-suggestion-card {
+  display: flex;
+  align-items: center;
+  background: #16213e;
+  border: 1px solid #333;
+  border-radius: 6px;
+  padding: 0.7rem 1rem;
+  margin-bottom: 0.5rem;
+  gap: 0.7rem;
+}
+
+.friend-suggestion-card.friend-suggestion-fade-out {
+  animation: suggestion-fade-out 0.3s ease forwards;
+}
+
+@keyframes suggestion-fade-out {
+  to {
+    opacity: 0;
+    transform: translateX(20px);
+    height: 0;
+    padding: 0;
+    margin: 0;
+    overflow: hidden;
+  }
+}
+
+.friend-suggestion-info {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.friend-suggestion-name {
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: #e0e0e0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.friend-suggestion-reason {
+  font-size: 0.8rem;
+  color: #888;
+}
+
+.friend-suggestion-follow-btn {
+  background: transparent;
+  border: 1px solid #e2b714;
+  color: #e2b714;
+  border-radius: 4px;
+  padding: 0.3rem 0.7rem;
+  font-size: 0.8rem;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s;
+}
+
+.friend-suggestion-follow-btn:hover {
+  background: #e2b714;
+  color: #1a1a2e;
+}
+
+.friend-suggestion-follow-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.friend-suggestion-card .avatar-sm {
+  flex-shrink: 0;
+}
+
+.friend-suggestions-more-link {
+  display: block;
+  text-align: center;
+  font-size: 0.8rem;
+  color: #888;
+  margin-top: 0.5rem;
+  text-decoration: none;
+}
+
+.friend-suggestions-more-link:hover {
+  color: #e2b714;
+}
+
 #request-topic-section {
   margin-top: 0.75rem;
 }

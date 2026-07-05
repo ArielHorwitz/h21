@@ -1224,6 +1224,114 @@ class GameDatabase:
             for row in rows
         ]
 
+    # -- Friend suggestions --
+
+    def get_friend_suggestions(self, user_id: int) -> list[dict[str, Any]]:
+        """Return the full candidate pool of users to suggest as friends.
+
+        Three tiers (priority order):
+        1. Users who follow you but you don't follow back
+        2. 2nd-order connections (friends-of-friends), excluding tier 1
+        3. Users who registered with the same invite code, excluding tiers 1-2
+
+        Returns empty list if the user is anonymous.  Each dict includes:
+        user_id, username, display_name, player_code, avatar_version, tier, reason.
+        """
+        account = self._connection.execute(
+            "SELECT anonymous, invite_code FROM accounts WHERE user_id = ?",
+            (user_id,),
+        ).fetchone()
+        if account is None or account["anonymous"]:
+            return []
+
+        seen_ids: set[int] = set()
+        pool: list[dict[str, Any]] = []
+
+        # Tier 1: users who follow me but I don't follow back.
+        tier1_rows = self._connection.execute(
+            "SELECT a.user_id, a.username, a.display_name, a.player_code, "
+            "a.avatar_version "
+            "FROM friends f "
+            "JOIN accounts a ON a.user_id = f.user_id "
+            "WHERE f.friend_id = ? "
+            "  AND a.anonymous = 0 "
+            "  AND f.user_id NOT IN ("
+            "    SELECT friend_id FROM friends WHERE user_id = ?"
+            "  ) "
+            "ORDER BY a.user_id",
+            (user_id, user_id),
+        ).fetchall()
+        for row in tier1_rows:
+            seen_ids.add(row["user_id"])
+            pool.append({
+                **dict(row),
+                "tier": 1,
+                "reason": "Follows you",
+            })
+
+        # Tier 2: people my friends follow (friends-of-friends).
+        tier2_rows = self._connection.execute(
+            "SELECT a.user_id, a.username, a.display_name, "
+            "a.player_code, a.avatar_version, "
+            "COALESCE(connector.display_name, connector.username) "
+            "  AS connector_name "
+            "FROM friends my_follows "
+            "JOIN friends fof ON fof.user_id = my_follows.friend_id "
+            "JOIN accounts a ON a.user_id = fof.friend_id "
+            "JOIN accounts connector ON connector.user_id = my_follows.friend_id "
+            "WHERE my_follows.user_id = ? "
+            "  AND a.anonymous = 0 "
+            "  AND a.user_id != ? "
+            "  AND a.user_id NOT IN ("
+            "    SELECT friend_id FROM friends WHERE user_id = ?"
+            "  ) "
+            "GROUP BY a.user_id "
+            "ORDER BY a.user_id",
+            (user_id, user_id, user_id),
+        ).fetchall()
+        for row in tier2_rows:
+            if row["user_id"] in seen_ids:
+                continue
+            seen_ids.add(row["user_id"])
+            connector_name = row["connector_name"] or "a friend"
+            pool.append({
+                "user_id": row["user_id"],
+                "username": row["username"],
+                "display_name": row["display_name"],
+                "player_code": row["player_code"],
+                "avatar_version": row["avatar_version"],
+                "tier": 2,
+                "reason": f"Friends with {connector_name}",
+            })
+
+        # Tier 3: same invite code.
+        invite_code = account["invite_code"]
+        if invite_code:
+            tier3_rows = self._connection.execute(
+                "SELECT a.user_id, a.username, a.display_name, a.player_code, "
+                "a.avatar_version "
+                "FROM accounts a "
+                "WHERE a.invite_code = ? "
+                "  AND a.user_id != ? "
+                "  AND a.anonymous = 0 "
+                "  AND a.user_id NOT IN ("
+                "    SELECT friend_id FROM friends WHERE user_id = ?"
+                "  ) "
+                "ORDER BY a.user_id",
+                (invite_code, user_id, user_id),
+            ).fetchall()
+            for row in tier3_rows:
+                if row["user_id"] in seen_ids:
+                    continue
+                seen_ids.add(row["user_id"])
+                pool.append({
+                    **dict(row),
+                    "tier": 3,
+                    "reason": "Joined from the same invite",
+                })
+
+        return pool
+
     # -- Invites --
 
     def create_invite(

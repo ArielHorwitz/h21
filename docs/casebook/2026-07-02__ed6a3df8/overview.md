@@ -218,6 +218,27 @@ AI-generated profile pictures for social identity.
   avatar generation usage alongside question/topic limits, with per-limit
   Edit and Reset buttons (see accounts case for details)
 
+### Phase 6 — Complete
+
+Friend suggestions on the home page to improve social discoverability.
+
+**Database** (`src/h21/db.py`):
+- New method `get_friend_suggestions(user_id)` — returns the full candidate
+  pool across three tiers: followers not followed back, friends-of-friends,
+  same invite code. Each entry includes tier number and human-readable reason.
+
+**API** (`src/h21/main.py`):
+- `GET /api/friend-suggestions` — applies stateless rotation algorithm
+  (date-based offset per tier with different cadences) and returns up to 3
+  suggestions with player_code, display info, and reason text.
+
+**Frontend** (`static/home.html`, `static/home.js`, `static/style.css`):
+- "People You May Know" section between "Friends Are Playing" and topic picker
+- Each card shows avatar, name, reason, and inline "Follow" button
+- Following animates the card away and re-fetches to fill the slot
+- "Find more friends" link to account page friends section
+- Hidden when suggestion pool is empty or user is anonymous
+
 ## Key Design Decisions
 
 | Decision | Rationale |
@@ -238,3 +259,7 @@ AI-generated profile pictures for social identity.
 | Background backfill for existing accounts | `auto_generate_missing_avatars` flag runs async task at startup so the server is immediately available while avatars generate one-by-one |
 | Play-next for today only | Discovery section shows only today's puzzles; keeps it fresh and actionable |
 | Per-puzzle leaderboards, no global ranking | Avoids fragmentation and gaming; comparison is contextual |
+| Stateless suggestion rotation | No impression-tracking table; deterministic offset from date + user_id rotates through pool |
+| Three-tier suggestion algorithm | Followers → friends-of-friends → same-invite; high-signal tiers prioritized |
+| No random suggestions | Section hidden when pool empty; avoids surfacing strangers with no social signal |
+| Per-tier rotation cadence | Tier 1 daily, tier 2 every 2 days, tier 3 every 3 days; higher-signal suggestions refresh faster |

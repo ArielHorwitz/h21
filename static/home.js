@@ -305,8 +305,97 @@ async function loadPlayNext() {
   }
 }
 
+const friendSuggestionsSection = document.getElementById("friend-suggestions-section");
+
+function renderFriendSuggestions(suggestions) {
+  if (!suggestions || suggestions.length === 0) {
+    friendSuggestionsSection.hidden = true;
+    return;
+  }
+
+  friendSuggestionsSection.hidden = false;
+  friendSuggestionsSection.innerHTML = "";
+
+  const heading = document.createElement("h2");
+  heading.className = "friend-suggestions-heading";
+  heading.textContent = "People You May Know";
+  friendSuggestionsSection.appendChild(heading);
+
+  for (const suggestion of suggestions) {
+    const card = document.createElement("div");
+    card.className = "friend-suggestion-card";
+
+    if (suggestion.player_code && suggestion.avatar_version > 0) {
+      const avatar = document.createElement("img");
+      avatar.className = "avatar-sm";
+      avatar.src = "/avatars/" + encodeURIComponent(suggestion.player_code) + ".webp?v=" + suggestion.avatar_version;
+      avatar.alt = "";
+      card.appendChild(avatar);
+    }
+
+    const info = document.createElement("div");
+    info.className = "friend-suggestion-info";
+
+    const name = document.createElement("span");
+    name.className = "friend-suggestion-name";
+    name.textContent = suggestion.display_name || suggestion.username;
+    info.appendChild(name);
+
+    const reason = document.createElement("span");
+    reason.className = "friend-suggestion-reason";
+    reason.textContent = suggestion.reason;
+    info.appendChild(reason);
+
+    card.appendChild(info);
+
+    const followBtn = document.createElement("button");
+    followBtn.className = "friend-suggestion-follow-btn";
+    followBtn.textContent = "Follow";
+    followBtn.addEventListener("click", async () => {
+      followBtn.disabled = true;
+      try {
+        const response = await fetch("/api/friends/" + encodeURIComponent(suggestion.player_code), {
+          method: "POST",
+        });
+        if (response.ok || response.status === 409) {
+          card.classList.add("friend-suggestion-fade-out");
+          card.addEventListener("animationend", () => {
+            card.remove();
+            // Re-fetch to fill the slot.
+            loadFriendSuggestions();
+          });
+        }
+      } catch {
+        followBtn.disabled = false;
+      }
+    });
+    card.appendChild(followBtn);
+
+    friendSuggestionsSection.appendChild(card);
+  }
+
+  const moreLink = document.createElement("a");
+  moreLink.className = "friend-suggestions-more-link";
+  moreLink.href = "/account#friends";
+  moreLink.textContent = "Find more friends";
+  friendSuggestionsSection.appendChild(moreLink);
+}
+
+async function loadFriendSuggestions() {
+  try {
+    const response = await fetch("/api/friend-suggestions");
+    if (response.ok) {
+      const data = await response.json();
+      renderFriendSuggestions(data);
+    }
+  } catch (error) {
+    console.error("Failed to load friend suggestions:", error);
+  }
+}
+
 loadCurrentUser().then(() => {
   loadRecentResults();
   loadPlayNext();
+  loadFriendSuggestions();
 });
 loadTopics();
