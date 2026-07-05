@@ -509,12 +509,6 @@ async def generate_avatar(
     prompt_text = prompt.strip() or None
     reference_bytes = None
 
-    if not prompt_text and reference is None:
-        raise HTTPException(
-            status_code=400,
-            detail="Provide a prompt, a reference image, or both",
-        )
-
     if reference is not None:
         reference_bytes = await reference.read()
         if len(reference_bytes) > MAX_AVATAR_UPLOAD_BYTES:

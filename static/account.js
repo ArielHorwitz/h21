@@ -331,11 +331,6 @@ avatarGenerateBtn.addEventListener("click", async () => {
   const fileInput = avatarReferenceInput;
   const hasFile = fileInput.files && fileInput.files.length > 0;
 
-  if (!prompt && !hasFile) {
-    showStatus(avatarGenStatus, "Provide a prompt, a reference image, or both", true);
-    return;
-  }
-
   avatarGenerateBtn.disabled = true;
   avatarGenStatus.textContent = "Generating...";
   avatarGenStatus.className = "field-status";
