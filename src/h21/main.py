@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import collections
 import logging
 import logging.handlers
@@ -117,6 +118,23 @@ async def _backfill_avatars(accounts: list[dict[str, Any]]) -> None:
     logger.info("Avatar backfill complete")
 
 
+async def _generate_registration_avatar(
+    user_id: int, username: str, player_code: str,
+) -> None:
+    """Generate an avatar for a newly registered account. Runs as a background task."""
+    try:
+        image_bytes = await avatar_mod.generate_auto_avatar(
+            openai_image_client, avatar_image_model,
+        )
+        avatar_mod.save_avatar_direct(
+            data_dir, player_code, image_bytes,
+        )
+        database.bump_avatar_version(user_id)
+        logger.info("Generated avatar for new user %s (%s)", username, player_code)
+    except Exception:
+        logger.exception("Failed to auto-generate avatar for user %s", username)
+
+
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     global llm_client, openai_image_client, database, signing_secret
@@ -164,7 +182,6 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     if config.auto_generate_missing_avatars:
         accounts_without_avatars = database.get_accounts_without_avatars()
         if accounts_without_avatars:
-            import asyncio
             asyncio.create_task(_backfill_avatars(accounts_without_avatars))
 
     yield
@@ -342,16 +359,9 @@ async def register(request_body: RegisterRequest) -> JSONResponse:
     # Auto-generate a profile picture in the background (best-effort).
     account = database.get_account_by_id(user_id)
     if account and account["player_code"]:
-        try:
-            image_bytes = await avatar_mod.generate_auto_avatar(
-                openai_image_client, avatar_image_model,
-            )
-            avatar_mod.save_avatar_direct(
-                data_dir, account["player_code"], image_bytes,
-            )
-            database.bump_avatar_version(user_id)
-        except Exception:
-            logger.exception("Failed to auto-generate avatar for user %s", username)
+        asyncio.create_task(_generate_registration_avatar(
+            user_id, username, account["player_code"],
+        ))
 
     response = JSONResponse({"user_id": user_id, "username": username})
     set_session_cookie(response, user_id, signing_secret)

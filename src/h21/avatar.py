@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import io
 import logging
+import random
 from pathlib import Path
 from typing import Optional
 
@@ -13,13 +14,55 @@ logger = logging.getLogger("h21.avatar")
 
 THUMBNAIL_SIZE = 128
 
-DEFAULT_PROMPT = (
-    "Generate a visually striking profile picture of a random interesting "
-    "object or scene. Think: a red telephone on marble, a paper airplane in "
-    "sunset sky, a rubber duck on ocean waves, a vintage compass on old maps. "
-    "Colorful, bold, memorable at small sizes. Square composition, no text "
-    "or letters."
+AVATAR_ADJECTIVES = (
+    "amber", "antique", "aquamarine", "azure", "bejeweled", "blackened",
+    "blazing", "blooming", "bronze", "burnished", "cerulean", "charred",
+    "checkered", "chrome", "cobalt", "copper", "coral", "cracked", "crimson",
+    "crystalline", "curved", "cyan", "dappled", "diamond", "dotted",
+    "emerald", "etched", "faceted", "feathered", "fiery", "floating",
+    "floral", "flowing", "fluorescent", "folded", "forged", "frosted",
+    "frozen", "gilded", "glacial", "glittering", "glossy", "glowing",
+    "golden", "granite", "hammered", "hazy", "hexagonal", "holographic",
+    "icy", "illuminated", "indigo", "iridescent", "ivory", "jade", "jagged",
+    "lacquered", "layered", "lavender", "leafy", "luminous", "magenta",
+    "marbled", "matte", "metallic", "miniature", "molten", "mossy",
+    "multicolored", "obsidian", "opaline", "ornate", "oxidized", "patterned",
+    "pearl", "polished", "prismatic", "radiant", "reflective", "ribbed",
+    "rough", "ruby", "rusted", "sapphire", "scarlet", "scorched",
+    "shattered", "shimmering", "silken", "silver", "speckled", "spiked",
+    "spiraled", "striped", "textured", "translucent", "turquoise", "velvet",
+    "violet", "woven",
 )
+
+AVATAR_NOUNS = (
+    "octopus", "beetle", "chameleon", "peacock", "fox", "owl", "raven",
+    "jellyfish", "seahorse", "penguin", "mushroom", "coral", "bonsai",
+    "sunflower", "cactus", "maple", "fern", "lotus", "pinecone", "crystal",
+    "lantern", "hourglass", "compass", "telescope", "spyglass", "astrolabe",
+    "sundial", "key", "locket", "mask", "crown", "helmet", "anchor", "quill",
+    "scroll", "book", "pocketwatch", "globe", "dice", "chesspiece", "violin",
+    "cello", "harp", "banjo", "saxophone", "trumpet", "tambourine", "ocarina",
+    "xylophone", "gramophone", "zeppelin", "canoe", "airship", "submarine",
+    "locomotive", "motorcycle", "sailboat", "rocket", "spaceship", "tram",
+    "lighthouse", "pagoda", "windmill", "castle", "observatory", "greenhouse",
+    "gazebo", "temple", "cathedral", "torii", "pomegranate", "croissant",
+    "pineapple", "watermelon", "dragonfruit", "strawberry", "pretzel",
+    "cupcake", "donut", "artichoke", "snail", "dragonfly", "butterfly",
+    "scorpion", "lobster", "crab", "hedgehog", "koala", "panda", "gecko",
+    "volcano", "waterfall", "iceberg", "geyser", "tornado", "moon", "planet",
+    "comet", "meteor", "rainbow",
+)
+
+
+def _random_avatar_prompt() -> str:
+    """Build a prompt with a randomly chosen adjective + noun subject."""
+    adjective = random.choice(AVATAR_ADJECTIVES)
+    noun = random.choice(AVATAR_NOUNS)
+    return (
+        f"Generate a visually striking profile picture of a {adjective} "
+        f"{noun}. Colorful, bold, memorable at small sizes. Square "
+        f"composition, no text or letters."
+    )
 
 REFERENCE_DEFAULT_PROMPT = (
     "Create a stylized profile picture inspired by this image. "
@@ -75,7 +118,7 @@ async def generate_avatar(
     image input), and images.generate() otherwise.
     """
     effective_prompt = prompt or (
-        REFERENCE_DEFAULT_PROMPT if reference_image else DEFAULT_PROMPT
+        REFERENCE_DEFAULT_PROMPT if reference_image else _random_avatar_prompt()
     )
 
     if reference_image:
