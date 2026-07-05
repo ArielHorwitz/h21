@@ -177,6 +177,16 @@ function renderRecentResults(games) {
     title.textContent = `${game.topic_name} (${difficulty})`;
     card.appendChild(title);
 
+    const dateLabel = document.createElement("div");
+    dateLabel.className = "recent-results-card-date";
+    const parsed = new Date(game.date + "T00:00:00");
+    dateLabel.textContent = parsed.toLocaleDateString("en-US", {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+    });
+    card.appendChild(dateLabel);
+
     // Build ranking: player + friends, sorted by score.
     const playerScore = computeScore(game.my_result.questions_asked, game.my_result.hints_used);
     const entries = [];
