@@ -358,13 +358,11 @@ function showShareButtons(won) {
   const container = document.createElement("div");
   container.id = "share-buttons";
 
-  const baseText = buildShareText(won);
-  container.appendChild(createShareButton("Share", baseText));
-
+  let text = buildShareText(won);
   if (shareCode) {
-    const spoilerText = baseText + `\nGame ID: ${shareCode}`;
-    container.appendChild(createShareButton("Share (with spoilers)", spoilerText));
+    text += `\nGame ID: ${shareCode}`;
   }
+  container.appendChild(createShareButton("Share", text));
 
   gameOverMessage.insertAdjacentElement("afterend", container);
 }

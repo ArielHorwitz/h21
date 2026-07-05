@@ -520,6 +520,18 @@ class GameDatabase:
             game["revealed_hints"] = revealed_hints
         return game
 
+    def has_played_puzzle(
+        self, user_id: int, puzzle_date: date, topic_slug: str, difficulty: str,
+    ) -> bool:
+        """Check whether a user has started a game for the given puzzle."""
+        row = self._connection.execute(
+            "SELECT 1 FROM games "
+            "WHERE user_id = ? AND date = ? AND topic_slug = ? AND difficulty = ? "
+            "LIMIT 1",
+            (user_id, puzzle_date.isoformat(), topic_slug, difficulty),
+        ).fetchone()
+        return row is not None
+
     def get_game_statuses(
         self, user_id: int, puzzle_date: date,
     ) -> list[dict[str, Any]]:

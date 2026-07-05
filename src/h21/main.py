@@ -1071,10 +1071,22 @@ async def get_hint(request_body: HintRequest, request: Request) -> dict[str, Any
 
 
 @app.get("/api/replay/{share_code}")
-async def get_replay(share_code: str) -> dict[str, Any]:
+async def get_replay(share_code: str, request: Request) -> dict[str, Any]:
     game = database.get_game_by_share_code(share_code.upper())
     if game is None:
         raise HTTPException(status_code=404, detail="Game not found")
+    # Gate today's puzzles: only allow replay if the viewer has played it.
+    today = date_type.today()
+    if game["date"] == today.isoformat():
+        viewer_id = request.state.user_id
+        has_played = database.has_played_puzzle(
+            viewer_id, today, game["topic_slug"], game["difficulty"],
+        )
+        if not has_played:
+            raise HTTPException(
+                status_code=403,
+                detail="Play this puzzle first to view replays from today.",
+            )
     # Strip internal fields the client doesn't need.
     game.pop("game_id", None)
     game.pop("started_at", None)

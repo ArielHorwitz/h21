@@ -177,6 +177,8 @@ async function init() {
     if (!response.ok) {
       if (response.status === 404) {
         showError("Game not found. Check the game ID and try again.");
+      } else if (response.status === 403) {
+        showError("Play this puzzle first to view today's replays.");
       } else {
         showError("Failed to load game.");
       }
