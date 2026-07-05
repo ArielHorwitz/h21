@@ -11,7 +11,9 @@ from typing import Any, AsyncIterator, Optional
 
 logger = logging.getLogger("h21")
 
-from fastapi import FastAPI, HTTPException, Request
+import base64
+
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -22,6 +24,9 @@ from h21.auth import (
     get_session_user_id,
     set_session_cookie,
 )
+from openai import AsyncOpenAI
+
+from h21 import avatar as avatar_mod
 from h21.config import load_config, _data_dir
 from h21.db import GameDatabase, VALID_DIFFICULTIES, slugify
 from h21.llm import (
@@ -39,7 +44,7 @@ STATIC_DIR = Path(__file__).resolve().parent.parent.parent / "static"
 
 # Routes that don't require authentication.
 PUBLIC_PATHS = frozenset({"/login", "/api/login", "/api/register", "/api/invite-request", "/api/invite-request-hint"})
-PUBLIC_PREFIXES = ("/static/",)
+PUBLIC_PREFIXES = ("/static/", "/avatars/")
 
 
 class AskRequest(BaseModel):
@@ -76,18 +81,24 @@ class RegisterRequest(BaseModel):
 # -- app state populated during lifespan --
 
 llm_client: OpenAIClient
+openai_image_client: AsyncOpenAI
 database: GameDatabase
 signing_secret: str
 invite_request_hint: str
 default_daily_question_limit: int
 default_daily_topic_limit: int
+default_monthly_avatar_limit: int
+avatar_image_model: str
+data_dir: Path
 log_path: Path
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
-    global llm_client, database, signing_secret, invite_request_hint
-    global default_daily_question_limit, default_daily_topic_limit, log_path
+    global llm_client, openai_image_client, database, signing_secret
+    global invite_request_hint
+    global default_daily_question_limit, default_daily_topic_limit
+    global default_monthly_avatar_limit, avatar_image_model, data_dir, log_path
 
     config = load_config()
 
@@ -114,11 +125,15 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         model=config.model,
         reasoning_effort=config.reasoning_effort,
     )
+    openai_image_client = AsyncOpenAI(api_key=config.openai_api_key)
     database = GameDatabase(config.db_path)
-    signing_secret = _ensure_signing_secret(_data_dir())
+    data_dir = _data_dir()
+    signing_secret = _ensure_signing_secret(data_dir)
     invite_request_hint = config.invite_request_hint
     default_daily_question_limit = config.default_daily_question_limit
     default_daily_topic_limit = config.default_daily_topic_limit
+    default_monthly_avatar_limit = config.default_monthly_avatar_limit
+    avatar_image_model = config.avatar_image_model
     log_path = config.log_path
     database.ensure_schema()
     yield
@@ -283,13 +298,29 @@ async def register(request_body: RegisterRequest) -> JSONResponse:
     try:
         question_limit = invite["daily_question_limit"] if invite["daily_question_limit"] is not None else default_daily_question_limit
         topic_limit = invite["daily_topic_limit"] if invite["daily_topic_limit"] is not None else default_daily_topic_limit
+        avatar_limit = invite["monthly_avatar_limit"] if invite["monthly_avatar_limit"] is not None else default_monthly_avatar_limit
         user_id = database.create_account(
             username, password, role=invite["role"], invite_code=invite_code,
             daily_question_limit=question_limit,
             daily_topic_limit=topic_limit,
+            monthly_avatar_limit=avatar_limit,
         )
     except sqlite3.IntegrityError:
         raise HTTPException(status_code=409, detail="Username already taken")
+
+    # Auto-generate a profile picture in the background (best-effort).
+    account = database.get_account_by_id(user_id)
+    if account and account["player_code"]:
+        try:
+            image_bytes = await avatar_mod.generate_auto_avatar(
+                openai_image_client, avatar_image_model,
+            )
+            avatar_mod.save_avatar_direct(
+                data_dir, account["player_code"], image_bytes,
+            )
+            database.bump_avatar_version(user_id)
+        except Exception:
+            logger.exception("Failed to auto-generate avatar for user %s", username)
 
     response = JSONResponse({"user_id": user_id, "username": username})
     set_session_cookie(response, user_id, signing_secret)
@@ -322,6 +353,7 @@ async def get_me(request: Request) -> dict[str, Any]:
     if account is None:
         raise HTTPException(status_code=404, detail="Account not found")
     usage = database.get_daily_usage(user_id, date_type.today())
+    avatar_usage = database.get_avatar_usage(user_id, date_type.today())
     return {
         "user_id": account["user_id"],
         "username": account["username"],
@@ -333,6 +365,9 @@ async def get_me(request: Request) -> dict[str, Any]:
         "display_name": account["display_name"],
         "player_code": account["player_code"],
         "anonymous": bool(account["anonymous"]),
+        "avatar_version": account["avatar_version"],
+        "avatar_generations_used": avatar_usage["used"],
+        "monthly_avatar_limit": avatar_usage["limit"],
     }
 
 
@@ -382,7 +417,8 @@ async def search_players(request: Request, q: str = "") -> list[dict[str, Any]]:
     results = database.search_players(q, exclude_user_id=user_id)
     return [
         {"username": row["username"], "display_name": row["display_name"],
-         "player_code": row["player_code"]}
+         "player_code": row["player_code"],
+         "avatar_version": row.get("avatar_version", 0)}
         for row in results
     ]
 
@@ -413,6 +449,7 @@ async def list_friends(request: Request) -> list[dict[str, Any]]:
     return [
         {"username": friend["username"], "display_name": friend["display_name"],
          "player_code": friend["player_code"],
+         "avatar_version": friend.get("avatar_version", 0),
          "anonymous": bool(friend["anonymous"])}
         for friend in friends
     ]
@@ -443,6 +480,131 @@ async def unfollow_player(player_code: str, request: Request) -> dict[str, str]:
     if not database.remove_friend(user_id, target["user_id"]):
         raise HTTPException(status_code=404, detail="Not following this player")
     return {"status": "ok"}
+
+
+# -- Avatar endpoints --
+
+MAX_AVATAR_UPLOAD_BYTES = 10 * 1024 * 1024  # 10 MB
+
+
+@app.post("/api/avatar/generate")
+async def generate_avatar(
+    request: Request,
+    prompt: str = Form(default=""),
+    reference: UploadFile = File(default=None),
+) -> dict[str, Any]:
+    user_id = request.state.user_id
+    account = database.get_account_by_id(user_id)
+    if account is None:
+        raise HTTPException(status_code=404, detail="Account not found")
+
+    today = date_type.today()
+    avatar_usage = database.get_avatar_usage(user_id, today)
+    if avatar_usage["used"] >= avatar_usage["limit"]:
+        raise HTTPException(
+            status_code=429,
+            detail="Monthly avatar generation limit reached",
+        )
+
+    prompt_text = prompt.strip() or None
+    reference_bytes = None
+
+    if not prompt_text and reference is None:
+        raise HTTPException(
+            status_code=400,
+            detail="Provide a prompt, a reference image, or both",
+        )
+
+    if reference is not None:
+        reference_bytes = await reference.read()
+        if len(reference_bytes) > MAX_AVATAR_UPLOAD_BYTES:
+            raise HTTPException(
+                status_code=400,
+                detail="Reference image must be under 10 MB",
+            )
+        if len(reference_bytes) == 0:
+            reference_bytes = None
+
+    player_code = account["player_code"]
+    try:
+        image_bytes = await avatar_mod.generate_avatar(
+            openai_image_client,
+            avatar_image_model,
+            prompt=prompt_text,
+            reference_image=reference_bytes,
+        )
+    except Exception as exc:
+        logger.error("Avatar generation failed for user %s: %s", user_id, exc)
+        raise HTTPException(
+            status_code=502,
+            detail="Failed to generate avatar. Try a different prompt.",
+        )
+
+    database.increment_avatar_generation(user_id, today)
+
+    thumbnail_bytes = avatar_mod.save_pending(data_dir, player_code, image_bytes)
+
+    avatar_usage = database.get_avatar_usage(user_id, today)
+    return {
+        "original_b64": base64.b64encode(image_bytes).decode(),
+        "thumbnail_b64": base64.b64encode(thumbnail_bytes).decode(),
+        "generations_used": avatar_usage["used"],
+        "monthly_avatar_limit": avatar_usage["limit"],
+    }
+
+
+@app.post("/api/avatar/confirm")
+async def confirm_avatar(request: Request) -> dict[str, Any]:
+    user_id = request.state.user_id
+    account = database.get_account_by_id(user_id)
+    if account is None:
+        raise HTTPException(status_code=404, detail="Account not found")
+
+    player_code = account["player_code"]
+    if not avatar_mod.confirm_pending(data_dir, player_code):
+        raise HTTPException(status_code=404, detail="No pending avatar to confirm")
+
+    new_version = database.bump_avatar_version(user_id)
+    return {"status": "ok", "avatar_version": new_version}
+
+
+@app.post("/api/avatar/discard")
+async def discard_avatar(request: Request) -> dict[str, str]:
+    user_id = request.state.user_id
+    account = database.get_account_by_id(user_id)
+    if account is None:
+        raise HTTPException(status_code=404, detail="Account not found")
+
+    avatar_mod.discard_pending(data_dir, account["player_code"])
+    return {"status": "ok"}
+
+
+@app.get("/avatars/{player_code}.webp")
+async def serve_avatar_thumbnail(player_code: str) -> Response:
+    path = avatar_mod.get_thumbnail_path(data_dir, player_code.upper())
+    if path is None:
+        raise HTTPException(status_code=404, detail="Avatar not found")
+    return FileResponse(
+        path,
+        media_type="image/webp",
+        headers={
+            "Cache-Control": "public, max-age=31536000, immutable",
+        },
+    )
+
+
+@app.get("/avatars/{player_code}_original.png")
+async def serve_avatar_original(player_code: str) -> Response:
+    path = avatar_mod.get_original_path(data_dir, player_code.upper())
+    if path is None:
+        raise HTTPException(status_code=404, detail="Avatar not found")
+    return FileResponse(
+        path,
+        media_type="image/png",
+        headers={
+            "Cache-Control": "public, max-age=31536000, immutable",
+        },
+    )
 
 
 # -- Recap --
@@ -508,6 +670,7 @@ async def get_recent_results(request: Request) -> list[dict[str, Any]]:
             friend_entries.append({
                 "display_name": friend["display_name"] or friend["username"],
                 "player_code": friend["player_code"],
+                "avatar_version": friend.get("avatar_version", 0),
                 "questions_asked": friend["questions_asked"],
                 "hints_used": friend["hints_used"],
             })
@@ -619,6 +782,8 @@ async def get_leaderboard(
         players.append({
             "rank": current_rank,
             "display_name": winner["display_name"] or winner["username"],
+            "player_code": winner.get("player_code"),
+            "avatar_version": winner.get("avatar_version", 0),
             "questions_asked": winner["questions_asked"],
             "hints_used": winner["hints_used"],
             "is_self": winner["user_id"] == user_id,
@@ -645,6 +810,7 @@ class CreateInviteRequest(BaseModel):
     role: str = "user"
     daily_question_limit: Optional[int] = None
     daily_topic_limit: Optional[int] = None
+    monthly_avatar_limit: Optional[int] = None
 
 
 @app.get("/api/invites")
@@ -663,6 +829,7 @@ async def create_invite_api(request_body: CreateInviteRequest) -> dict[str, Any]
         alias=alias, uses=request_body.uses, role=request_body.role,
         daily_question_limit=request_body.daily_question_limit,
         daily_topic_limit=request_body.daily_topic_limit,
+        monthly_avatar_limit=request_body.monthly_avatar_limit,
     )
     invite = database.get_invite(code)
     return invite

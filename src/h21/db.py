@@ -999,7 +999,7 @@ class GameDatabase:
         Excludes the searching user and anonymous players. Returns up to 20 results."""
         pattern = f"%{query}%"
         rows = self._connection.execute(
-            "SELECT user_id, username, display_name, player_code "
+            "SELECT user_id, username, display_name, player_code, avatar_version "
             "FROM accounts "
             "WHERE anonymous = 0 AND user_id != ? "
             "AND (username LIKE ? OR display_name LIKE ?) "
@@ -1036,7 +1036,8 @@ class GameDatabase:
         """Return all friends (accounts the user follows). Does NOT filter by
         anonymous — the API layer gates access."""
         rows = self._connection.execute(
-            "SELECT a.user_id, a.username, a.display_name, a.player_code, a.anonymous "
+            "SELECT a.user_id, a.username, a.display_name, a.player_code, "
+            "a.avatar_version, a.anonymous "
             "FROM friends f "
             "JOIN accounts a ON a.user_id = f.friend_id "
             "WHERE f.user_id = ? "
@@ -1104,7 +1105,7 @@ class GameDatabase:
             # Get friends' won games on the same puzzle.
             friend_games = self._connection.execute(
                 "SELECT a.display_name, a.username, a.player_code, "
-                "g.questions_asked, "
+                "a.avatar_version, g.questions_asked, "
                 "(SELECT COUNT(*) FROM hint_reveals h "
                 " WHERE h.game_id = g.game_id) AS hints_used "
                 "FROM friends f "
@@ -1135,6 +1136,7 @@ class GameDatabase:
         """
         rows = self._connection.execute(
             "SELECT a.user_id, a.username, a.display_name, "
+            "a.player_code, a.avatar_version, "
             "g.questions_asked, "
             "(SELECT COUNT(*) FROM hint_reveals h "
             " WHERE h.game_id = g.game_id) AS hints_used, "
