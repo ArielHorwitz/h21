@@ -115,6 +115,22 @@ requestForm.addEventListener("submit", async (event) => {
   }
 });
 
+let currentUserPlayerCode = null;
+let currentUserAvatarVersion = 0;
+
+async function loadCurrentUser() {
+  try {
+    const response = await fetch("/api/me");
+    if (response.ok) {
+      const data = await response.json();
+      currentUserPlayerCode = data.player_code;
+      currentUserAvatarVersion = data.avatar_version;
+    }
+  } catch {
+    // Non-critical.
+  }
+}
+
 const replayForm = document.getElementById("replay-form");
 const replayCodeInput = document.getElementById("replay-code-input");
 
@@ -170,6 +186,8 @@ function renderRecentResults(games) {
       hintsUsed: game.my_result.hints_used,
       score: playerScore,
       isPlayer: true,
+      playerCode: currentUserPlayerCode,
+      avatarVersion: currentUserAvatarVersion,
     });
     for (const friend of game.friends) {
       entries.push({
@@ -178,6 +196,8 @@ function renderRecentResults(games) {
         hintsUsed: friend.hints_used,
         score: computeScore(friend.questions_asked, friend.hints_used),
         isPlayer: false,
+        playerCode: friend.player_code,
+        avatarVersion: friend.avatar_version || 0,
       });
     }
     entries.sort((a, b) => a.score - b.score);
@@ -190,6 +210,14 @@ function renderRecentResults(games) {
       li.className = "recent-results-rank-entry";
       if (entry.isPlayer) {
         li.classList.add("recent-results-rank-self");
+      }
+
+      if (entry.playerCode && entry.avatarVersion > 0) {
+        const avatarImg = document.createElement("img");
+        avatarImg.className = "avatar-sm";
+        avatarImg.src = "/avatars/" + encodeURIComponent(entry.playerCode) + ".webp?v=" + entry.avatarVersion;
+        avatarImg.alt = "";
+        li.appendChild(avatarImg);
       }
 
       const nameSpan = document.createElement("span");
@@ -277,6 +305,8 @@ async function loadPlayNext() {
   }
 }
 
-loadRecentResults();
-loadPlayNext();
+loadCurrentUser().then(() => {
+  loadRecentResults();
+  loadPlayNext();
+});
 loadTopics();

@@ -884,6 +884,15 @@ h1 a.home-link:hover {
   color: #e0e0e0;
 }
 
+.leaderboard-table td .avatar-sm,
+.search-result-row .avatar-sm,
+.friend-row .avatar-sm,
+.recent-results-rank-entry .avatar-sm {
+  vertical-align: middle;
+  margin-right: 0.4rem;
+  flex-shrink: 0;
+}
+
 .player-code-text {
   font-family: monospace;
   font-size: 1.1rem;

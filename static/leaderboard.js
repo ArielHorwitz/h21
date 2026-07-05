@@ -59,10 +59,16 @@ function renderTable(players) {
     row.appendChild(rankCell);
 
     const nameCell = document.createElement("td");
-    nameCell.textContent = player.display_name;
-    if (player.is_self) {
-      nameCell.textContent += " (you)";
+    if (player.player_code && player.avatar_version > 0) {
+      const avatar = document.createElement("img");
+      avatar.className = "avatar-sm";
+      avatar.src = "/avatars/" + encodeURIComponent(player.player_code) + ".webp?v=" + player.avatar_version;
+      avatar.alt = "";
+      nameCell.appendChild(avatar);
+      nameCell.appendChild(document.createTextNode(" "));
     }
+    const nameText = document.createTextNode(player.display_name + (player.is_self ? " (you)" : ""));
+    nameCell.appendChild(nameText);
     row.appendChild(nameCell);
 
     const questionsCell = document.createElement("td");

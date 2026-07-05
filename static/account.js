@@ -187,6 +187,14 @@ async function searchPlayers(query) {
       const row = document.createElement("div");
       row.className = "search-result-row";
 
+      if (player.avatar_version > 0 && player.player_code) {
+        const avatar = document.createElement("img");
+        avatar.className = "avatar-sm";
+        avatar.src = "/avatars/" + encodeURIComponent(player.player_code) + ".webp?v=" + player.avatar_version;
+        avatar.alt = "";
+        row.appendChild(avatar);
+      }
+
       const info = document.createElement("span");
       info.className = "search-result-info";
       const name = player.display_name || player.username;
@@ -231,6 +239,14 @@ async function loadFriends() {
     for (const friend of friends) {
       const row = document.createElement("div");
       row.className = "friend-row";
+
+      if (friend.avatar_version > 0 && friend.player_code && !friend.anonymous) {
+        const avatar = document.createElement("img");
+        avatar.className = "avatar-sm";
+        avatar.src = "/avatars/" + encodeURIComponent(friend.player_code) + ".webp?v=" + friend.avatar_version;
+        avatar.alt = "";
+        row.appendChild(avatar);
+      }
 
       const info = document.createElement("span");
       info.className = "friend-info";
