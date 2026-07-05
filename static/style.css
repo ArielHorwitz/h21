@@ -783,6 +783,10 @@ h1 a.home-link:hover {
   font-size: 2rem;
 }
 
+.avatar-placeholder[hidden] {
+  display: none;
+}
+
 #avatar-section {
   display: flex;
   flex-direction: column;
