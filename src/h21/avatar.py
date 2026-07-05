@@ -196,6 +196,27 @@ def get_pending_original_path(data_dir: Path, player_code: str) -> Optional[Path
     return path if path.exists() else None
 
 
+def process_upload(data_dir: Path, player_code: str, image_bytes: bytes) -> None:
+    """Process an uploaded image and save as the active avatar.
+
+    Normalizes the image to PNG (original) and creates a webp thumbnail,
+    regardless of the input format.
+    """
+    image = Image.open(io.BytesIO(image_bytes))
+    image = image.convert("RGB")
+
+    # Save original as PNG.
+    original_buffer = io.BytesIO()
+    image.save(original_buffer, format="PNG")
+    original_path = _original_path(data_dir, player_code)
+    original_path.write_bytes(original_buffer.getvalue())
+
+    # Save thumbnail as webp.
+    thumbnail_bytes = _create_thumbnail(image_bytes)
+    thumbnail_path = _thumbnail_path(data_dir, player_code)
+    thumbnail_path.write_bytes(thumbnail_bytes)
+
+
 def has_avatar(data_dir: Path, player_code: str) -> bool:
     """Check whether an active avatar exists for a player."""
     return _thumbnail_path(data_dir, player_code).exists()

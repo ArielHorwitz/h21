@@ -928,6 +928,26 @@ async def reset_usage(user_id: int) -> dict[str, str]:
     return {"status": "ok"}
 
 
+@app.post("/api/accounts/{user_id}/avatar")
+async def upload_avatar(user_id: int, image: UploadFile = File()) -> dict[str, Any]:
+    account = database.get_account_by_id(user_id)
+    if account is None:
+        raise HTTPException(status_code=404, detail="Account not found")
+
+    image_bytes = await image.read()
+    if len(image_bytes) == 0:
+        raise HTTPException(status_code=400, detail="No image data")
+    if len(image_bytes) > MAX_AVATAR_UPLOAD_BYTES:
+        raise HTTPException(status_code=400, detail="Image must be under 10 MB")
+
+    player_code = account["player_code"]
+    avatar_mod.discard_pending(data_dir, player_code)
+    avatar_mod.process_upload(data_dir, player_code, image_bytes)
+    new_version = database.bump_avatar_version(user_id)
+
+    return {"status": "ok", "avatar_version": new_version}
+
+
 # -- Query (dev only) --
 
 class QueryRequest(BaseModel):

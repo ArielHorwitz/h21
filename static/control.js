@@ -336,6 +336,33 @@ function renderUserDetail(user) {
     container.appendChild(row);
   }
 
+  // Avatar upload row.
+  const avatarRow = document.createElement("div");
+  avatarRow.className = "user-detail-limit-row";
+
+  const avatarLabel = document.createElement("span");
+  avatarLabel.className = "user-detail-limit-label";
+  avatarLabel.textContent = "Avatar";
+  avatarRow.appendChild(avatarLabel);
+
+  const fileInput = document.createElement("input");
+  fileInput.type = "file";
+  fileInput.accept = "image/*";
+  fileInput.addEventListener("click", (event) => event.stopPropagation());
+  avatarRow.appendChild(fileInput);
+
+  const uploadBtn = document.createElement("button");
+  uploadBtn.className = "unblock-btn";
+  uploadBtn.textContent = "Upload";
+  uploadBtn.addEventListener("click", (event) => {
+    event.stopPropagation();
+    if (!fileInput.files.length) return;
+    uploadAvatar(user.user_id, fileInput.files[0]);
+  });
+  avatarRow.appendChild(uploadBtn);
+
+  container.appendChild(avatarRow);
+
   return container;
 }
 
@@ -408,6 +435,25 @@ async function resetUsage(userId) {
     }
   } catch (error) {
     console.error("Failed to reset usage:", error);
+  }
+}
+
+async function uploadAvatar(userId, file) {
+  const formData = new FormData();
+  formData.append("image", file);
+  try {
+    const response = await fetch(`/api/accounts/${userId}/avatar`, {
+      method: "POST",
+      body: formData,
+    });
+    if (response.ok) {
+      await loadUsers();
+    } else {
+      const data = await response.json().catch(() => ({}));
+      console.error(data.detail || "Failed to upload avatar");
+    }
+  } catch (error) {
+    console.error("Failed to upload avatar:", error);
   }
 }
 
