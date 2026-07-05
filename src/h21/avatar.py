@@ -14,22 +14,17 @@ logger = logging.getLogger("h21.avatar")
 THUMBNAIL_SIZE = 128
 
 DEFAULT_PROMPT = (
-    "A visually striking and creative profile picture. "
-    "Colorful, expressive, unique. Square composition, no text or letters."
+    "Generate a visually striking profile picture of a random interesting "
+    "object or scene. Think: a red telephone on marble, a paper airplane in "
+    "sunset sky, a rubber duck on ocean waves, a vintage compass on old maps. "
+    "Colorful, bold, memorable at small sizes. Square composition, no text "
+    "or letters."
 )
 
 REFERENCE_DEFAULT_PROMPT = (
     "Create a stylized profile picture inspired by this image. "
     "Creative interpretation, suitable as a small avatar. "
     "Square composition, no text or letters."
-)
-
-AUTO_GENERATE_PROMPT = (
-    "Generate a visually striking profile picture of a random interesting "
-    "object or scene. Think: a red telephone on marble, a paper airplane in "
-    "sunset sky, a rubber duck on ocean waves, a vintage compass on old maps. "
-    "Colorful, bold, memorable at small sizes. Square composition, no text "
-    "or letters."
 )
 
 
@@ -118,7 +113,7 @@ async def generate_auto_avatar(
     model: str,
 ) -> bytes:
     """Generate the automatic default avatar for a new account."""
-    return await generate_avatar(client, model, prompt=AUTO_GENERATE_PROMPT)
+    return await generate_avatar(client, model)
 
 
 def save_pending(data_dir: Path, player_code: str, image_bytes: bytes) -> bytes:
