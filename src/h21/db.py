@@ -1042,6 +1042,56 @@ class GameDatabase:
         ).fetchall()
         return [dict(row) for row in rows]
 
+    def get_play_next(self, user_id: int, today: date) -> list[dict[str, Any]]:
+        """Find today's puzzles that friends have won but the user hasn't played.
+
+        Returns a list of puzzles with topic name, slug, difficulty, and the
+        count of friends who have won. Sorted by friend count descending.
+
+        Returns empty list if the user is anonymous.
+        """
+        account = self._connection.execute(
+            "SELECT anonymous FROM accounts WHERE user_id = ?", (user_id,)
+        ).fetchone()
+        if account is None or account["anonymous"]:
+            return []
+
+        today_str = today.isoformat()
+        rows = self._connection.execute(
+            "SELECT dp.topic_slug, t.name AS topic_name, dp.difficulty, "
+            "COUNT(DISTINCT fg.user_id) AS friend_count "
+            "FROM daily_puzzles dp "
+            "LEFT JOIN topics t ON dp.topic_slug = t.slug "
+            "JOIN friends f ON f.user_id = ? "
+            "JOIN games fg ON fg.user_id = f.friend_id "
+            "  AND fg.date = dp.date "
+            "  AND fg.topic_slug = dp.topic_slug "
+            "  AND fg.difficulty = dp.difficulty "
+            "  AND fg.result = 'win' "
+            "JOIN accounts fa ON fa.user_id = f.friend_id AND fa.anonymous = 0 "
+            "WHERE dp.date = ? "
+            "AND NOT EXISTS ("
+            "  SELECT 1 FROM games ug "
+            "  WHERE ug.user_id = ? "
+            "    AND ug.date = dp.date "
+            "    AND ug.topic_slug = dp.topic_slug "
+            "    AND ug.difficulty = dp.difficulty"
+            ") "
+            "GROUP BY dp.topic_slug, dp.difficulty "
+            "ORDER BY friend_count DESC",
+            (user_id, today_str, user_id),
+        ).fetchall()
+
+        return [
+            {
+                "topic_slug": row["topic_slug"],
+                "topic_name": row["topic_name"] or row["topic_slug"],
+                "difficulty": row["difficulty"],
+                "friend_count": row["friend_count"],
+            }
+            for row in rows
+        ]
+
     # -- Invites --
 
     def create_invite(

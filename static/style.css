@@ -218,6 +218,48 @@ h1 a.home-link:hover {
   color: #fff;
 }
 
+/* -- Play next -- */
+
+#play-next-section {
+  margin-bottom: 2rem;
+}
+
+.play-next-heading {
+  font-size: 1.1rem;
+  color: #ccc;
+  margin-bottom: 0.75rem;
+}
+
+.play-next-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #16213e;
+  border: 1px solid #333;
+  border-radius: 6px;
+  padding: 0.7rem 1rem;
+  margin-bottom: 0.5rem;
+  text-decoration: none;
+  color: #e0e0e0;
+  transition: border-color 0.15s;
+}
+
+.play-next-card:hover {
+  border-color: #e2b714;
+}
+
+.play-next-title {
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+
+.play-next-friend-count {
+  font-size: 0.8rem;
+  color: #e2b714;
+  white-space: nowrap;
+  margin-left: 1rem;
+}
+
 #request-topic-section {
   border-top: 1px solid #333;
   padding-top: 1.5rem;

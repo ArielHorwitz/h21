@@ -4,6 +4,7 @@ const topicNameInput = document.getElementById("topic-name-input");
 const requestTopicBtn = document.getElementById("request-topic-btn");
 const requestStatus = document.getElementById("request-topic-status");
 const recentResultsSection = document.getElementById("recent-results-section");
+const playNextSection = document.getElementById("play-next-section");
 
 const DIFFICULTIES = ["normal", "expert"];
 
@@ -240,5 +241,53 @@ async function loadRecentResults() {
   }
 }
 
+function renderPlayNext(puzzles) {
+  if (!puzzles || puzzles.length === 0) {
+    playNextSection.hidden = true;
+    return;
+  }
+
+  playNextSection.hidden = false;
+  playNextSection.innerHTML = "";
+
+  const heading = document.createElement("h2");
+  heading.className = "play-next-heading";
+  heading.textContent = "Friends Are Playing";
+  playNextSection.appendChild(heading);
+
+  for (const puzzle of puzzles) {
+    const link = document.createElement("a");
+    link.className = "play-next-card";
+    link.href = `/game?topic=${encodeURIComponent(puzzle.topic_slug)}&difficulty=${puzzle.difficulty}`;
+
+    const title = document.createElement("span");
+    title.className = "play-next-title";
+    const difficulty = puzzle.difficulty.charAt(0).toUpperCase() + puzzle.difficulty.slice(1);
+    title.textContent = `${puzzle.topic_name} (${difficulty})`;
+    link.appendChild(title);
+
+    const friendCount = document.createElement("span");
+    friendCount.className = "play-next-friend-count";
+    const noun = puzzle.friend_count === 1 ? "friend" : "friends";
+    friendCount.textContent = `${puzzle.friend_count} ${noun} played this`;
+    link.appendChild(friendCount);
+
+    playNextSection.appendChild(link);
+  }
+}
+
+async function loadPlayNext() {
+  try {
+    const response = await fetch("/api/play-next");
+    if (response.ok) {
+      const data = await response.json();
+      renderPlayNext(data);
+    }
+  } catch (error) {
+    console.error("Failed to load play next:", error);
+  }
+}
+
 loadRecentResults();
+loadPlayNext();
 loadTopics();

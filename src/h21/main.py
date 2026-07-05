@@ -527,6 +527,13 @@ async def get_recent_results(request: Request) -> list[dict[str, Any]]:
     return result
 
 
+@app.get("/api/play-next")
+async def get_play_next(request: Request) -> list[dict[str, Any]]:
+    user_id = request.state.user_id
+    today = date_type.today()
+    return database.get_play_next(user_id, today)
+
+
 @app.get("/api/leaderboard")
 async def get_leaderboard(
     request: Request, topic_slug: str, difficulty: str, date: str,
