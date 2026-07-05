@@ -723,12 +723,13 @@ async def get_play_next(request: Request) -> list[dict[str, Any]]:
 
 
 @app.get("/api/friend-suggestions")
-async def get_friend_suggestions(request: Request) -> list[dict[str, Any]]:
+async def get_friend_suggestions(request: Request, limit: int = 3) -> list[dict[str, Any]]:
     user_id = request.state.user_id
     pool = database.get_friend_suggestions(user_id)
     if not pool:
         return []
 
+    max_suggestions = max(1, min(limit, 10))
     today_days = (date_type.today() - date_type(2000, 1, 1)).days
     cadence_by_tier = {1: 1, 2: 2, 3: 3}
 
@@ -737,9 +738,9 @@ async def get_friend_suggestions(request: Request) -> list[dict[str, Any]]:
     for candidate in pool:
         tiers.setdefault(candidate["tier"], []).append(candidate)
 
-    # Select up to 3 suggestions, preferring higher-priority tiers.
+    # Select up to max_suggestions, preferring higher-priority tiers.
     suggestions: list[dict[str, Any]] = []
-    remaining = 3
+    remaining = max_suggestions
     for tier_number in (1, 2, 3):
         tier_pool = tiers.get(tier_number, [])
         if not tier_pool:

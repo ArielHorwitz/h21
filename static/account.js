@@ -82,6 +82,7 @@ function updateFriendsVisibility() {
     friendsDisabledMessage.hidden = true;
     friendsControls.hidden = false;
     loadFriends();
+    loadAccountFriendSuggestions();
   }
 }
 
@@ -274,6 +275,72 @@ async function loadFriends() {
     }
   } catch (error) {
     console.error("Failed to load friends:", error);
+  }
+}
+
+// -- Friend suggestions (account page) --
+
+const friendSuggestionsContainer = document.getElementById("friend-suggestions-container");
+const accountFriendSuggestions = document.getElementById("account-friend-suggestions");
+
+async function loadAccountFriendSuggestions() {
+  try {
+    const response = await fetch("/api/friend-suggestions?limit=5");
+    if (!response.ok) return;
+    const suggestions = await response.json();
+    if (!suggestions || suggestions.length === 0) {
+      friendSuggestionsContainer.hidden = true;
+      return;
+    }
+    friendSuggestionsContainer.hidden = false;
+    accountFriendSuggestions.innerHTML = "";
+    for (const suggestion of suggestions) {
+      const row = document.createElement("div");
+      row.className = "friend-row";
+
+      if (suggestion.avatar_version > 0 && suggestion.player_code) {
+        const avatar = document.createElement("img");
+        avatar.className = "avatar-sm";
+        avatar.src = "/avatars/" + encodeURIComponent(suggestion.player_code) + ".webp?v=" + suggestion.avatar_version;
+        avatar.alt = "";
+        row.appendChild(avatar);
+      }
+
+      const info = document.createElement("div");
+      info.className = "friend-suggestion-info";
+
+      const name = document.createElement("span");
+      name.className = "friend-suggestion-name";
+      name.textContent = suggestion.display_name || suggestion.username;
+      info.appendChild(name);
+
+      const reason = document.createElement("span");
+      reason.className = "friend-suggestion-reason";
+      reason.textContent = suggestion.reason;
+      info.appendChild(reason);
+
+      row.appendChild(info);
+
+      const followBtn = document.createElement("button");
+      followBtn.className = "friend-suggestion-follow-btn";
+      followBtn.textContent = "Follow";
+      followBtn.addEventListener("click", async () => {
+        followBtn.disabled = true;
+        const resp = await fetch("/api/friends/" + encodeURIComponent(suggestion.player_code), {
+          method: "POST",
+        });
+        if (resp.ok || resp.status === 409) {
+          loadFriends();
+          loadAccountFriendSuggestions();
+        } else {
+          followBtn.disabled = false;
+        }
+      });
+      row.appendChild(followBtn);
+      accountFriendSuggestions.appendChild(row);
+    }
+  } catch (error) {
+    console.error("Failed to load friend suggestions:", error);
   }
 }
 
