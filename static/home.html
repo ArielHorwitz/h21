@@ -22,22 +22,24 @@
 
     <div id="play-next-section" hidden></div>
 
-    <div id="topics-list"></div>
+    <div id="play-section">
+      <h2 class="play-section-heading">Today's Puzzles</h2>
+      <div id="topics-list"></div>
 
-    <div id="request-topic-section">
-      <h2>Request a Topic</h2>
-      <form id="request-topic-form">
-        <input
-          type="text"
-          id="topic-name-input"
-          placeholder="e.g. Ancient Rome, Jazz Music, Space Exploration..."
-          autocomplete="off"
-          maxlength="100"
-          required
-        >
-        <button type="submit" id="request-topic-btn">Request</button>
-      </form>
-      <p id="request-topic-status" hidden></p>
+      <div id="request-topic-section">
+        <form id="request-topic-form">
+          <input
+            type="text"
+            id="topic-name-input"
+            placeholder="Request a topic, e.g. Ancient Rome, Jazz Music..."
+            autocomplete="off"
+            maxlength="100"
+            required
+          >
+          <button type="submit" id="request-topic-btn">Request</button>
+        </form>
+        <p id="request-topic-status" hidden></p>
+      </div>
     </div>
 
     <div id="replay-section">

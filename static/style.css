@@ -252,15 +252,14 @@ h1 a.home-link:hover {
   margin-left: 1rem;
 }
 
-#request-topic-section {
-  border-top: 1px solid #333;
-  padding-top: 1.5rem;
-}
-
-#request-topic-section h2 {
+.play-section-heading {
   font-size: 1.1rem;
   color: #ccc;
   margin-bottom: 0.75rem;
+}
+
+#request-topic-section {
+  margin-top: 0.75rem;
 }
 
 #request-topic-form {
