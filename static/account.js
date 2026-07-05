@@ -23,7 +23,6 @@ const friendsList = document.getElementById("friends-list");
 const avatarImg = document.getElementById("avatar-img");
 const avatarPlaceholder = document.getElementById("avatar-placeholder");
 const avatarGenerateToggle = document.getElementById("avatar-generate-toggle");
-const avatarDownload = document.getElementById("avatar-download");
 const avatarGenerator = document.getElementById("avatar-generator");
 const avatarReferenceInput = document.getElementById("avatar-reference-input");
 const avatarPromptInput = document.getElementById("avatar-prompt-input");
@@ -293,12 +292,9 @@ function updateAvatarDisplay() {
     avatarImg.src = avatarOriginalUrl(currentPlayerCode, currentAvatarVersion);
     avatarImg.hidden = false;
     avatarPlaceholder.hidden = true;
-    avatarDownload.href = avatarOriginalUrl(currentPlayerCode, currentAvatarVersion);
-    avatarDownload.hidden = false;
   } else {
     avatarImg.hidden = true;
     avatarPlaceholder.hidden = false;
-    avatarDownload.hidden = true;
   }
 }
 
