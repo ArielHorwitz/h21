@@ -83,9 +83,18 @@ async def generate_avatar(
             "Generating avatar with reference image, model=%s, prompt=%r",
             model, effective_prompt[:80],
         )
+        # Detect image format from magic bytes for correct MIME type.
+        if reference_image[:3] == b"\xff\xd8\xff":
+            filename = "reference.jpg"
+        elif reference_image[:8] == b"\x89PNG\r\n\x1a\n":
+            filename = "reference.png"
+        elif reference_image[:4] == b"RIFF" and reference_image[8:12] == b"WEBP":
+            filename = "reference.webp"
+        else:
+            filename = "reference.png"
         result = await client.images.edit(
             model=model,
-            image=io.BytesIO(reference_image),
+            image=(filename, io.BytesIO(reference_image)),
             prompt=effective_prompt,
             n=1,
             size="1024x1024",
