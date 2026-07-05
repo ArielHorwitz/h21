@@ -907,6 +907,8 @@ async def end_game(request_body: EndGameRequest, request: Request) -> dict[str, 
         raise HTTPException(status_code=404, detail="Game not found")
     if game["user_id"] is not None and game["user_id"] != request.state.user_id:
         raise HTTPException(status_code=403, detail="Not your game")
+    if game["date"] != date_type.today().isoformat():
+        raise HTTPException(status_code=410, detail="This puzzle has expired")
 
     database.end_game(request_body.game_id, request_body.result)
 
@@ -938,6 +940,8 @@ async def ask(request_body: AskRequest, request: Request) -> dict[str, str]:
         if game is not None:
             if game["user_id"] is not None and game["user_id"] != user_id:
                 raise HTTPException(status_code=403, detail="Not your game")
+            if game["date"] != date_type.today().isoformat():
+                raise HTTPException(status_code=410, detail="This puzzle has expired")
             topic_slug = game["topic_slug"]
             difficulty = game["difficulty"]
 
@@ -1046,6 +1050,8 @@ async def get_hint(request_body: HintRequest, request: Request) -> dict[str, Any
         raise HTTPException(status_code=404, detail="Game not found")
     if game["user_id"] is not None and game["user_id"] != request.state.user_id:
         raise HTTPException(status_code=403, detail="Not your game")
+    if game["date"] != date_type.today().isoformat():
+        raise HTTPException(status_code=410, detail="This puzzle has expired")
 
     required_questions = (request_body.hint_index + 1) * 4
     if game["questions_asked"] < required_questions:

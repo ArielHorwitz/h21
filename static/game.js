@@ -81,6 +81,10 @@ async function endGameSession(result) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ game_id: gameId, result }),
     });
+    if (response.status === 410) {
+      window.location.href = "/";
+      return;
+    }
     if (response.ok) {
       const data = await response.json();
       if (data.solution) {
@@ -261,6 +265,10 @@ async function fetchAndRevealHint(hintIndex) {
       body: JSON.stringify({ game_id: gameId, hint_index: hintIndex }),
     });
     if (!response.ok) {
+      if (response.status === 410) {
+        window.location.href = "/";
+        return;
+      }
       const error = await response.json().catch(() => ({}));
       btn.textContent = error.detail || "Failed";
       btn.disabled = false;
@@ -408,6 +416,10 @@ async function submitQuestion(question) {
   });
 
   if (!response.ok) {
+    if (response.status === 410) {
+      window.location.href = "/";
+      throw new Error("This puzzle has expired. Redirecting...");
+    }
     const error = await response.json().catch(() => ({}));
     throw new Error(error.detail || "Request failed");
   }
