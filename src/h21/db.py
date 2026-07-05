@@ -896,12 +896,28 @@ class GameDatabase:
         return [dict(row) for row in rows]
 
     def update_account_limits(
-        self, user_id: int, daily_question_limit: int, daily_topic_limit: int,
+        self, user_id: int,
+        daily_question_limit: Optional[int] = None,
+        daily_topic_limit: Optional[int] = None,
+        monthly_avatar_limit: Optional[int] = None,
     ) -> bool:
+        updates = []
+        params: list[Any] = []
+        if daily_question_limit is not None:
+            updates.append("daily_question_limit = ?")
+            params.append(daily_question_limit)
+        if daily_topic_limit is not None:
+            updates.append("daily_topic_limit = ?")
+            params.append(daily_topic_limit)
+        if monthly_avatar_limit is not None:
+            updates.append("monthly_avatar_limit = ?")
+            params.append(monthly_avatar_limit)
+        if not updates:
+            return True
+        params.append(user_id)
         cursor = self._connection.execute(
-            "UPDATE accounts SET daily_question_limit = ?, daily_topic_limit = ? "
-            "WHERE user_id = ?",
-            (daily_question_limit, daily_topic_limit, user_id),
+            f"UPDATE accounts SET {', '.join(updates)} WHERE user_id = ?",
+            params,
         )
         self._connection.commit()
         return cursor.rowcount > 0
@@ -1311,6 +1327,10 @@ class GameDatabase:
         self._connection.execute(
             "DELETE FROM daily_usage WHERE user_id = ? AND date = ?",
             (user_id, usage_date.isoformat()),
+        )
+        self._connection.execute(
+            "UPDATE accounts SET avatar_generations_used = 0 WHERE user_id = ?",
+            (user_id,),
         )
         self._connection.commit()
 

@@ -215,6 +215,8 @@ async function deleteInviteRequest(requestId) {
 
 // -- Users --
 
+let expandedUserId = null;
+
 function renderUsers(users) {
   usersList.innerHTML = "";
 
@@ -224,15 +226,13 @@ function renderUsers(users) {
   }
 
   const table = document.createElement("table");
-  table.className = "invites-table";
+  table.className = "invites-table users-table";
 
   const thead = document.createElement("thead");
   thead.innerHTML = `<tr>
     <th>Username</th>
     <th>Role</th>
     <th>Status</th>
-    <th>Questions</th>
-    <th>Topics</th>
     <th></th>
   </tr>`;
   table.appendChild(thead);
@@ -240,9 +240,9 @@ function renderUsers(users) {
   const tbody = document.createElement("tbody");
   for (const user of users) {
     const tr = document.createElement("tr");
-    if (user.blocked) {
-      tr.className = "exhausted";
-    }
+    tr.className = user.blocked ? "exhausted" : "";
+    tr.style.cursor = "pointer";
+    tr.addEventListener("click", () => toggleExpand(user.user_id));
 
     const nameCell = document.createElement("td");
     nameCell.textContent = user.username;
@@ -256,49 +256,96 @@ function renderUsers(users) {
     statusCell.textContent = user.blocked ? "blocked" : "active";
     tr.appendChild(statusCell);
 
-    const questionsCell = document.createElement("td");
-    questionsCell.textContent = `${user.questions_used_today} / ${user.daily_question_limit}`;
-    tr.appendChild(questionsCell);
-
-    const topicsCell = document.createElement("td");
-    topicsCell.textContent = `${user.topic_suggestions_used_today} / ${user.daily_topic_limit}`;
-    tr.appendChild(topicsCell);
-
     const actionCell = document.createElement("td");
     actionCell.className = "user-actions";
-
-    const editBtn = document.createElement("button");
-    editBtn.className = "unblock-btn";
-    editBtn.textContent = "Limits";
-    editBtn.addEventListener("click", () => promptLimits(user));
-    actionCell.appendChild(editBtn);
-
-    const resetBtn = document.createElement("button");
-    resetBtn.className = "unblock-btn";
-    resetBtn.textContent = "Reset";
-    resetBtn.addEventListener("click", () => resetUsage(user.user_id));
-    actionCell.appendChild(resetBtn);
-
     if (user.blocked) {
       const unblockBtn = document.createElement("button");
       unblockBtn.className = "unblock-btn";
       unblockBtn.textContent = "Unblock";
-      unblockBtn.addEventListener("click", () => toggleBlock(user.user_id, false));
+      unblockBtn.addEventListener("click", (event) => { event.stopPropagation(); toggleBlock(user.user_id, false); });
       actionCell.appendChild(unblockBtn);
     } else {
       const blockBtn = document.createElement("button");
       blockBtn.className = "delete-invite-btn";
       blockBtn.textContent = "Block";
-      blockBtn.addEventListener("click", () => toggleBlock(user.user_id, true));
+      blockBtn.addEventListener("click", (event) => { event.stopPropagation(); toggleBlock(user.user_id, true); });
       actionCell.appendChild(blockBtn);
     }
-
     tr.appendChild(actionCell);
     tbody.appendChild(tr);
+
+    // Expandable detail row.
+    const detailTr = document.createElement("tr");
+    detailTr.className = "user-detail-row";
+    if (expandedUserId !== user.user_id) {
+      detailTr.hidden = true;
+    }
+    const detailCell = document.createElement("td");
+    detailCell.colSpan = 4;
+    detailCell.appendChild(renderUserDetail(user));
+    detailTr.appendChild(detailCell);
+    tbody.appendChild(detailTr);
   }
 
   table.appendChild(tbody);
   usersList.appendChild(table);
+}
+
+function renderUserDetail(user) {
+  const container = document.createElement("div");
+  container.className = "user-detail-panel";
+
+  const limits = [
+    { label: "Questions", used: user.questions_used_today, limit: user.daily_question_limit, field: "daily_question_limit" },
+    { label: "Topics", used: user.topic_suggestions_used_today, limit: user.daily_topic_limit, field: "daily_topic_limit" },
+    { label: "Avatars", used: user.avatar_generations_used, limit: user.monthly_avatar_limit, field: "monthly_avatar_limit" },
+  ];
+
+  for (const item of limits) {
+    const row = document.createElement("div");
+    row.className = "user-detail-limit-row";
+
+    const label = document.createElement("span");
+    label.className = "user-detail-limit-label";
+    label.textContent = item.label;
+    row.appendChild(label);
+
+    const value = document.createElement("span");
+    value.className = "user-detail-limit-value";
+    value.textContent = `${item.used} / ${item.limit}`;
+    row.appendChild(value);
+
+    const editBtn = document.createElement("button");
+    editBtn.className = "unblock-btn";
+    editBtn.textContent = "Edit";
+    editBtn.addEventListener("click", (event) => {
+      event.stopPropagation();
+      promptSingleLimit(user, item.field, item.label, item.limit);
+    });
+    row.appendChild(editBtn);
+
+    const resetBtn = document.createElement("button");
+    resetBtn.className = "unblock-btn";
+    resetBtn.textContent = "Reset";
+    resetBtn.addEventListener("click", (event) => {
+      event.stopPropagation();
+      resetUsage(user.user_id);
+    });
+    row.appendChild(resetBtn);
+
+    container.appendChild(row);
+  }
+
+  return container;
+}
+
+function toggleExpand(userId) {
+  if (expandedUserId === userId) {
+    expandedUserId = null;
+  } else {
+    expandedUserId = userId;
+  }
+  loadUsers();
 }
 
 async function loadUsers() {
@@ -328,29 +375,28 @@ async function toggleBlock(userId, block) {
   }
 }
 
-function promptLimits(user) {
-  const questionLimit = prompt(`Daily question limit for ${user.username}:`, user.daily_question_limit);
-  if (questionLimit === null) return;
-  const topicLimit = prompt(`Daily topic suggestion limit for ${user.username}:`, user.daily_topic_limit);
-  if (topicLimit === null) return;
-  updateLimits(user.user_id, parseInt(questionLimit, 10), parseInt(topicLimit, 10));
+function promptSingleLimit(user, field, label, currentValue) {
+  const newValue = prompt(`${label} limit for ${user.username}:`, currentValue);
+  if (newValue === null) return;
+  const parsed = parseInt(newValue, 10);
+  if (isNaN(parsed) || parsed < 0) return;
+  updateLimit(user.user_id, field, parsed);
 }
 
-async function updateLimits(userId, questionLimit, topicLimit) {
-  if (isNaN(questionLimit) || isNaN(topicLimit) || questionLimit < 0 || topicLimit < 0) {
-    return;
-  }
+async function updateLimit(userId, field, value) {
   try {
+    const body = {};
+    body[field] = value;
     const response = await fetch(`/api/accounts/${userId}/limits`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ daily_question_limit: questionLimit, daily_topic_limit: topicLimit }),
+      body: JSON.stringify(body),
     });
     if (response.ok) {
       await loadUsers();
     }
   } catch (error) {
-    console.error("Failed to update limits:", error);
+    console.error("Failed to update limit:", error);
   }
 }
 

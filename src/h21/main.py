@@ -877,6 +877,8 @@ async def list_accounts() -> list[dict[str, Any]]:
         usage = database.get_daily_usage(account["user_id"], today)
         account["questions_used_today"] = usage["questions_used"]
         account["topic_suggestions_used_today"] = usage["topic_suggestions_used"]
+        avatar_usage = database.get_avatar_usage(account["user_id"], today)
+        account["avatar_generations_used"] = avatar_usage["used"]
     return accounts
 
 
@@ -897,16 +899,24 @@ async def unblock_account(user_id: int) -> dict[str, str]:
 
 
 class UpdateLimitsRequest(BaseModel):
-    daily_question_limit: int
-    daily_topic_limit: int
+    daily_question_limit: Optional[int] = None
+    daily_topic_limit: Optional[int] = None
+    monthly_avatar_limit: Optional[int] = None
 
 
 @app.post("/api/accounts/{user_id}/limits")
 async def update_limits(user_id: int, request_body: UpdateLimitsRequest) -> dict[str, str]:
-    if request_body.daily_question_limit < 0 or request_body.daily_topic_limit < 0:
+    if request_body.daily_question_limit is not None and request_body.daily_question_limit < 0:
+        raise HTTPException(status_code=400, detail="Limits must be non-negative")
+    if request_body.daily_topic_limit is not None and request_body.daily_topic_limit < 0:
+        raise HTTPException(status_code=400, detail="Limits must be non-negative")
+    if request_body.monthly_avatar_limit is not None and request_body.monthly_avatar_limit < 0:
         raise HTTPException(status_code=400, detail="Limits must be non-negative")
     if not database.update_account_limits(
-        user_id, request_body.daily_question_limit, request_body.daily_topic_limit,
+        user_id,
+        daily_question_limit=request_body.daily_question_limit,
+        daily_topic_limit=request_body.daily_topic_limit,
+        monthly_avatar_limit=request_body.monthly_avatar_limit,
     ):
         raise HTTPException(status_code=404, detail="Account not found")
     return {"status": "ok"}

@@ -1157,6 +1157,36 @@ h1 a.home-link:hover {
   gap: 0.3rem;
 }
 
+.user-detail-row > td {
+  padding: 0;
+  border-top: none;
+}
+
+.user-detail-panel {
+  padding: 0.5rem 0.8rem;
+  background: #161b22;
+  border-top: 1px solid #1e2630;
+}
+
+.user-detail-limit-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.25rem 0;
+}
+
+.user-detail-limit-label {
+  width: 5rem;
+  color: #8b949e;
+  font-size: 0.85rem;
+}
+
+.user-detail-limit-value {
+  width: 4rem;
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+}
+
 .query-buttons {
   display: flex;
   gap: 0.5rem;
