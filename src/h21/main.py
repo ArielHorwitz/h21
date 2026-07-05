@@ -93,6 +93,30 @@ data_dir: Path
 log_path: Path
 
 
+async def _backfill_avatars(accounts: list[dict[str, Any]]) -> None:
+    """Generate avatars for accounts that don't have one. Runs as a background task."""
+    logger.info("Backfilling avatars for %d accounts", len(accounts))
+    for account in accounts:
+        try:
+            image_bytes = await avatar_mod.generate_auto_avatar(
+                openai_image_client, avatar_image_model,
+            )
+            avatar_mod.save_avatar_direct(
+                data_dir, account["player_code"], image_bytes,
+            )
+            database.bump_avatar_version(account["user_id"])
+            logger.info(
+                "Generated avatar for user %s (%s)",
+                account["username"], account["player_code"],
+            )
+        except Exception:
+            logger.exception(
+                "Failed to generate avatar for user %s",
+                account["username"],
+            )
+    logger.info("Avatar backfill complete")
+
+
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     global llm_client, openai_image_client, database, signing_secret
@@ -140,28 +164,8 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     if config.auto_generate_missing_avatars:
         accounts_without_avatars = database.get_accounts_without_avatars()
         if accounts_without_avatars:
-            logger.info(
-                "Auto-generating avatars for %d accounts",
-                len(accounts_without_avatars),
-            )
-            for account in accounts_without_avatars:
-                try:
-                    image_bytes = await avatar_mod.generate_auto_avatar(
-                        openai_image_client, avatar_image_model,
-                    )
-                    avatar_mod.save_avatar_direct(
-                        data_dir, account["player_code"], image_bytes,
-                    )
-                    database.bump_avatar_version(account["user_id"])
-                    logger.info(
-                        "Generated avatar for user %s (%s)",
-                        account["username"], account["player_code"],
-                    )
-                except Exception:
-                    logger.exception(
-                        "Failed to generate avatar for user %s",
-                        account["username"],
-                    )
+            import asyncio
+            asyncio.create_task(_backfill_avatars(accounts_without_avatars))
 
     yield
     database.close()
