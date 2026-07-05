@@ -534,6 +534,51 @@ async def get_play_next(request: Request) -> list[dict[str, Any]]:
     return database.get_play_next(user_id, today)
 
 
+def _truncate_leaderboard(
+    players: list[dict[str, Any]], limit: int,
+) -> list[dict[str, Any]]:
+    """Truncate a leaderboard to at most `limit` players.
+
+    Priority order: the viewing user, top 3 performers, all friends, then
+    remaining players in rank order. Preserves the original sort order in
+    the returned list.
+    """
+    # Build index sets by priority tier.
+    self_indices: set[int] = set()
+    top3_indices: set[int] = set()
+    friend_indices: set[int] = set()
+
+    for index, player in enumerate(players):
+        if player["is_self"]:
+            self_indices.add(index)
+        if player["rank"] <= 3:
+            top3_indices.add(index)
+        if player["is_friend"]:
+            friend_indices.add(index)
+
+    # Collect indices in priority order, deduplicating.
+    kept: list[int] = []
+    seen: set[int] = set()
+
+    for index_set in (self_indices, top3_indices, friend_indices):
+        for index in sorted(index_set):
+            if index not in seen:
+                kept.append(index)
+                seen.add(index)
+
+    # Fill remaining slots with other players in rank order.
+    for index in range(len(players)):
+        if len(kept) >= limit:
+            break
+        if index not in seen:
+            kept.append(index)
+            seen.add(index)
+
+    # Return in original sort order.
+    kept.sort()
+    return [players[index] for index in kept]
+
+
 @app.get("/api/leaderboard")
 async def get_leaderboard(
     request: Request, topic_slug: str, difficulty: str, date: str,
@@ -563,6 +608,7 @@ async def get_leaderboard(
         scored.append((score, winner))
     scored.sort(key=lambda entry: (entry[0], entry[1]["username"] or ""))
 
+    max_players = 60
     players = []
     current_rank = 0
     previous_score = None
@@ -578,6 +624,9 @@ async def get_leaderboard(
             "is_self": winner["user_id"] == user_id,
             "is_friend": bool(winner["is_friend"]),
         })
+
+    if len(players) > max_players:
+        players = _truncate_leaderboard(players, max_players)
 
     return {
         "topic_name": topic_name,
