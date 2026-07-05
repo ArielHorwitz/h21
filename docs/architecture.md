@@ -6,6 +6,7 @@
 - **`db.py`** -- All SQLite access. The `GameDatabase` class owns the connection, schema creation, migrations, and every query. No SQL exists outside this file.
 - **`llm.py`** -- `OpenAIClient` wraps the async OpenAI SDK. Four public functions (`ask_question`, `generate_solution`, `generate_hints`, `normalize_topic`) each use a prompt template and parse the response. `LLMError` is the user-facing error type.
 - **`auth.py`** -- Stateless session management. Creates HMAC-SHA256 signed tokens containing `{user_id, exp}` as JSON. Tokens are stored in an `h21_session` httponly cookie with 30-day expiry. The signing secret is persisted in the data directory.
+- **`avatar.py`** -- AI-generated profile pictures. Uses `AsyncOpenAI.images.generate()` and `images.edit()` for text-to-image and reference-based generation. Pillow handles resizing to 128x128 webp thumbnails. Files stored in `data_dir/avatars/` as `{player_code}_original.png` and `{player_code}.webp`. Supports a pending/confirm flow for user-initiated generation.
 - **`config.py`** -- Loads config from `XDG_CONFIG_HOME/h21/config.toml` with env var overrides. Returns a frozen `Config` dataclass with `openai_api_key`, `model`, `reasoning_effort`, `db_path`, `log_path`.
 
 ## Request Flow

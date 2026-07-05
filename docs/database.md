@@ -58,6 +58,10 @@ Composite primary key: `(date, topic_slug, difficulty)`.
 | `daily_question_limit` | INTEGER | Default 105 |
 | `daily_topic_limit` | INTEGER | Default 1 |
 | `invite_code` | TEXT | Code used to register |
+| `avatar_version` | INTEGER | Bumped on each avatar change (0 = no avatar) |
+| `avatar_generations_used` | INTEGER | Monthly counter for avatar generations |
+| `avatar_generation_reset` | TEXT | ISO date of last counter reset (nullable) |
+| `monthly_avatar_limit` | INTEGER | Max avatar generations per month (default 3) |
 | `created_at` | TEXT | UTC ISO timestamp |
 
 ### `invites`
@@ -69,6 +73,7 @@ Composite primary key: `(date, topic_slug, difficulty)`.
 | `remaining_uses` | INTEGER | Decremented on each registration |
 | `daily_question_limit` | INTEGER | Default question limit for registrants (nullable, NULL = 105) |
 | `daily_topic_limit` | INTEGER | Default topic limit for registrants (nullable, NULL = 1) |
+| `monthly_avatar_limit` | INTEGER | Default avatar generation limit for registrants (nullable, NULL = 3) |
 | `created_at` | TEXT | UTC ISO timestamp |
 
 ### `daily_usage`
@@ -99,6 +104,12 @@ Current migrations in order:
 11. `_migrate_add_user_id_to_topics` -- adds `user_id` to `topics`
 12. `_migrate_add_user_id_to_questions` -- adds `user_id` to `questions`
 13. `_migrate_add_limits_to_invites` -- adds `daily_question_limit` and `daily_topic_limit` to `invites`
+14. `_migrate_add_share_code_to_games` -- adds `share_code` to `games` with backfill
+15. `_migrate_add_hint_reveals_table` -- creates `hint_reveals` table
+16. `_migrate_add_profile_columns` -- adds `display_name`, `player_code`, `anonymous` to `accounts`
+17. `_migrate_add_friends_table` -- creates `friends` table
+18. `_migrate_add_avatar_columns` -- adds `avatar_version`, `avatar_generations_used`, `avatar_generation_reset`, `monthly_avatar_limit` to `accounts`
+19. `_migrate_add_avatar_limit_to_invites` -- adds `monthly_avatar_limit` to `invites`
 
 ### Adding a New Migration
 

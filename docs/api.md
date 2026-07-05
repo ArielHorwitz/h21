@@ -29,6 +29,16 @@ All API endpoints are defined in `src/h21/main.py`. JSON request/response bodies
 | POST | `/api/hint` | User | Get a hint by index (0-4). Requires `(hint_index + 1) * 4` questions asked. |
 | GET | `/api/history` | User | Get all past games with questions for the current user. |
 
+## Avatars
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| POST | `/api/avatar/generate` | User | Generate avatar from prompt and/or reference image (multipart form). Returns base64 preview. |
+| POST | `/api/avatar/confirm` | User | Confirm pending avatar as active. |
+| POST | `/api/avatar/discard` | User | Discard pending avatar. |
+| GET | `/avatars/{player_code}.webp` | Public | Serve avatar thumbnail (128x128 webp). Cache-busted via `?v=` param. |
+| GET | `/avatars/{player_code}_original.png` | Public | Serve original avatar (full resolution PNG). |
+
 ## Admin (dev role only)
 
 | Method | Path | Auth | Description |
@@ -60,4 +70,5 @@ All API endpoints are defined in `src/h21/main.py`. JSON request/response bodies
 
 - Questions: tracked per user per day. Checked against `accounts.daily_question_limit` (default 105).
 - Topic suggestions: tracked per user per day. Checked against `accounts.daily_topic_limit` (default 1).
+- Avatar generations: tracked per user per month. Checked against `accounts.monthly_avatar_limit` (default 3). Auto-generation on registration does not count.
 - Returns HTTP 429 when limits are exceeded.

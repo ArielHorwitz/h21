@@ -164,6 +164,53 @@ game history.
 **Account page** (`static/account.js`):
 - Game history now shows "Leaderboard" link alongside "Replay" for won games
 
+### Phase 5 — Complete
+
+AI-generated profile pictures for social identity.
+
+**New module** (`src/h21/avatar.py`):
+- Generates profile pictures via OpenAI image API (configurable model,
+  default `gpt-image-1-mini`)
+- Four generation modes: prompt only, reference image only, both, or auto
+  (random object/scene for new account defaults)
+- Saves original PNG + 128x128 webp thumbnail per player
+- Pending/confirm flow: generated images saved as pending, then moved to
+  active on confirmation
+- Pillow for image resizing
+
+**Database** (`src/h21/db.py`):
+- New columns on `accounts`: `avatar_version`, `avatar_generations_used`,
+  `avatar_generation_reset`, `monthly_avatar_limit`
+- New column on `invites`: `monthly_avatar_limit` (per-tier limits)
+- Methods: `get_avatar_usage`, `increment_avatar_generation`,
+  `bump_avatar_version`
+- Social queries (`get_puzzle_winners`, `get_friends`, `search_players`,
+  `get_recent_results`) now return `player_code` + `avatar_version`
+
+**API** (`src/h21/main.py`):
+- `POST /api/avatar/generate` — multipart form (optional reference image +
+  optional prompt), returns base64 original + thumbnail for preview
+- `POST /api/avatar/confirm` — moves pending avatar to active
+- `POST /api/avatar/discard` — removes pending avatar
+- `GET /avatars/{player_code}.webp` — serves thumbnail with immutable cache
+- `GET /avatars/{player_code}_original.png` — serves original for download
+- Registration auto-generates avatar (best-effort, doesn't block)
+- `/api/me` extended with `avatar_version`, `avatar_generations_used`,
+  `monthly_avatar_limit`
+- All social API responses include `avatar_version` for frontend rendering
+
+**Frontend**:
+- Account page: avatar display, generation form (reference photo + prompt),
+  preview with original + thumbnail at multiple sizes, confirm/retry/discard
+- Avatars displayed in: leaderboard rows, recent results cards, friends list,
+  player search results, nav bar
+- `nav.js` loaded on all pages: replaces account SVG icon with avatar
+  thumbnail
+
+**Config** (`src/h21/config.py`):
+- `avatar_image_model` (default `gpt-image-1-mini`)
+- `default_monthly_avatar_limit` (default 3)
+
 ## Key Design Decisions
 
 | Decision | Rationale |
@@ -174,6 +221,10 @@ game history.
 | Recent results not date-anchored | Shows last 3 wins with friend overlap; avoids empty results when players skip days |
 | Extend `/api/me` rather than new `/api/profile` | Avoids endpoint proliferation for own-account data |
 | Player codes start at 4 chars | ~65k space, plenty for current scale, grow on exhaustion |
-| Profile pictures deferred | High effort, not blocking for social comparisons |
+| AI-generated avatars, not raw uploads | Eliminates crop/resize UX, ensures consistent square output, model safety filters handle moderation |
+| Auto-generate on registration | Every account has a visually distinct avatar from day one, not a grey placeholder |
+| Preview-then-confirm for custom avatars | Generation is non-deterministic; users want to see before committing |
+| Store original + thumbnail | Original for account page display/download, thumbnail for efficient rendering across the site |
+| Monthly generation limit | Controls API costs; per-invite-tier for flexibility |
 | Play-next for today only | Discovery section shows only today's puzzles; keeps it fresh and actionable |
 | Per-puzzle leaderboards, no global ranking | Avoids fragmentation and gaming; comparison is contextual |
