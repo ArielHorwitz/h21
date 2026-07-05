@@ -1,10 +1,10 @@
-const compareSubtitle = document.getElementById("compare-subtitle");
-const compareError = document.getElementById("compare-error");
-const compareContent = document.getElementById("compare-content");
-const compareMeta = document.getElementById("compare-meta");
-const compareBody = document.getElementById("compare-body");
-const compareEmpty = document.getElementById("compare-empty");
-const compareTable = document.getElementById("compare-table");
+const leaderboardSubtitle = document.getElementById("leaderboard-subtitle");
+const leaderboardError = document.getElementById("leaderboard-error");
+const leaderboardContent = document.getElementById("leaderboard-content");
+const leaderboardMeta = document.getElementById("leaderboard-meta");
+const leaderboardBody = document.getElementById("leaderboard-body");
+const leaderboardEmpty = document.getElementById("leaderboard-empty");
+const leaderboardTable = document.getElementById("leaderboard-table");
 const filterBtn = document.getElementById("filter-btn");
 
 const urlParams = new URLSearchParams(window.location.search);
@@ -16,9 +16,9 @@ let allPlayers = [];
 let showFriendsOnly = false;
 
 function showError(message) {
-  compareError.textContent = message;
-  compareError.hidden = false;
-  compareContent.hidden = true;
+  leaderboardError.textContent = message;
+  leaderboardError.hidden = false;
+  leaderboardContent.hidden = true;
 }
 
 function formatDate(dateStr) {
@@ -37,21 +37,21 @@ function formatHints(hintsUsed) {
 }
 
 function renderTable(players) {
-  compareBody.innerHTML = "";
+  leaderboardBody.innerHTML = "";
 
   if (players.length === 0) {
-    compareTable.hidden = true;
-    compareEmpty.hidden = false;
+    leaderboardTable.hidden = true;
+    leaderboardEmpty.hidden = false;
     return;
   }
 
-  compareTable.hidden = false;
-  compareEmpty.hidden = true;
+  leaderboardTable.hidden = false;
+  leaderboardEmpty.hidden = true;
 
   for (const player of players) {
     const row = document.createElement("tr");
     if (player.is_self) {
-      row.className = "compare-self";
+      row.className = "leaderboard-self";
     }
 
     const rankCell = document.createElement("td");
@@ -73,7 +73,7 @@ function renderTable(players) {
     hintsCell.textContent = formatHints(player.hints_used);
     row.appendChild(hintsCell);
 
-    compareBody.appendChild(row);
+    leaderboardBody.appendChild(row);
   }
 }
 
@@ -105,10 +105,10 @@ async function init() {
       difficulty: difficulty,
       date: puzzleDate,
     });
-    const response = await fetch(`/api/compare?${params}`);
+    const response = await fetch(`/api/leaderboard?${params}`);
     if (!response.ok) {
       const data = await response.json().catch(() => null);
-      const detail = data && data.detail ? data.detail : "Failed to load comparison.";
+      const detail = data && data.detail ? data.detail : "Failed to load leaderboard.";
       showError(detail);
       return;
     }
@@ -117,17 +117,17 @@ async function init() {
 
     const difficultyLabel =
       data.difficulty.charAt(0).toUpperCase() + data.difficulty.slice(1);
-    compareSubtitle.textContent = `${data.topic_name} \u2014 ${difficultyLabel}`;
+    leaderboardSubtitle.textContent = `${data.topic_name} \u2014 ${difficultyLabel}`;
 
     const dateLine = document.createElement("div");
     dateLine.className = "date";
     dateLine.textContent = formatDate(data.date);
-    compareMeta.appendChild(dateLine);
+    leaderboardMeta.appendChild(dateLine);
 
     allPlayers = data.players;
     applyFilter();
 
-    compareContent.hidden = false;
+    leaderboardContent.hidden = false;
   } catch {
     showError("Network error. Please try again.");
   }

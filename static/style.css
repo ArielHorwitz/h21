@@ -1029,33 +1029,33 @@ h1 a.home-link:hover {
   }
 }
 
-/* -- Compare page -- */
+/* -- Leaderboard page -- */
 
-#compare-error {
+#leaderboard-error {
   text-align: center;
   color: #f44336;
   margin-top: 1.5rem;
   font-size: 1rem;
 }
 
-#compare-controls {
+#leaderboard-controls {
   display: flex;
   justify-content: flex-end;
   margin-bottom: 0.75rem;
 }
 
-#compare-controls .secondary-btn {
+#leaderboard-controls .secondary-btn {
   font-size: 0.85rem;
   padding: 0.35rem 0.8rem;
 }
 
-.compare-table {
+.leaderboard-table {
   width: 100%;
   border-collapse: collapse;
   font-size: 0.9rem;
 }
 
-.compare-table th {
+.leaderboard-table th {
   text-align: left;
   color: #999;
   font-weight: normal;
@@ -1064,18 +1064,18 @@ h1 a.home-link:hover {
   border-bottom: 1px solid #333;
 }
 
-.compare-table td {
+.leaderboard-table td {
   padding: 0.5rem;
   border-bottom: 1px solid #262640;
   color: #ccc;
 }
 
-.compare-self td {
+.leaderboard-self td {
   color: #e2b714;
   font-weight: bold;
 }
 
-#compare-empty {
+#leaderboard-empty {
   text-align: center;
   color: #888;
   margin-top: 1.5rem;

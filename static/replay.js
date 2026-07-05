@@ -147,7 +147,7 @@ function renderGame(game) {
     compareWrapper.style.marginTop = "0.75rem";
     const compareLink = document.createElement("a");
     compareLink.className = "share-btn";
-    compareLink.href = `/compare?topic=${encodeURIComponent(game.topic_slug)}&difficulty=${encodeURIComponent(game.difficulty)}&date=${encodeURIComponent(game.date)}`;
+    compareLink.href = `/leaderboard?topic=${encodeURIComponent(game.topic_slug)}&difficulty=${encodeURIComponent(game.difficulty)}&date=${encodeURIComponent(game.date)}`;
     compareLink.textContent = "View Leaderboard";
     compareWrapper.appendChild(compareLink);
     replayDetails.appendChild(compareWrapper);

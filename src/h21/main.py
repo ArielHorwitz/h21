@@ -252,9 +252,9 @@ async def replay_page() -> FileResponse:
     return FileResponse(STATIC_DIR / "replay.html")
 
 
-@app.get("/compare")
-async def compare_page() -> FileResponse:
-    return FileResponse(STATIC_DIR / "compare.html")
+@app.get("/leaderboard")
+async def leaderboard_page() -> FileResponse:
+    return FileResponse(STATIC_DIR / "leaderboard.html")
 
 
 @app.get("/login")
@@ -528,8 +528,8 @@ async def get_recap(request: Request) -> list[dict[str, Any]]:
     return result
 
 
-@app.get("/api/compare")
-async def get_compare(
+@app.get("/api/leaderboard")
+async def get_leaderboard(
     request: Request, topic_slug: str, difficulty: str, date: str,
 ) -> dict[str, Any]:
     try:
