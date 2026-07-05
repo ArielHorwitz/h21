@@ -205,17 +205,6 @@ function renderRecentResults(games) {
       rankingList.appendChild(li);
     }
 
-    // Add empty slots if fewer than 4 total entries (player + up to 3 friends).
-    const emptySlots = 4 - entries.length;
-    for (let slotIndex = 0; slotIndex < emptySlots; slotIndex++) {
-      const li = document.createElement("li");
-      li.className = "recent-results-rank-entry recent-results-rank-empty";
-      const dash = document.createElement("span");
-      dash.className = "recent-results-rank-name";
-      dash.textContent = "\u2014";
-      li.appendChild(dash);
-      rankingList.appendChild(li);
-    }
 
     card.appendChild(rankingList);
 

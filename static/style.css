@@ -196,14 +196,6 @@ h1 a.home-link:hover {
   color: #c9a512;
 }
 
-.recent-results-rank-empty {
-  color: #444;
-}
-
-.recent-results-rank-empty::before {
-  color: #444;
-}
-
 .recent-results-leaderboard-link {
   display: block;
   text-align: center;
