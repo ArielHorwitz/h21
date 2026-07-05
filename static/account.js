@@ -20,7 +20,30 @@ const searchPlayersInput = document.getElementById("search-players-input");
 const searchResults = document.getElementById("search-results");
 const friendsList = document.getElementById("friends-list");
 
+const avatarImg = document.getElementById("avatar-img");
+const avatarPlaceholder = document.getElementById("avatar-placeholder");
+const avatarGenerateToggle = document.getElementById("avatar-generate-toggle");
+const avatarDownload = document.getElementById("avatar-download");
+const avatarGenerator = document.getElementById("avatar-generator");
+const avatarReferenceInput = document.getElementById("avatar-reference-input");
+const avatarPromptInput = document.getElementById("avatar-prompt-input");
+const avatarGenerateBtn = document.getElementById("avatar-generate-btn");
+const avatarCancelBtn = document.getElementById("avatar-cancel-btn");
+const avatarGenCounter = document.getElementById("avatar-gen-counter");
+const avatarGenStatus = document.getElementById("avatar-gen-status");
+const avatarPreview = document.getElementById("avatar-preview");
+const avatarPreviewOriginal = document.getElementById("avatar-preview-original");
+const avatarPreviewThumb48 = document.getElementById("avatar-preview-thumb-48");
+const avatarPreviewThumb32 = document.getElementById("avatar-preview-thumb-32");
+const avatarUseBtn = document.getElementById("avatar-use-btn");
+const avatarRetryBtn = document.getElementById("avatar-retry-btn");
+const avatarDiscardBtn = document.getElementById("avatar-discard-btn");
+
 let currentAnonymous = false;
+let currentPlayerCode = null;
+let currentAvatarVersion = 0;
+let avatarGenerationsUsed = 0;
+let monthlyAvatarLimit = 3;
 let searchTimeout = null;
 
 async function loadAccount() {
@@ -37,6 +60,12 @@ async function loadAccount() {
       playerCodeValue.textContent = data.player_code;
       anonymousToggle.checked = data.anonymous;
       currentAnonymous = data.anonymous;
+      currentPlayerCode = data.player_code;
+      currentAvatarVersion = data.avatar_version;
+      avatarGenerationsUsed = data.avatar_generations_used;
+      monthlyAvatarLimit = data.monthly_avatar_limit;
+      updateAvatarDisplay();
+      updateAvatarCounter();
       updateFriendsVisibility();
     } else {
       window.location.href = "/login";
@@ -232,6 +261,139 @@ async function loadFriends() {
     console.error("Failed to load friends:", error);
   }
 }
+
+// -- Avatar --
+
+function avatarUrl(playerCode, version) {
+  return "/avatars/" + encodeURIComponent(playerCode) + ".webp?v=" + version;
+}
+
+function avatarOriginalUrl(playerCode, version) {
+  return "/avatars/" + encodeURIComponent(playerCode) + "_original.png?v=" + version;
+}
+
+function updateAvatarDisplay() {
+  if (currentAvatarVersion > 0 && currentPlayerCode) {
+    avatarImg.src = avatarOriginalUrl(currentPlayerCode, currentAvatarVersion);
+    avatarImg.hidden = false;
+    avatarPlaceholder.hidden = true;
+    avatarDownload.href = avatarOriginalUrl(currentPlayerCode, currentAvatarVersion);
+    avatarDownload.hidden = false;
+  } else {
+    avatarImg.hidden = true;
+    avatarPlaceholder.hidden = false;
+    avatarDownload.hidden = true;
+  }
+}
+
+function updateAvatarCounter() {
+  const remaining = monthlyAvatarLimit - avatarGenerationsUsed;
+  avatarGenCounter.textContent = remaining + " of " + monthlyAvatarLimit + " generations remaining this month";
+  avatarGenerateBtn.disabled = remaining <= 0;
+}
+
+function showAvatarGenerator() {
+  avatarGenerator.hidden = false;
+  avatarPreview.hidden = true;
+  avatarGenerateToggle.hidden = true;
+  avatarGenStatus.textContent = "";
+  avatarReferenceInput.value = "";
+  avatarPromptInput.value = "";
+}
+
+function hideAvatarGenerator() {
+  avatarGenerator.hidden = true;
+  avatarPreview.hidden = true;
+  avatarGenerateToggle.hidden = false;
+}
+
+avatarGenerateToggle.addEventListener("click", showAvatarGenerator);
+avatarCancelBtn.addEventListener("click", hideAvatarGenerator);
+
+avatarGenerateBtn.addEventListener("click", async () => {
+  const prompt = avatarPromptInput.value.trim();
+  const fileInput = avatarReferenceInput;
+  const hasFile = fileInput.files && fileInput.files.length > 0;
+
+  if (!prompt && !hasFile) {
+    showStatus(avatarGenStatus, "Provide a prompt, a reference image, or both", true);
+    return;
+  }
+
+  avatarGenerateBtn.disabled = true;
+  avatarGenStatus.textContent = "Generating...";
+  avatarGenStatus.className = "field-status";
+
+  const formData = new FormData();
+  formData.append("prompt", prompt);
+  if (hasFile) {
+    formData.append("reference", fileInput.files[0]);
+  }
+
+  try {
+    const response = await fetch("/api/avatar/generate", {
+      method: "POST",
+      body: formData,
+    });
+    if (!response.ok) {
+      const data = await response.json();
+      showStatus(avatarGenStatus, data.detail || "Generation failed", true);
+      avatarGenerateBtn.disabled = false;
+      return;
+    }
+    const data = await response.json();
+    avatarGenerationsUsed = data.generations_used;
+    monthlyAvatarLimit = data.monthly_avatar_limit;
+    updateAvatarCounter();
+
+    // Show preview.
+    const originalSrc = "data:image/png;base64," + data.original_b64;
+    const thumbSrc = "data:image/webp;base64," + data.thumbnail_b64;
+    avatarPreviewOriginal.src = originalSrc;
+    avatarPreviewThumb48.src = thumbSrc;
+    avatarPreviewThumb32.src = thumbSrc;
+
+    avatarGenerator.hidden = true;
+    avatarPreview.hidden = false;
+    avatarGenStatus.textContent = "";
+  } catch {
+    showStatus(avatarGenStatus, "Network error", true);
+  }
+  avatarGenerateBtn.disabled = avatarGenerationsUsed >= monthlyAvatarLimit;
+});
+
+avatarUseBtn.addEventListener("click", async () => {
+  avatarUseBtn.disabled = true;
+  try {
+    const response = await fetch("/api/avatar/confirm", { method: "POST" });
+    if (response.ok) {
+      const data = await response.json();
+      currentAvatarVersion = data.avatar_version;
+      updateAvatarDisplay();
+      hideAvatarGenerator();
+    } else {
+      const data = await response.json();
+      showStatus(avatarGenStatus, data.detail || "Failed to save", true);
+    }
+  } catch {
+    showStatus(avatarGenStatus, "Network error", true);
+  }
+  avatarUseBtn.disabled = false;
+});
+
+avatarRetryBtn.addEventListener("click", () => {
+  avatarPreview.hidden = true;
+  avatarGenerator.hidden = false;
+});
+
+avatarDiscardBtn.addEventListener("click", async () => {
+  try {
+    await fetch("/api/avatar/discard", { method: "POST" });
+  } catch {
+    // Ignore.
+  }
+  hideAvatarGenerator();
+});
 
 logoutBtn.addEventListener("click", async () => {
   try {

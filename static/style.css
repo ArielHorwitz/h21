@@ -743,6 +743,147 @@ h1 a.home-link:hover {
   border-color: #e2b714;
 }
 
+/* -- Avatar -- */
+
+.avatar-large {
+  width: 128px;
+  height: 128px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.avatar-sm {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.avatar-xs {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.avatar-nav {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  object-fit: cover;
+  vertical-align: middle;
+}
+
+.avatar-placeholder {
+  background: #333;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #666;
+  font-size: 2rem;
+}
+
+#avatar-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid #333;
+}
+
+#avatar-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+#avatar-actions .secondary-btn {
+  font-size: 0.85rem;
+  padding: 0.35rem 0.8rem;
+}
+
+#avatar-generator {
+  width: 100%;
+  margin-top: 0.5rem;
+}
+
+#avatar-gen-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+#avatar-gen-actions button:first-child {
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 4px;
+  background: #e2b714;
+  color: #1a1a2e;
+  font-weight: bold;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+#avatar-gen-actions button:first-child:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+#avatar-preview-images {
+  display: flex;
+  align-items: flex-end;
+  gap: 1.5rem;
+  justify-content: center;
+  margin-bottom: 0.75rem;
+}
+
+#avatar-preview-images > div {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+#avatar-confirm-actions {
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+#avatar-confirm-actions button:first-child {
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 4px;
+  background: #e2b714;
+  color: #1a1a2e;
+  font-weight: bold;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+#avatar-reference-input {
+  font-size: 0.85rem;
+  color: #ccc;
+}
+
+#avatar-reference-input::file-selector-button {
+  padding: 0.35rem 0.7rem;
+  border: 1px solid #444;
+  border-radius: 4px;
+  background: transparent;
+  color: #ccc;
+  font-size: 0.85rem;
+  cursor: pointer;
+  margin-right: 0.5rem;
+}
+
+#avatar-reference-input::file-selector-button:hover {
+  border-color: #888;
+  color: #e0e0e0;
+}
+
 .player-code-text {
   font-family: monospace;
   font-size: 1.1rem;

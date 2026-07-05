@@ -18,6 +18,54 @@
     <p class="subtitle">Account</p>
 
     <div id="account-info" class="auth-section">
+      <div id="avatar-section">
+        <div id="avatar-display">
+          <img id="avatar-img" class="avatar-large" alt="Profile picture" hidden>
+          <div id="avatar-placeholder" class="avatar-large avatar-placeholder"></div>
+        </div>
+        <div id="avatar-actions">
+          <button type="button" id="avatar-generate-toggle" class="secondary-btn">Change picture</button>
+          <a id="avatar-download" class="secondary-btn" download="avatar.png" hidden>Download</a>
+        </div>
+        <div id="avatar-generator" hidden>
+          <div class="settings-field">
+            <label>Reference photo (optional)</label>
+            <input type="file" id="avatar-reference-input" accept="image/*">
+          </div>
+          <div class="settings-field">
+            <label>Prompt (optional)</label>
+            <input type="text" id="avatar-prompt-input" maxlength="500" placeholder="Describe the picture you want...">
+          </div>
+          <div id="avatar-gen-actions">
+            <button type="button" id="avatar-generate-btn">Generate</button>
+            <button type="button" id="avatar-cancel-btn" class="secondary-btn">Cancel</button>
+            <span id="avatar-gen-counter" class="field-hint"></span>
+          </div>
+          <p id="avatar-gen-status" class="field-status"></p>
+        </div>
+        <div id="avatar-preview" hidden>
+          <p class="field-hint" style="margin-bottom: 0.5rem;">Preview:</p>
+          <div id="avatar-preview-images">
+            <div>
+              <img id="avatar-preview-original" class="avatar-large" alt="Full size preview">
+              <span class="field-hint">Full size</span>
+            </div>
+            <div>
+              <img id="avatar-preview-thumb-48" class="avatar-sm" alt="Leaderboard preview" style="width: 48px; height: 48px;">
+              <span class="field-hint">In lists</span>
+            </div>
+            <div>
+              <img id="avatar-preview-thumb-32" class="avatar-xs" alt="Nav preview" style="width: 32px; height: 32px;">
+              <span class="field-hint">In nav</span>
+            </div>
+          </div>
+          <div id="avatar-confirm-actions">
+            <button type="button" id="avatar-use-btn">Use this</button>
+            <button type="button" id="avatar-retry-btn" class="secondary-btn">Try again</button>
+            <button type="button" id="avatar-discard-btn" class="secondary-btn">Cancel</button>
+          </div>
+        </div>
+      </div>
       <div class="settings-field">
         <label>Username</label>
         <p id="account-username" class="account-value"></p>
