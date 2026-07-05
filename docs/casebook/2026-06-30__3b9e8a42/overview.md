@@ -105,3 +105,31 @@ to manually adjust limits per-account after registration.
   `daily_topic_limit` fields to the request body
 - **Control panel** — invite creation form includes limit fields; invites table
   shows a "Limits" column displaying `Q: N / T: N` or "default"
+
+### Avatar account columns (follow-up)
+
+New columns added to `accounts` to support AI-generated profile pictures (see
+social features case for full avatar implementation):
+
+- `avatar_version` — bumped on each confirmed avatar, used for cache-busting
+- `avatar_generations_used` — tracks monthly generation count
+- `avatar_generation_reset` — date of last generation counter reset
+- `monthly_avatar_limit` — per-account generation cap (set via invite or admin)
+
+New column on `invites`: `monthly_avatar_limit` — allows per-tier avatar
+generation limits, inherited by accounts on registration.
+
+### Control panel redesign (follow-up)
+
+Redesigned the Users section of the control panel to handle growing per-account
+settings (questions, topics, avatars) without cluttering the table.
+
+- **Compact main rows**: Username, Role, Status, Block/Unblock — one row per
+  user, clickable to expand
+- **Expandable detail panels**: each user row expands to show per-limit detail
+  with three rows (Questions, Topics, Avatars), each displaying `used / limit`
+- **Per-limit controls**: individual Edit and Reset buttons on each limit row,
+  replacing the old combined "Limits" prompt dialog and single "Reset" button
+- **Backend**: `update_account_limits` now accepts partial updates (any subset
+  of the three limits); `reset_daily_usage` also resets avatar generation
+  counts

@@ -210,6 +210,13 @@ AI-generated profile pictures for social identity.
 **Config** (`src/h21/config.py`):
 - `avatar_image_model` (default `gpt-image-1-mini`)
 - `default_monthly_avatar_limit` (default 3)
+- `auto_generate_missing_avatars` (default false) — backfill flag for existing
+  accounts
+
+**Admin** (`static/control.js`):
+- Control panel Users table redesigned with expandable detail rows showing
+  avatar generation usage alongside question/topic limits, with per-limit
+  Edit and Reset buttons (see accounts case for details)
 
 ## Key Design Decisions
 
@@ -226,5 +233,8 @@ AI-generated profile pictures for social identity.
 | Preview-then-confirm for custom avatars | Generation is non-deterministic; users want to see before committing |
 | Store original + thumbnail | Original for account page display/download, thumbnail for efficient rendering across the site |
 | Monthly generation limit | Controls API costs; per-invite-tier for flexibility |
+| Single default prompt for all no-input generation | Auto-generate on registration and user "roll" with no prompt/reference use the same object/scene prompt — no reason for different quality levels |
+| Allow generation with no prompt or reference | Users can "roll" a random avatar without specifying anything; lowers friction |
+| Background backfill for existing accounts | `auto_generate_missing_avatars` flag runs async task at startup so the server is immediately available while avatars generate one-by-one |
 | Play-next for today only | Discovery section shows only today's puzzles; keeps it fresh and actionable |
 | Per-puzzle leaderboards, no global ranking | Avoids fragmentation and gaming; comparison is contextual |
