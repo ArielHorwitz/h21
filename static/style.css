@@ -868,6 +868,7 @@ h1 a.home-link:hover {
   color: #e2b714;
   text-decoration: none;
   font-size: 0.85rem;
+  margin-right: 0.75rem;
 }
 
 .history-replay-link:hover {

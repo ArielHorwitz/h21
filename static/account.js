@@ -298,15 +298,22 @@ async function loadHistory() {
       }
       row.appendChild(resultCell);
 
-      const replayCell = document.createElement("td");
+      const linksCell = document.createElement("td");
       if (game.share_code) {
-        const link = document.createElement("a");
-        link.href = `/replay?code=${encodeURIComponent(game.share_code)}`;
-        link.textContent = "Replay";
-        link.className = "history-replay-link";
-        replayCell.appendChild(link);
+        const replayLink = document.createElement("a");
+        replayLink.href = `/replay?code=${encodeURIComponent(game.share_code)}`;
+        replayLink.textContent = "Replay";
+        replayLink.className = "history-replay-link";
+        linksCell.appendChild(replayLink);
       }
-      row.appendChild(replayCell);
+      if (game.result === "win") {
+        const leaderboardLink = document.createElement("a");
+        leaderboardLink.href = `/leaderboard?topic=${encodeURIComponent(game.topic_slug)}&difficulty=${encodeURIComponent(game.difficulty)}&date=${encodeURIComponent(game.date)}`;
+        leaderboardLink.textContent = "Leaderboard";
+        leaderboardLink.className = "history-replay-link";
+        linksCell.appendChild(leaderboardLink);
+      }
+      row.appendChild(linksCell);
 
       tbody.appendChild(row);
     }
