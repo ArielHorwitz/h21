@@ -32,6 +32,8 @@ class Config:
     invite_request_hint: str
     default_daily_question_limit: int
     default_daily_topic_limit: int
+    avatar_image_model: str
+    default_monthly_avatar_limit: int
 
 
 def load_config() -> Config:
@@ -59,6 +61,8 @@ def load_config() -> Config:
     invite_request_hint = raw.get("invite_request_hint", "Email")
     default_daily_question_limit = raw.get("default_daily_question_limit", 200)
     default_daily_topic_limit = raw.get("default_daily_topic_limit", 3)
+    avatar_image_model = raw.get("avatar_image_model", "gpt-image-1-mini")
+    default_monthly_avatar_limit = raw.get("default_monthly_avatar_limit", 3)
 
     return Config(
         openai_api_key=openai_api_key,
@@ -69,4 +73,6 @@ def load_config() -> Config:
         invite_request_hint=invite_request_hint,
         default_daily_question_limit=default_daily_question_limit,
         default_daily_topic_limit=default_daily_topic_limit,
+        avatar_image_model=avatar_image_model,
+        default_monthly_avatar_limit=default_monthly_avatar_limit,
     )
