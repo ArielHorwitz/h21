@@ -939,14 +939,14 @@ class GameDatabase:
         ).fetchall()
         return [dict(row) for row in rows]
 
-    # -- Recap --
+    # -- Recent results --
 
-    def get_recap(self, user_id: int, recap_date: date) -> list[dict[str, Any]]:
-        """Get recap data for a user on a given date.
+    def get_recent_results(self, user_id: int, limit: int = 3) -> list[dict[str, Any]]:
+        """Get the user's most recent won games where at least one friend also played.
 
-        Returns a list of the user's won games on recap_date, each with the
-        user's own result and ALL friends who also won the same puzzle.
-        The API layer handles friend selection/filtering.
+        Returns up to `limit` games, each with the user's own result and ALL
+        friends who also won the same puzzle. The API layer handles friend
+        selection/filtering.
 
         Returns empty list if the user is anonymous.
         """
@@ -957,20 +957,33 @@ class GameDatabase:
         if account is None or account["anonymous"]:
             return []
 
-        # Get all of the user's won games on recap_date.
+        # Find the user's most recent wins where at least one non-anonymous
+        # friend also won the same puzzle.
         user_games = self._connection.execute(
             "SELECT g.game_id, g.topic_slug, t.name AS topic_name, "
             "g.difficulty, g.date, g.questions_asked "
             "FROM games g "
             "LEFT JOIN topics t ON g.topic_slug = t.slug "
-            "WHERE g.user_id = ? AND g.date = ? AND g.result = 'win'",
-            (user_id, recap_date.isoformat()),
+            "WHERE g.user_id = ? AND g.result = 'win' "
+            "AND EXISTS ("
+            "  SELECT 1 FROM friends f "
+            "  JOIN games fg ON fg.user_id = f.friend_id "
+            "    AND fg.date = g.date "
+            "    AND fg.topic_slug = g.topic_slug "
+            "    AND fg.difficulty = g.difficulty "
+            "    AND fg.result = 'win' "
+            "  JOIN accounts fa ON fa.user_id = f.friend_id "
+            "  WHERE f.user_id = ? AND fa.anonymous = 0"
+            ") "
+            "ORDER BY g.ended_at DESC "
+            "LIMIT ?",
+            (user_id, user_id, limit),
         ).fetchall()
 
         if not user_games:
             return []
 
-        recap = []
+        results = []
         for game_row in user_games:
             game = dict(game_row)
             game["topic_name"] = game["topic_name"] or game["topic_slug"]
@@ -996,14 +1009,14 @@ class GameDatabase:
                 "  AND g.difficulty = ? "
                 "  AND g.result = 'win' "
                 "WHERE f.user_id = ? AND a.anonymous = 0",
-                (recap_date.isoformat(), game["topic_slug"],
+                (game["date"], game["topic_slug"],
                  game["difficulty"], user_id),
             ).fetchall()
 
             game["friends"] = [dict(friend) for friend in friend_games]
-            recap.append(game)
+            results.append(game)
 
-        return recap
+        return results
 
     def get_puzzle_winners(
         self, puzzle_date: date, topic_slug: str, difficulty: str,

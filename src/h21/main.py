@@ -5,7 +5,7 @@ import logging
 import logging.handlers
 import sqlite3
 from contextlib import asynccontextmanager
-from datetime import date as date_type, datetime, timedelta, timezone
+from datetime import date as date_type, datetime, timezone
 from pathlib import Path
 from typing import Any, AsyncIterator, Optional
 
@@ -451,10 +451,10 @@ def _compute_score(questions_asked: int, hints_used: int) -> int:
     return questions_asked + hints_used * 50
 
 
-def _select_friends_for_recap(
+def _select_friends_for_result(
     player_score: int, friends: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
-    """Select up to 3 friends for a recap game entry.
+    """Select up to 3 friends for a recent results game entry.
 
     If the player is NOT the top performer: show the top performer + 2 closest.
     If the player IS the top performer: show the 3 closest below.
@@ -491,17 +491,16 @@ def _select_friends_for_recap(
         return [top_friend] + closest
 
 
-@app.get("/api/recap")
-async def get_recap(request: Request) -> list[dict[str, Any]]:
+@app.get("/api/recent-results")
+async def get_recent_results(request: Request) -> list[dict[str, Any]]:
     user_id = request.state.user_id
-    yesterday = date_type.today() - timedelta(days=1)
-    recap_data = database.get_recap(user_id, yesterday)
+    recent_results = database.get_recent_results(user_id, limit=3)
 
     result = []
-    for game in recap_data:
+    for game in recent_results:
         player_score = _compute_score(game["questions_asked"], game["hints_used"])
 
-        selected_friends = _select_friends_for_recap(player_score, game["friends"])
+        selected_friends = _select_friends_for_result(player_score, game["friends"])
 
         # Build friend response objects with display_name fallback.
         friend_entries = []

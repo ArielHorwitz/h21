@@ -3,7 +3,7 @@ const requestForm = document.getElementById("request-topic-form");
 const topicNameInput = document.getElementById("topic-name-input");
 const requestTopicBtn = document.getElementById("request-topic-btn");
 const requestStatus = document.getElementById("request-topic-status");
-const recapSection = document.getElementById("recap-section");
+const recentResultsSection = document.getElementById("recent-results-section");
 
 const DIFFICULTIES = ["normal", "expert"];
 
@@ -136,26 +136,26 @@ function computeScore(questionsAsked, hintsUsed) {
   return questionsAsked + hintsUsed * 50;
 }
 
-function renderRecap(recapData) {
-  if (!recapData || recapData.length === 0) {
-    recapSection.hidden = true;
+function renderRecentResults(games) {
+  if (!games || games.length === 0) {
+    recentResultsSection.hidden = true;
     return;
   }
 
-  recapSection.hidden = false;
-  recapSection.innerHTML = "";
+  recentResultsSection.hidden = false;
+  recentResultsSection.innerHTML = "";
 
   const heading = document.createElement("h2");
-  heading.className = "recap-heading";
-  heading.textContent = "Yesterday's Recap";
-  recapSection.appendChild(heading);
+  heading.className = "recent-results-heading";
+  heading.textContent = "Recent Results";
+  recentResultsSection.appendChild(heading);
 
-  for (const game of recapData) {
+  for (const game of games) {
     const card = document.createElement("div");
-    card.className = "recap-card";
+    card.className = "recent-results-card";
 
     const title = document.createElement("div");
-    title.className = "recap-card-title";
+    title.className = "recent-results-card-title";
     const difficulty = game.difficulty.charAt(0).toUpperCase() + game.difficulty.slice(1);
     title.textContent = `${game.topic_name} (${difficulty})`;
     card.appendChild(title);
@@ -182,22 +182,22 @@ function renderRecap(recapData) {
     entries.sort((a, b) => a.score - b.score);
 
     const rankingList = document.createElement("ol");
-    rankingList.className = "recap-ranking";
+    rankingList.className = "recent-results-ranking";
 
     for (const entry of entries) {
       const li = document.createElement("li");
-      li.className = "recap-rank-entry";
+      li.className = "recent-results-rank-entry";
       if (entry.isPlayer) {
-        li.classList.add("recap-rank-self");
+        li.classList.add("recent-results-rank-self");
       }
 
       const nameSpan = document.createElement("span");
-      nameSpan.className = "recap-rank-name";
+      nameSpan.className = "recent-results-rank-name";
       nameSpan.textContent = entry.name;
       li.appendChild(nameSpan);
 
       const resultSpan = document.createElement("span");
-      resultSpan.className = "recap-rank-result";
+      resultSpan.className = "recent-results-rank-result";
       resultSpan.textContent = formatResult(entry.questionsAsked, entry.hintsUsed);
       li.appendChild(resultSpan);
 
@@ -208,9 +208,9 @@ function renderRecap(recapData) {
     const emptySlots = 4 - entries.length;
     for (let slotIndex = 0; slotIndex < emptySlots; slotIndex++) {
       const li = document.createElement("li");
-      li.className = "recap-rank-entry recap-rank-empty";
+      li.className = "recent-results-rank-entry recent-results-rank-empty";
       const dash = document.createElement("span");
-      dash.className = "recap-rank-name";
+      dash.className = "recent-results-rank-name";
       dash.textContent = "\u2014";
       li.appendChild(dash);
       rankingList.appendChild(li);
@@ -218,27 +218,27 @@ function renderRecap(recapData) {
 
     card.appendChild(rankingList);
 
-    const compareLink = document.createElement("a");
-    compareLink.className = "recap-compare-link";
-    compareLink.href = `/leaderboard?topic=${encodeURIComponent(game.topic_slug)}&difficulty=${encodeURIComponent(game.difficulty)}&date=${encodeURIComponent(game.date)}`;
-    compareLink.textContent = "View full leaderboard";
-    card.appendChild(compareLink);
+    const leaderboardLink = document.createElement("a");
+    leaderboardLink.className = "recent-results-leaderboard-link";
+    leaderboardLink.href = `/leaderboard?topic=${encodeURIComponent(game.topic_slug)}&difficulty=${encodeURIComponent(game.difficulty)}&date=${encodeURIComponent(game.date)}`;
+    leaderboardLink.textContent = "View full leaderboard";
+    card.appendChild(leaderboardLink);
 
-    recapSection.appendChild(card);
+    recentResultsSection.appendChild(card);
   }
 }
 
-async function loadRecap() {
+async function loadRecentResults() {
   try {
-    const response = await fetch("/api/recap");
+    const response = await fetch("/api/recent-results");
     if (response.ok) {
       const data = await response.json();
-      renderRecap(data);
+      renderRecentResults(data);
     }
   } catch (error) {
-    console.error("Failed to load recap:", error);
+    console.error("Failed to load recent results:", error);
   }
 }
 
-loadRecap();
+loadRecentResults();
 loadTopics();
