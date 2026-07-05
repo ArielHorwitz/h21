@@ -11,6 +11,7 @@ An AI-powered 21 questions trivia game. Players pick a topic (user-submitted or 
 | `src/h21/llm.py` | OpenAI client wrapper, prompt templates, answer parsing |
 | `src/h21/auth.py` | HMAC-signed session cookies, token creation/validation |
 | `src/h21/config.py` | XDG-compliant config loading (env vars + TOML file) |
+| `src/h21/avatar.py` | AI-generated profile pictures: OpenAI image API, Pillow resize, file management |
 | `src/h21/invite.py` | CLI utility to generate invite codes |
 | `src/h21/reset.py` | CLI utility to delete database and logs |
 
@@ -24,6 +25,7 @@ An AI-powered 21 questions trivia game. Players pick a topic (user-submitted or 
 | `static/account.html/js` | User profile and stats |
 | `static/control.html/js` | Dev-only admin panel: SQL queries, account management |
 | `static/help.html` | Game rules and instructions |
+| `static/nav.js` | Shared nav bar script: replaces account icon with avatar |
 
 ## Progressive Discovery
 
