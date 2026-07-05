@@ -136,6 +136,33 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     avatar_image_model = config.avatar_image_model
     log_path = config.log_path
     database.ensure_schema()
+
+    if config.auto_generate_missing_avatars:
+        accounts_without_avatars = database.get_accounts_without_avatars()
+        if accounts_without_avatars:
+            logger.info(
+                "Auto-generating avatars for %d accounts",
+                len(accounts_without_avatars),
+            )
+            for account in accounts_without_avatars:
+                try:
+                    image_bytes = await avatar_mod.generate_auto_avatar(
+                        openai_image_client, avatar_image_model,
+                    )
+                    avatar_mod.save_avatar_direct(
+                        data_dir, account["player_code"], image_bytes,
+                    )
+                    database.bump_avatar_version(account["user_id"])
+                    logger.info(
+                        "Generated avatar for user %s (%s)",
+                        account["username"], account["player_code"],
+                    )
+                except Exception:
+                    logger.exception(
+                        "Failed to generate avatar for user %s",
+                        account["username"],
+                    )
+
     yield
     database.close()
 

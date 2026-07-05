@@ -983,6 +983,14 @@ class GameDatabase:
         ).fetchone()
         return row["avatar_version"] if row else 0
 
+    def get_accounts_without_avatars(self) -> list[dict[str, Any]]:
+        """Return accounts with avatar_version = 0 (no avatar generated yet)."""
+        rows = self._connection.execute(
+            "SELECT user_id, username, player_code "
+            "FROM accounts WHERE avatar_version = 0 AND player_code IS NOT NULL"
+        ).fetchall()
+        return [dict(row) for row in rows]
+
     def get_account_by_player_code(self, player_code: str) -> Optional[dict[str, Any]]:
         """Look up an account by player_code. Returns None if not found."""
         row = self._connection.execute(

@@ -34,6 +34,7 @@ class Config:
     default_daily_topic_limit: int
     avatar_image_model: str
     default_monthly_avatar_limit: int
+    auto_generate_missing_avatars: bool
 
 
 def load_config() -> Config:
@@ -63,6 +64,7 @@ def load_config() -> Config:
     default_daily_topic_limit = raw.get("default_daily_topic_limit", 3)
     avatar_image_model = raw.get("avatar_image_model", "gpt-image-1-mini")
     default_monthly_avatar_limit = raw.get("default_monthly_avatar_limit", 3)
+    auto_generate_missing_avatars = raw.get("auto_generate_missing_avatars", False)
 
     return Config(
         openai_api_key=openai_api_key,
@@ -75,4 +77,5 @@ def load_config() -> Config:
         default_daily_topic_limit=default_daily_topic_limit,
         avatar_image_model=avatar_image_model,
         default_monthly_avatar_limit=default_monthly_avatar_limit,
+        auto_generate_missing_avatars=auto_generate_missing_avatars,
     )
