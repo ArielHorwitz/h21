@@ -175,12 +175,14 @@ function addLogEntry(question, answer, explanation) {
   questionLog.scrollTop = questionLog.scrollHeight;
 }
 
-function addHintLogEntry(hintIndex) {
+function addHintLogEntry(hintIndex, afterQuestion) {
   const entry = document.createElement("div");
   entry.className = "log-entry hint-log-entry";
   const label = document.createElement("div");
   label.className = "hint-log-label";
-  label.textContent = `Opened hint ${hintIndex + 1}`;
+  const afterQ = afterQuestion ?? hintRevealAfterQuestion.get(hintIndex);
+  const suffix = afterQ != null ? ` after question ${afterQ}` : "";
+  label.textContent = `Opened hint ${hintIndex + 1}${suffix}`;
   entry.appendChild(label);
   questionLog.appendChild(entry);
   questionLog.scrollTop = questionLog.scrollHeight;
@@ -209,44 +211,67 @@ function updateHintPanel() {
     Math.floor(questionsAsked / QUESTIONS_PER_HINT),
     HINTS_TOTAL,
   );
-  if (newUnlocked <= hintsUnlocked) return;
-  hintsUnlocked = newUnlocked;
 
-  if (hintsUnlocked > 0) {
+  // Show panel and ensure all hint slots exist.
+  if (newUnlocked > 0 || hintList.children.length > 0) {
     hintPanel.hidden = false;
   }
 
-  while (hintList.children.length < hintsUnlocked) {
+  // Create all hint slots up front (unlocked + pending).
+  while (hintList.children.length < HINTS_TOTAL) {
     const index = hintList.children.length;
     const li = document.createElement("li");
     li.dataset.hintIndex = index;
 
     const revealBtn = document.createElement("button");
     revealBtn.className = "hint-reveal-btn";
-    revealBtn.textContent = `Reveal hint ${index + 1}`;
     li.appendChild(revealBtn);
 
     const textSpan = document.createElement("span");
     textSpan.className = "hint-text";
     li.appendChild(textSpan);
 
-    // If this hint was already revealed (e.g. on resume), show it directly.
-    if (revealedHintTexts.has(index)) {
-      textSpan.textContent = revealedHintTexts.get(index);
-      textSpan.hidden = false;
-      revealBtn.hidden = true;
-      li.className = "hint-item revealed";
-    } else {
-      textSpan.hidden = true;
-      li.className = "hint-item locked";
-      if (index > hintsRevealed) {
-        revealBtn.disabled = true;
-      }
-      revealBtn.addEventListener("click", () => fetchAndRevealHint(index));
-    }
-
     hintList.appendChild(li);
   }
+
+  // Update each slot's state.
+  for (let index = 0; index < HINTS_TOTAL; index++) {
+    const li = hintList.children[index];
+    const btn = li.querySelector(".hint-reveal-btn");
+    const textSpan = li.querySelector(".hint-text");
+    const unlocked = index < newUnlocked;
+
+    if (revealedHintTexts.has(index) || revealedHintIndices.has(index)) {
+      // Already revealed.
+      if (revealedHintTexts.has(index)) {
+        textSpan.textContent = revealedHintTexts.get(index);
+      }
+      textSpan.hidden = false;
+      btn.hidden = true;
+      li.className = "hint-item revealed";
+    } else if (unlocked) {
+      // Unlocked but not yet revealed.
+      btn.textContent = `Reveal hint ${index + 1}`;
+      btn.hidden = false;
+      btn.disabled = index > hintsRevealed;
+      textSpan.hidden = true;
+      li.className = "hint-item locked";
+      if (!li.dataset.listenerAdded) {
+        btn.addEventListener("click", () => fetchAndRevealHint(index));
+        li.dataset.listenerAdded = "1";
+      }
+    } else {
+      // Pending — show when it unlocks.
+      const requiredQuestions = (index + 1) * QUESTIONS_PER_HINT;
+      btn.textContent = `Hint ${index + 1} after question ${requiredQuestions}`;
+      btn.hidden = false;
+      btn.disabled = true;
+      textSpan.hidden = true;
+      li.className = "hint-item pending";
+    }
+  }
+
+  hintsUnlocked = newUnlocked;
 }
 
 async function fetchAndRevealHint(hintIndex) {
@@ -285,7 +310,7 @@ async function fetchAndRevealHint(hintIndex) {
     hintRevealAfterQuestion.set(hintIndex, data.after_question);
     addHintLogEntry(hintIndex);
 
-    if (hintList.children.length > hintsRevealed) {
+    if (hintsRevealed < hintsUnlocked) {
       const nextBtn = hintList.children[hintsRevealed].querySelector(".hint-reveal-btn");
       if (nextBtn) nextBtn.disabled = false;
     }
@@ -512,7 +537,7 @@ async function tryResumeGame() {
       const hintsHere = hintRevealsAtQuestion.get(questionsAsked);
       if (hintsHere) {
         for (const hintIndex of hintsHere) {
-          addHintLogEntry(hintIndex);
+          addHintLogEntry(hintIndex, questionsAsked);
         }
       }
     }
@@ -561,6 +586,7 @@ async function init() {
     statusText.textContent = "";
     submitBtn.disabled = false;
     questionInput.focus();
+    updateHintPanel();
   }
 }
 
