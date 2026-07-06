@@ -2,8 +2,9 @@ const replaySubtitle = document.getElementById("replay-subtitle");
 const replayError = document.getElementById("replay-error");
 const replayContent = document.getElementById("replay-content");
 const replayMeta = document.getElementById("replay-meta");
-const spoilerGate = document.getElementById("spoiler-gate");
-const revealBtn = document.getElementById("reveal-btn");
+const replayGated = document.getElementById("replay-gated");
+const gatedMessage = document.getElementById("gated-message");
+const gatedPlayBtn = document.getElementById("gated-play-btn");
 const replayDetails = document.getElementById("replay-details");
 const replayResult = document.getElementById("replay-result");
 const replayQuestionLog = document.getElementById("replay-question-log");
@@ -153,18 +154,30 @@ function renderGame(game) {
     replayDetails.appendChild(compareWrapper);
   }
 
-  if (!game.result) {
-    spoilerGate.querySelector("p").textContent =
-      "This replay contains spoilers including all questions and answers so far.";
-  }
-
+  replayDetails.hidden = false;
   replayContent.hidden = false;
 }
 
-revealBtn.addEventListener("click", () => {
-  spoilerGate.hidden = true;
-  replayDetails.hidden = false;
-});
+function renderGated(game) {
+  const topicName = game.topic_name || game.topic_slug;
+  const difficultyLabel = game.difficulty.charAt(0).toUpperCase() + game.difficulty.slice(1);
+
+  replaySubtitle.textContent = `${topicName} — ${difficultyLabel}`;
+
+  if (game.username) {
+    const playerLine = document.createElement("div");
+    playerLine.className = "replay-player";
+    playerLine.textContent = `Played by ${game.username}`;
+    replayMeta.appendChild(playerLine);
+  }
+
+  gatedMessage.textContent =
+    "This replay contains spoilers. Play today\u2019s puzzle first to unlock it.";
+  gatedPlayBtn.href =
+    `/game?topic=${encodeURIComponent(game.topic_slug)}&difficulty=${encodeURIComponent(game.difficulty)}`;
+  replayGated.hidden = false;
+  replayContent.hidden = false;
+}
 
 async function init() {
   if (!shareCode) {
@@ -177,15 +190,17 @@ async function init() {
     if (!response.ok) {
       if (response.status === 404) {
         showError("Game not found. Check the game ID and try again.");
-      } else if (response.status === 403) {
-        showError("Play this puzzle first to view today's replays.");
       } else {
         showError("Failed to load game.");
       }
       return;
     }
     const game = await response.json();
-    renderGame(game);
+    if (game.gated) {
+      renderGated(game);
+    } else {
+      renderGame(game);
+    }
   } catch {
     showError("Network error. Please try again.");
   }

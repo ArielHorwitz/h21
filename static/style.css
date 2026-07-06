@@ -1536,7 +1536,7 @@ h1 a.home-link:hover {
   font-size: 0.85rem;
 }
 
-#spoiler-gate {
+#replay-gated {
   text-align: center;
   margin-top: 1.5rem;
   padding: 1.5rem;
@@ -1545,26 +1545,9 @@ h1 a.home-link:hover {
   border-radius: 6px;
 }
 
-#spoiler-gate p {
+#replay-gated p {
   color: #999;
   margin-bottom: 1rem;
-}
-
-#reveal-btn {
-  padding: 0.6rem 1.5rem;
-  border: 1px solid #e2b714;
-  border-radius: 4px;
-  background: transparent;
-  color: #e2b714;
-  font-size: 1rem;
-  font-weight: bold;
-  cursor: pointer;
-  transition: background 0.15s, color 0.15s;
-}
-
-#reveal-btn:hover {
-  background: #e2b714;
-  color: #1a1a2e;
 }
 
 .replay-result {
