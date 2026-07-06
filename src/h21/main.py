@@ -727,13 +727,6 @@ async def get_recent_results(request: Request) -> list[dict[str, Any]]:
     return result
 
 
-@app.get("/api/play-next")
-async def get_play_next(request: Request) -> list[dict[str, Any]]:
-    user_id = request.state.user_id
-    today = date_type.today()
-    return database.get_play_next(user_id, today)
-
-
 @app.get("/api/friend-suggestions")
 async def get_friend_suggestions(request: Request, limit: int = 3) -> list[dict[str, Any]]:
     user_id = request.state.user_id
@@ -1110,8 +1103,10 @@ async def delete_invite_request(request_id: int) -> dict[str, str]:
 # -- Topic endpoints --
 
 @app.get("/api/topics")
-async def get_topics() -> list[dict[str, str]]:
-    return database.get_all_topics()
+async def get_topics(request: Request) -> list[dict[str, Any]]:
+    user_id = request.state.user_id
+    today = date_type.today()
+    return database.get_topics_ranked(user_id, today)
 
 
 @app.post("/api/topics")

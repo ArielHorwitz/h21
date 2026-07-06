@@ -4,7 +4,6 @@ const topicNameInput = document.getElementById("topic-name-input");
 const requestTopicBtn = document.getElementById("request-topic-btn");
 const requestStatus = document.getElementById("request-topic-status");
 const recentResultsSection = document.getElementById("recent-results-section");
-const playNextSection = document.getElementById("play-next-section");
 
 const DIFFICULTIES = ["normal", "expert"];
 
@@ -17,10 +16,13 @@ function renderTopics(topics) {
     const card = document.createElement("div");
     card.className = "topic-card";
 
+    const header = document.createElement("div");
+    header.className = "topic-card-header";
+
     const name = document.createElement("span");
     name.className = "topic-name";
     name.textContent = topic.name;
-    card.appendChild(name);
+    header.appendChild(name);
 
     const buttons = document.createElement("div");
     buttons.className = "difficulty-buttons";
@@ -41,7 +43,47 @@ function renderTopics(topics) {
       buttons.appendChild(link);
     }
 
-    card.appendChild(buttons);
+    header.appendChild(buttons);
+    card.appendChild(header);
+
+    // Friend avatars per difficulty (expanded rows).
+    const friends = topic.friends || {};
+    for (const difficulty of DIFFICULTIES) {
+      const friendList = friends[difficulty];
+      if (!friendList || friendList.length === 0) continue;
+
+      const row = document.createElement("div");
+      row.className = "topic-friends-row";
+
+      const label = document.createElement("span");
+      label.className = "topic-friends-label";
+      label.textContent = difficulty.charAt(0).toUpperCase() + difficulty.slice(1) + ":";
+      row.appendChild(label);
+
+      const avatars = document.createElement("div");
+      avatars.className = "topic-friends-avatars";
+
+      for (const friend of friendList) {
+        if (friend.player_code && friend.avatar_version > 0) {
+          const img = document.createElement("img");
+          img.className = "avatar-xs";
+          img.src = "/avatars/" + encodeURIComponent(friend.player_code) + ".webp?v=" + friend.avatar_version;
+          img.alt = friend.display_name;
+          img.title = friend.display_name;
+          avatars.appendChild(img);
+        } else {
+          const placeholder = document.createElement("span");
+          placeholder.className = "avatar-xs avatar-placeholder";
+          placeholder.textContent = friend.display_name.charAt(0).toUpperCase();
+          placeholder.title = friend.display_name;
+          avatars.appendChild(placeholder);
+        }
+      }
+
+      row.appendChild(avatars);
+      card.appendChild(row);
+    }
+
     topicsList.appendChild(card);
   }
 }
@@ -268,82 +310,6 @@ async function loadRecentResults() {
   }
 }
 
-function renderPlayNext(puzzles) {
-  if (!puzzles || puzzles.length === 0) {
-    playNextSection.hidden = true;
-    return;
-  }
-
-  playNextSection.hidden = false;
-  playNextSection.innerHTML = "";
-
-  const heading = document.createElement("h2");
-  heading.className = "play-next-heading";
-  heading.textContent = "Friends Are Playing";
-  playNextSection.appendChild(heading);
-
-  const maxAvatars = 10;
-
-  for (const puzzle of puzzles) {
-    const link = document.createElement("a");
-    link.className = "play-next-card";
-    link.href = `/game?topic=${encodeURIComponent(puzzle.topic_slug)}&difficulty=${puzzle.difficulty}`;
-
-    const title = document.createElement("span");
-    title.className = "play-next-title";
-    const difficulty = puzzle.difficulty.charAt(0).toUpperCase() + puzzle.difficulty.slice(1);
-    title.textContent = `${puzzle.topic_name} (${difficulty})`;
-    link.appendChild(title);
-
-    const avatarRow = document.createElement("div");
-    avatarRow.className = "play-next-avatars";
-
-    const visible = puzzle.friends.slice(0, maxAvatars);
-    const remaining = puzzle.friends.length - visible.length;
-
-    for (const friend of visible) {
-      if (friend.player_code && friend.avatar_version > 0) {
-        const img = document.createElement("img");
-        img.className = "avatar-sm";
-        img.src = "/avatars/" + encodeURIComponent(friend.player_code) + ".webp?v=" + friend.avatar_version;
-        img.alt = friend.display_name;
-        img.title = friend.display_name;
-        avatarRow.appendChild(img);
-      } else {
-        const placeholder = document.createElement("span");
-        placeholder.className = "avatar-sm avatar-placeholder";
-        placeholder.textContent = friend.display_name.charAt(0).toUpperCase();
-        placeholder.title = friend.display_name;
-        avatarRow.appendChild(placeholder);
-      }
-    }
-
-    if (remaining > 0) {
-      const moreLabel = document.createElement("span");
-      moreLabel.className = "play-next-more-friends";
-      const noun = remaining === 1 ? "friend" : "friends";
-      moreLabel.textContent = `+${remaining} more ${noun}`;
-      avatarRow.appendChild(moreLabel);
-    }
-
-    link.appendChild(avatarRow);
-
-    playNextSection.appendChild(link);
-  }
-}
-
-async function loadPlayNext() {
-  try {
-    const response = await fetch("/api/play-next");
-    if (response.ok) {
-      const data = await response.json();
-      renderPlayNext(data);
-    }
-  } catch (error) {
-    console.error("Failed to load play next:", error);
-  }
-}
-
 const friendSuggestionsSection = document.getElementById("friend-suggestions-section");
 
 function renderFriendSuggestions(suggestions) {
@@ -434,7 +400,6 @@ async function loadFriendSuggestions() {
 
 loadCurrentUser().then(() => {
   loadRecentResults();
-  loadPlayNext();
   loadFriendSuggestions();
 });
 loadTopics();

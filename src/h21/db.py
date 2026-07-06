@@ -372,6 +372,78 @@ class GameDatabase:
         ).fetchall()
         return [dict(row) for row in rows]
 
+    def get_topics_ranked(self, user_id: int, today: date) -> list[dict[str, Any]]:
+        """Return all topics sorted by popularity with friend activity for today.
+
+        Each topic includes a ``friends`` dict mapping difficulty to a list of
+        friend avatar entries for today's puzzles.  Topics are sorted by total
+        play count plus a boost for friend activity.
+        """
+        today_str = today.isoformat()
+
+        # All topics with their total play count.
+        topic_rows = self._connection.execute(
+            "SELECT t.slug, t.name, COUNT(g.game_id) AS play_count "
+            "FROM topics t "
+            "LEFT JOIN games g ON g.topic_slug = t.slug "
+            "GROUP BY t.slug, t.name",
+        ).fetchall()
+
+        topics: dict[str, dict[str, Any]] = {}
+        for row in topic_rows:
+            topics[row["slug"]] = {
+                "slug": row["slug"],
+                "name": row["name"],
+                "play_count": row["play_count"],
+                "friends": {},
+            }
+
+        # Friend activity on today's puzzles.
+        account = self._connection.execute(
+            "SELECT anonymous FROM accounts WHERE user_id = ?", (user_id,)
+        ).fetchone()
+        is_anonymous = account is None or account["anonymous"]
+
+        if not is_anonymous:
+            friend_rows = self._connection.execute(
+                "SELECT dp.topic_slug, dp.difficulty, "
+                "fa.display_name, fa.player_code, fa.avatar_version "
+                "FROM daily_puzzles dp "
+                "JOIN friends f ON f.user_id = ? "
+                "JOIN games fg ON fg.user_id = f.friend_id "
+                "  AND fg.date = dp.date "
+                "  AND fg.topic_slug = dp.topic_slug "
+                "  AND fg.difficulty = dp.difficulty "
+                "  AND fg.result IS NOT NULL "
+                "JOIN accounts fa ON fa.user_id = f.friend_id AND fa.anonymous = 0 "
+                "WHERE dp.date = ? "
+                "ORDER BY fa.display_name",
+                (user_id, today_str),
+            ).fetchall()
+
+            for row in friend_rows:
+                topic = topics.get(row["topic_slug"])
+                if topic is None:
+                    continue
+                difficulty = row["difficulty"]
+                if difficulty not in topic["friends"]:
+                    topic["friends"][difficulty] = []
+                topic["friends"][difficulty].append({
+                    "display_name": row["display_name"],
+                    "player_code": row["player_code"],
+                    "avatar_version": row["avatar_version"],
+                })
+
+        friend_boost_weight = 50
+
+        def sort_key(topic: dict[str, Any]) -> tuple[int, str]:
+            friend_count = sum(len(v) for v in topic["friends"].values())
+            score = topic["play_count"] + friend_count * friend_boost_weight
+            # Negate score for descending, then name for alphabetical tiebreak.
+            return (-score, topic["name"])
+
+        return sorted(topics.values(), key=sort_key)
+
     def add_topic(self, slug: str, name: str, user_id: Optional[int] = None) -> None:
         self._connection.execute(
             "INSERT OR IGNORE INTO topics (slug, name, user_id) VALUES (?, ?, ?)",
@@ -1184,67 +1256,6 @@ class GameDatabase:
             (requesting_user_id, puzzle_date.isoformat(), topic_slug, difficulty),
         ).fetchall()
         return [dict(row) for row in rows]
-
-    def get_play_next(self, user_id: int, today: date) -> list[dict[str, Any]]:
-        """Find today's puzzles that friends have won but the user hasn't played.
-
-        Returns a list of puzzles with topic name, slug, difficulty, and the
-        count of friends who have won. Sorted by friend count descending.
-
-        Returns empty list if the user is anonymous.
-        """
-        account = self._connection.execute(
-            "SELECT anonymous FROM accounts WHERE user_id = ?", (user_id,)
-        ).fetchone()
-        if account is None or account["anonymous"]:
-            return []
-
-        today_str = today.isoformat()
-        rows = self._connection.execute(
-            "SELECT dp.topic_slug, t.name AS topic_name, dp.difficulty, "
-            "fa.display_name, fa.player_code, fa.avatar_version "
-            "FROM daily_puzzles dp "
-            "LEFT JOIN topics t ON dp.topic_slug = t.slug "
-            "JOIN friends f ON f.user_id = ? "
-            "JOIN games fg ON fg.user_id = f.friend_id "
-            "  AND fg.date = dp.date "
-            "  AND fg.topic_slug = dp.topic_slug "
-            "  AND fg.difficulty = dp.difficulty "
-            "  AND fg.result = 'win' "
-            "JOIN accounts fa ON fa.user_id = f.friend_id AND fa.anonymous = 0 "
-            "WHERE dp.date = ? "
-            "AND NOT EXISTS ("
-            "  SELECT 1 FROM games ug "
-            "  WHERE ug.user_id = ? "
-            "    AND ug.date = dp.date "
-            "    AND ug.topic_slug = dp.topic_slug "
-            "    AND ug.difficulty = dp.difficulty "
-            "    AND ug.result IS NOT NULL"
-            ") "
-            "ORDER BY fa.display_name",
-            (user_id, today_str, user_id),
-        ).fetchall()
-
-        puzzles: dict[tuple[str, str], dict[str, Any]] = {}
-        for row in rows:
-            key = (row["topic_slug"], row["difficulty"])
-            if key not in puzzles:
-                puzzles[key] = {
-                    "topic_slug": row["topic_slug"],
-                    "topic_name": row["topic_name"] or row["topic_slug"],
-                    "difficulty": row["difficulty"],
-                    "friends": [],
-                }
-            puzzles[key]["friends"].append({
-                "display_name": row["display_name"],
-                "player_code": row["player_code"],
-                "avatar_version": row["avatar_version"],
-            })
-
-        result = sorted(
-            puzzles.values(), key=lambda p: len(p["friends"]), reverse=True
-        )
-        return result
 
     # -- Friend suggestions --
 

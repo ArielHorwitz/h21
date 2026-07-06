@@ -66,12 +66,38 @@ h1 a.home-link:hover {
 
 .topic-card {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  flex-direction: column;
   background: #16213e;
   border: 1px solid #333;
   border-radius: 6px;
   padding: 0.8rem 1rem;
+  gap: 0.5rem;
+}
+
+.topic-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.topic-friends-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding-left: 0.15rem;
+}
+
+.topic-friends-label {
+  font-size: 0.75rem;
+  color: #999;
+  min-width: 4rem;
+}
+
+.topic-friends-avatars {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem;
 }
 
 .topic-name {
@@ -216,51 +242,6 @@ h1 a.home-link:hover {
   color: #fff;
 }
 
-/* -- Play next -- */
-
-#play-next-section {
-  margin-bottom: 2rem;
-}
-
-.play-next-heading {
-  font-size: 1.1rem;
-  color: #ccc;
-  margin-bottom: 0.75rem;
-}
-
-.play-next-card {
-  display: block;
-  background: #16213e;
-  border: 1px solid #333;
-  border-radius: 6px;
-  padding: 0.7rem 1rem;
-  margin-bottom: 0.5rem;
-  text-decoration: none;
-  color: #e0e0e0;
-  transition: border-color 0.15s;
-}
-
-.play-next-card:hover {
-  border-color: #e2b714;
-}
-
-.play-next-title {
-  font-size: 0.95rem;
-  font-weight: 500;
-  margin-bottom: 0.5rem;
-}
-
-.play-next-avatars {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.35rem;
-}
-
-.play-next-avatars .avatar-sm {
-  flex-shrink: 0;
-}
-
 .avatar-placeholder {
   display: inline-flex;
   align-items: center;
@@ -269,12 +250,6 @@ h1 a.home-link:hover {
   color: #ccc;
   font-size: 0.75rem;
   font-weight: 600;
-}
-
-.play-next-more-friends {
-  font-size: 0.8rem;
-  color: #e2b714;
-  margin-left: 0.25rem;
 }
 
 .play-section-heading {
@@ -705,6 +680,10 @@ h1 a.home-link:hover {
   display: flex;
   gap: 0.6rem;
   z-index: 10;
+  background: rgba(26, 26, 46, 0.85);
+  backdrop-filter: blur(6px);
+  padding: 0.5rem 0.65rem;
+  border-radius: 999px;
 }
 
 .nav-bar a {
@@ -1096,6 +1075,13 @@ h1 a.home-link:hover {
 #logout-btn:hover {
   background: #f44336;
   color: #1a1a2e;
+}
+
+/* -- Scrollable table wrapper -- */
+
+.table-scroll-wrapper {
+  overflow-x: auto;
+  max-width: 100%;
 }
 
 /* -- Game history table -- */

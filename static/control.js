@@ -73,7 +73,10 @@ function renderInvites(invites) {
   }
 
   table.appendChild(tbody);
-  invitesList.appendChild(table);
+  const wrapper = document.createElement("div");
+  wrapper.className = "table-scroll-wrapper";
+  wrapper.appendChild(table);
+  invitesList.appendChild(wrapper);
 }
 
 async function loadInvites() {
@@ -187,7 +190,10 @@ function renderInviteRequests(requests) {
   }
 
   table.appendChild(tbody);
-  inviteRequestsList.appendChild(table);
+  const wrapper = document.createElement("div");
+  wrapper.className = "table-scroll-wrapper";
+  wrapper.appendChild(table);
+  inviteRequestsList.appendChild(wrapper);
 }
 
 async function loadInviteRequests() {
@@ -275,7 +281,10 @@ function renderActivityLog(entries, append) {
     table.appendChild(thead);
     tbody = document.createElement("tbody");
     table.appendChild(tbody);
-    activityLogContainer.appendChild(table);
+    const wrapper = document.createElement("div");
+    wrapper.className = "table-scroll-wrapper";
+    wrapper.appendChild(table);
+    activityLogContainer.appendChild(wrapper);
   } else {
     tbody = table.querySelector("tbody");
   }
@@ -399,7 +408,10 @@ function renderUsers(users) {
   }
 
   table.appendChild(tbody);
-  usersList.appendChild(table);
+  const wrapper = document.createElement("div");
+  wrapper.className = "table-scroll-wrapper";
+  wrapper.appendChild(table);
+  usersList.appendChild(wrapper);
 }
 
 function renderUserDetail(user) {

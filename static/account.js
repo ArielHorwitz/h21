@@ -556,7 +556,10 @@ async function loadHistory() {
 
     table.appendChild(tbody);
     historyList.innerHTML = "";
-    historyList.appendChild(table);
+    const wrapper = document.createElement("div");
+    wrapper.className = "table-scroll-wrapper";
+    wrapper.appendChild(table);
+    historyList.appendChild(wrapper);
   } catch (error) {
     console.error("Failed to load history:", error);
   }
