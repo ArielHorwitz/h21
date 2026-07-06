@@ -673,43 +673,23 @@ def _compute_score(questions_asked: int, hints_used: int) -> int:
 
 
 def _select_friends_for_result(
-    player_score: int, friends: list[dict[str, Any]],
+    friends: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
-    """Select up to 3 friends for a recent results game entry.
+    """Select up to 2 friends for a recent results mini-leaderboard.
 
-    If the player is NOT the top performer: show the top performer + 2 closest.
-    If the player IS the top performer: show the 3 closest below.
+    The frontend adds the player as a 3rd entry, so we return at most 2
+    friends — always the top scorers among the player's friends.
     """
     if not friends:
         return []
 
-    # Compute scores and sort friends by score (best first).
     scored_friends = []
     for friend in friends:
         friend_score = _compute_score(friend["questions_asked"], friend["hints_used"])
         scored_friends.append((friend_score, friend))
     scored_friends.sort(key=lambda entry: (entry[0], entry[1].get("username", "")))
 
-    best_friend_score = scored_friends[0][0]
-    player_is_top = player_score <= best_friend_score
-
-    if player_is_top:
-        # Show 3 closest to player's score (all are below or equal).
-        by_distance = sorted(
-            scored_friends,
-            key=lambda entry: (abs(entry[0] - player_score), entry[1].get("username", "")),
-        )
-        return [entry[1] for entry in by_distance[:3]]
-    else:
-        # Top performer + 2 closest to player's score (excluding top performer).
-        top_friend = scored_friends[0][1]
-        remaining = scored_friends[1:]
-        by_distance = sorted(
-            remaining,
-            key=lambda entry: (abs(entry[0] - player_score), entry[1].get("username", "")),
-        )
-        closest = [entry[1] for entry in by_distance[:2]]
-        return [top_friend] + closest
+    return [friend for _, friend in scored_friends[:2]]
 
 
 @app.get("/api/recent-results")
@@ -719,9 +699,7 @@ async def get_recent_results(request: Request) -> list[dict[str, Any]]:
 
     result = []
     for game in recent_results:
-        player_score = _compute_score(game["questions_asked"], game["hints_used"])
-
-        selected_friends = _select_friends_for_result(player_score, game["friends"])
+        selected_friends = _select_friends_for_result(game["friends"])
 
         # Build friend response objects with display_name fallback.
         friend_entries = []
