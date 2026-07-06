@@ -282,6 +282,8 @@ function renderPlayNext(puzzles) {
   heading.textContent = "Friends Are Playing";
   playNextSection.appendChild(heading);
 
+  const maxAvatars = 10;
+
   for (const puzzle of puzzles) {
     const link = document.createElement("a");
     link.className = "play-next-card";
@@ -293,11 +295,38 @@ function renderPlayNext(puzzles) {
     title.textContent = `${puzzle.topic_name} (${difficulty})`;
     link.appendChild(title);
 
-    const friendCount = document.createElement("span");
-    friendCount.className = "play-next-friend-count";
-    const noun = puzzle.friend_count === 1 ? "friend" : "friends";
-    friendCount.textContent = `${puzzle.friend_count} ${noun} played this`;
-    link.appendChild(friendCount);
+    const avatarRow = document.createElement("div");
+    avatarRow.className = "play-next-avatars";
+
+    const visible = puzzle.friends.slice(0, maxAvatars);
+    const remaining = puzzle.friends.length - visible.length;
+
+    for (const friend of visible) {
+      if (friend.player_code && friend.avatar_version > 0) {
+        const img = document.createElement("img");
+        img.className = "avatar-sm";
+        img.src = "/avatars/" + encodeURIComponent(friend.player_code) + ".webp?v=" + friend.avatar_version;
+        img.alt = friend.display_name;
+        img.title = friend.display_name;
+        avatarRow.appendChild(img);
+      } else {
+        const placeholder = document.createElement("span");
+        placeholder.className = "avatar-sm avatar-placeholder";
+        placeholder.textContent = friend.display_name.charAt(0).toUpperCase();
+        placeholder.title = friend.display_name;
+        avatarRow.appendChild(placeholder);
+      }
+    }
+
+    if (remaining > 0) {
+      const moreLabel = document.createElement("span");
+      moreLabel.className = "play-next-more-friends";
+      const noun = remaining === 1 ? "friend" : "friends";
+      moreLabel.textContent = `+${remaining} more ${noun}`;
+      avatarRow.appendChild(moreLabel);
+    }
+
+    link.appendChild(avatarRow);
 
     playNextSection.appendChild(link);
   }

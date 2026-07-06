@@ -1202,7 +1202,7 @@ class GameDatabase:
         today_str = today.isoformat()
         rows = self._connection.execute(
             "SELECT dp.topic_slug, t.name AS topic_name, dp.difficulty, "
-            "COUNT(DISTINCT fg.user_id) AS friend_count "
+            "fa.display_name, fa.player_code, fa.avatar_version "
             "FROM daily_puzzles dp "
             "LEFT JOIN topics t ON dp.topic_slug = t.slug "
             "JOIN friends f ON f.user_id = ? "
@@ -1220,20 +1220,30 @@ class GameDatabase:
             "    AND ug.topic_slug = dp.topic_slug "
             "    AND ug.difficulty = dp.difficulty"
             ") "
-            "GROUP BY dp.topic_slug, dp.difficulty "
-            "ORDER BY friend_count DESC",
+            "ORDER BY fa.display_name",
             (user_id, today_str, user_id),
         ).fetchall()
 
-        return [
-            {
-                "topic_slug": row["topic_slug"],
-                "topic_name": row["topic_name"] or row["topic_slug"],
-                "difficulty": row["difficulty"],
-                "friend_count": row["friend_count"],
-            }
-            for row in rows
-        ]
+        puzzles: dict[tuple[str, str], dict[str, Any]] = {}
+        for row in rows:
+            key = (row["topic_slug"], row["difficulty"])
+            if key not in puzzles:
+                puzzles[key] = {
+                    "topic_slug": row["topic_slug"],
+                    "topic_name": row["topic_name"] or row["topic_slug"],
+                    "difficulty": row["difficulty"],
+                    "friends": [],
+                }
+            puzzles[key]["friends"].append({
+                "display_name": row["display_name"],
+                "player_code": row["player_code"],
+                "avatar_version": row["avatar_version"],
+            })
+
+        result = sorted(
+            puzzles.values(), key=lambda p: len(p["friends"]), reverse=True
+        )
+        return result
 
     # -- Friend suggestions --
 
