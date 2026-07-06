@@ -218,7 +218,8 @@ async function deleteInviteRequest(requestId) {
 const activityLogContainer = document.getElementById("activity-log");
 const loadMoreActivityBtn = document.getElementById("load-more-activity");
 let activityOffset = 0;
-const ACTIVITY_PAGE_SIZE = 50;
+const ACTIVITY_INITIAL_SIZE = 10;
+const ACTIVITY_PAGE_SIZE = 20;
 
 function formatActivityDetail(action, detail) {
   if (!detail) return "";
@@ -301,12 +302,14 @@ function renderActivityLog(entries, append) {
     tbody.appendChild(tr);
   }
 
-  loadMoreActivityBtn.hidden = entries.length < ACTIVITY_PAGE_SIZE;
+  const expectedSize = append ? ACTIVITY_PAGE_SIZE : ACTIVITY_INITIAL_SIZE;
+  loadMoreActivityBtn.hidden = entries.length < expectedSize;
 }
 
 async function loadActivityLog(append) {
   try {
-    const response = await fetch(`/api/activity-log?limit=${ACTIVITY_PAGE_SIZE}&offset=${activityOffset}`);
+    const pageSize = append ? ACTIVITY_PAGE_SIZE : ACTIVITY_INITIAL_SIZE;
+    const response = await fetch(`/api/activity-log?limit=${pageSize}&offset=${activityOffset}`);
     if (response.ok) {
       const entries = await response.json();
       renderActivityLog(entries, append);
