@@ -10,6 +10,7 @@ const todayDate = document.getElementById("today-date");
 const gameSubtitle = document.getElementById("game-subtitle");
 const hintPanel = document.getElementById("hint-panel");
 const hintList = document.getElementById("hint-list");
+const concedeBtn = document.getElementById("concede-btn");
 
 // Parse topic and difficulty from URL query params.
 const urlParams = new URLSearchParams(window.location.search);
@@ -257,6 +258,7 @@ async function fetchAndRevealHint(hintIndex) {
 async function endGame(won) {
   gameFinished = true;
   submitBtn.disabled = true;
+  concedeBtn.disabled = true;
   statusText.textContent = "Finishing...";
   await endGameSession(won ? "win" : "loss");
   window.location.href = `/replay?code=${encodeURIComponent(shareCode)}`;
@@ -326,6 +328,12 @@ askForm.addEventListener("submit", async (event) => {
   }
 });
 
+concedeBtn.addEventListener("click", () => {
+  if (gameFinished || concedeBtn.disabled) return;
+  if (!confirm("Are you sure you want to give up? This counts as a loss.")) return;
+  endGame(false);
+});
+
 async function tryResumeGame() {
   try {
     const params = new URLSearchParams({ topic_slug: topicSlug, difficulty });
@@ -382,6 +390,7 @@ async function init() {
   updateCounter();
   statusText.textContent = "Loading...";
   submitBtn.disabled = true;
+  concedeBtn.disabled = true;
 
   const resumed = await tryResumeGame();
   if (!resumed) {
@@ -392,6 +401,7 @@ async function init() {
   if (gameId !== null) {
     statusText.textContent = "";
     submitBtn.disabled = false;
+    concedeBtn.disabled = false;
     questionInput.focus();
     updateHintPanel();
   }

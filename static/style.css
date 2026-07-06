@@ -637,6 +637,27 @@ h1 a.home-link:hover {
   cursor: not-allowed;
 }
 
+#concede-btn {
+  padding: 0.6rem 0.8rem;
+  border: 1px solid #555;
+  border-radius: 4px;
+  background: transparent;
+  color: #888;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+#concede-btn:hover:not(:disabled) {
+  border-color: #ff6b6b;
+  color: #ff6b6b;
+}
+
+#concede-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
 .share-btn {
   padding: 0.5rem 1.5rem;
   border: 1px solid #e2b714;
