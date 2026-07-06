@@ -564,10 +564,11 @@ class GameDatabase:
     def has_played_puzzle(
         self, user_id: int, puzzle_date: date, topic_slug: str, difficulty: str,
     ) -> bool:
-        """Check whether a user has started a game for the given puzzle."""
+        """Check whether a user has completed a game for the given puzzle."""
         row = self._connection.execute(
             "SELECT 1 FROM games "
             "WHERE user_id = ? AND date = ? AND topic_slug = ? AND difficulty = ? "
+            "AND result IS NOT NULL "
             "LIMIT 1",
             (user_id, puzzle_date.isoformat(), topic_slug, difficulty),
         ).fetchone()
