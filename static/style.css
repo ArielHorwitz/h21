@@ -682,7 +682,7 @@ h1 a.home-link:hover {
 .nav-bar {
   position: fixed;
   top: 0.75rem;
-  right: 0.75rem;
+  left: 0.75rem;
   display: flex;
   gap: 0.6rem;
   z-index: 10;
