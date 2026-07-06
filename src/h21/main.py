@@ -1379,10 +1379,11 @@ async def get_replay(share_code: str, request: Request) -> dict[str, Any]:
     if game is None:
         raise HTTPException(status_code=404, detail="Game not found")
     # Gate today's puzzles: only return metadata if the viewer hasn't played.
+    viewer_id = request.state.user_id
+    is_own_game = game.get("user_id") == viewer_id
     today = date_type.today()
     gated = False
     if game["date"] == today.isoformat():
-        viewer_id = request.state.user_id
         has_played = database.has_played_puzzle(
             viewer_id, today, game["topic_slug"], game["difficulty"],
         )
@@ -1390,6 +1391,7 @@ async def get_replay(share_code: str, request: Request) -> dict[str, Any]:
             gated = True
     # Strip internal fields the client doesn't need.
     game.pop("game_id", None)
+    game.pop("user_id", None)
     game.pop("started_at", None)
     game.pop("ended_at", None)
     if gated:
@@ -1403,6 +1405,7 @@ async def get_replay(share_code: str, request: Request) -> dict[str, Any]:
             "difficulty": game["difficulty"],
             "username": game.get("username"),
         }
+    game["is_own_game"] = is_own_game
     return game
 
 

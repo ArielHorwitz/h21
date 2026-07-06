@@ -30,6 +30,72 @@ function formatDate(dateStr) {
   });
 }
 
+const ANSWER_EMOJI = {
+  yes: "\u{1F7E2}",
+  no: "\u{1F534}",
+  partially: "\u{1F7E1}",
+  depends: "\u{1F535}",
+  win: "\u{1F3C6}",
+};
+
+function buildShareText(game) {
+  const topicName = game.topic_name || game.topic_slug;
+  const difficultyLabel = game.difficulty.charAt(0).toUpperCase() + game.difficulty.slice(1);
+  const dateStr = formatDate(game.date);
+  const won = game.result === "win";
+
+  // Build a map of after_question -> list of hint indices revealed at that point.
+  const hintsAfterQuestion = new Map();
+  if (game.hint_reveals) {
+    for (const reveal of game.hint_reveals) {
+      if (!hintsAfterQuestion.has(reveal.after_question)) {
+        hintsAfterQuestion.set(reveal.after_question, []);
+      }
+      hintsAfterQuestion.get(reveal.after_question).push(reveal.hint_index);
+    }
+  }
+
+  let emojis = "";
+  for (const question of game.questions) {
+    emojis += ANSWER_EMOJI[question.answer] || "";
+    const hintsHere = hintsAfterQuestion.get(question.question_number);
+    if (hintsHere) {
+      for (const _hintIndex of hintsHere) {
+        emojis += "\u{1F4A1}";
+      }
+    }
+  }
+
+  const hintsUsed = game.hint_reveals ? game.hint_reveals.length : 0;
+  const resultLine = won
+    ? `Won in ${game.questions_asked}/21 questions!`
+    : `Lost after ${game.questions_asked} questions.`;
+  const hintsLine = hintsUsed > 0 ? ` (${hintsUsed} hint${hintsUsed === 1 ? "" : "s"} used)` : "";
+  let text = `H21 \u2014 ${topicName} (${difficultyLabel})\n${dateStr}\n\n${resultLine}${hintsLine}\n${emojis}`;
+  if (game.share_code) {
+    text += `\nGame ID: ${game.share_code}`;
+  }
+  return text;
+}
+
+async function copyToClipboard(text) {
+  if (navigator.clipboard && window.isSecureContext) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch { /* fall through to execCommand fallback */ }
+  }
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.style.position = "fixed";
+  textarea.style.opacity = "0";
+  document.body.appendChild(textarea);
+  textarea.select();
+  const copied = document.execCommand("copy");
+  document.body.removeChild(textarea);
+  return copied;
+}
+
 function renderGame(game) {
   const topicName = game.topic_name || game.topic_slug;
   const difficultyLabel = game.difficulty.charAt(0).toUpperCase() + game.difficulty.slice(1);
@@ -105,7 +171,18 @@ function renderGame(game) {
       const explanationEl = document.createElement("div");
       explanationEl.className = "log-explanation";
       explanationEl.textContent = question.explanation;
+      explanationEl.hidden = true;
       entry.appendChild(explanationEl);
+
+      const toggle = document.createElement("button");
+      toggle.className = "explanation-toggle";
+      toggle.textContent = "why?";
+      toggle.addEventListener("click", () => {
+        const visible = !explanationEl.hidden;
+        explanationEl.hidden = visible;
+        toggle.textContent = visible ? "why?" : "hide";
+      });
+      answerRow.appendChild(toggle);
     }
 
     replayQuestionLog.appendChild(entry);
@@ -123,6 +200,26 @@ function renderGame(game) {
         replayQuestionLog.appendChild(hintEntry);
       }
     }
+  }
+
+  // Add expand/collapse all button if any explanations exist.
+  const explanations = replayQuestionLog.querySelectorAll(".log-explanation");
+  if (explanations.length > 0) {
+    const toggleAllBtn = document.createElement("button");
+    toggleAllBtn.className = "explanation-toggle-all";
+    toggleAllBtn.textContent = "Show all reasoning";
+    let allExpanded = false;
+    toggleAllBtn.addEventListener("click", () => {
+      allExpanded = !allExpanded;
+      for (const el of explanations) {
+        el.hidden = !allExpanded;
+      }
+      for (const btn of replayQuestionLog.querySelectorAll(".explanation-toggle")) {
+        btn.textContent = allExpanded ? "hide" : "why?";
+      }
+      toggleAllBtn.textContent = allExpanded ? "Hide all reasoning" : "Show all reasoning";
+    });
+    replayQuestionLog.appendChild(toggleAllBtn);
   }
 
   if (game.hints && game.hints.length > 0) {
@@ -143,15 +240,29 @@ function renderGame(game) {
   }
 
   if (game.result === "win" || game.result === "loss") {
-    const compareWrapper = document.createElement("div");
-    compareWrapper.style.textAlign = "center";
-    compareWrapper.style.marginTop = "0.75rem";
+    const actionsWrapper = document.createElement("div");
+    actionsWrapper.className = "replay-actions";
+
+    if (game.is_own_game) {
+      const shareText = buildShareText(game);
+      const shareBtn = document.createElement("button");
+      shareBtn.className = "share-btn";
+      shareBtn.textContent = "Share";
+      shareBtn.addEventListener("click", async () => {
+        const copied = await copyToClipboard(shareText);
+        shareBtn.textContent = copied ? "Copied!" : "Failed to copy";
+        setTimeout(() => { shareBtn.textContent = "Share"; }, 2000);
+      });
+      actionsWrapper.appendChild(shareBtn);
+    }
+
     const compareLink = document.createElement("a");
     compareLink.className = "share-btn";
     compareLink.href = `/leaderboard?topic=${encodeURIComponent(game.topic_slug)}&difficulty=${encodeURIComponent(game.difficulty)}&date=${encodeURIComponent(game.date)}`;
     compareLink.textContent = "View Leaderboard";
-    compareWrapper.appendChild(compareLink);
-    replayDetails.appendChild(compareWrapper);
+    actionsWrapper.appendChild(compareLink);
+
+    replayDetails.appendChild(actionsWrapper);
   }
 
   replayDetails.hidden = false;

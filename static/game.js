@@ -6,7 +6,6 @@ const submitBtn = document.getElementById("submit-btn");
 const askForm = document.getElementById("ask-form");
 const questionCounter = document.getElementById("question-counter");
 const statusText = document.getElementById("status-text");
-const gameOverMessage = document.getElementById("game-over-message");
 const todayDate = document.getElementById("today-date");
 const gameSubtitle = document.getElementById("game-subtitle");
 const hintPanel = document.getElementById("hint-panel");
@@ -29,7 +28,6 @@ let questionsAsked = 0;
 let gameFinished = false;
 let gameId = null;
 let shareCode = null;
-const answerHistory = [];
 let hintsUnlocked = 0;
 let hintsRevealed = 0;
 const revealedHintIndices = new Set();
@@ -83,55 +81,9 @@ async function endGameSession(result) {
     });
     if (response.status === 410) {
       window.location.href = "/";
-      return;
-    }
-    if (response.ok) {
-      const data = await response.json();
-      if (data.solution) {
-        showSolution(data.solution);
-      }
-      if (data.hints) {
-        revealAllHints(data.hints);
-      }
     }
   } catch (error) {
     console.error("Failed to end game session:", error);
-  }
-}
-
-function revealAllHints(hints) {
-  hintPanel.hidden = false;
-
-  for (let index = 0; index < hints.length; index++) {
-    if (revealedHintIndices.has(index)) continue;
-
-    let li;
-    if (index < hintList.children.length) {
-      li = hintList.children[index];
-    } else {
-      li = document.createElement("li");
-      li.className = "hint-item locked";
-      li.dataset.hintIndex = index;
-
-      const revealBtn = document.createElement("button");
-      revealBtn.className = "hint-reveal-btn";
-      li.appendChild(revealBtn);
-
-      const textSpan = document.createElement("span");
-      textSpan.className = "hint-text";
-      textSpan.hidden = true;
-      li.appendChild(textSpan);
-
-      hintList.appendChild(li);
-    }
-
-    const btn = li.querySelector(".hint-reveal-btn");
-    const textSpan = li.querySelector(".hint-text");
-    textSpan.textContent = hints[index];
-    textSpan.hidden = false;
-    if (btn) btn.hidden = true;
-    li.classList.remove("locked");
-    li.classList.add("revealed");
   }
 }
 
@@ -186,24 +138,6 @@ function addHintLogEntry(hintIndex, afterQuestion) {
   entry.appendChild(label);
   questionLog.appendChild(entry);
   questionLog.scrollTop = questionLog.scrollHeight;
-}
-
-function revealExplanationButtons() {
-  for (const entry of questionLog.querySelectorAll(".log-entry")) {
-    const explanationEl = entry.querySelector(".log-explanation");
-    if (!explanationEl) continue;
-
-    const toggle = document.createElement("button");
-    toggle.className = "explanation-toggle";
-    toggle.textContent = "why?";
-    toggle.addEventListener("click", () => {
-      const visible = !explanationEl.hidden;
-      explanationEl.hidden = visible;
-      toggle.textContent = visible ? "why?" : "hide";
-    });
-
-    entry.querySelector(".log-answer-row").appendChild(toggle);
-  }
 }
 
 function updateHintPanel() {
@@ -320,111 +254,12 @@ async function fetchAndRevealHint(hintIndex) {
   }
 }
 
-const ANSWER_EMOJI = {
-  yes: "\u{1F7E2}",
-  no: "\u{1F534}",
-  partially: "\u{1F7E1}",
-  depends: "\u{1F535}",
-  win: "\u{1F3C6}",
-};
-
-function buildShareText(won) {
-  const dateStr = todayDate.textContent;
-  // Build a map of after_question -> list of hint indices revealed at that point.
-  const hintsAfterQuestion = new Map();
-  for (const [hintIndex, afterQuestion] of hintRevealAfterQuestion) {
-    if (!hintsAfterQuestion.has(afterQuestion)) {
-      hintsAfterQuestion.set(afterQuestion, []);
-    }
-    hintsAfterQuestion.get(afterQuestion).push(hintIndex);
-  }
-  let emojis = "";
-  for (let question_index = 0; question_index < answerHistory.length; question_index++) {
-    emojis += ANSWER_EMOJI[answerHistory[question_index]] || "";
-    const questionNumber = question_index + 1;
-    const hintsHere = hintsAfterQuestion.get(questionNumber);
-    if (hintsHere) {
-      for (const _hintIndex of hintsHere) {
-        emojis += "\u{1F4A1}";
-      }
-    }
-  }
-  const hintsUsed = revealedHintIndices.size;
-  const resultLine = won
-    ? `Won in ${questionsAsked}/${MAX_QUESTIONS} questions!`
-    : `Lost after ${questionsAsked} questions.`;
-  const hintsLine = hintsUsed > 0 ? ` (${hintsUsed} hint${hintsUsed === 1 ? "" : "s"} used)` : "";
-  return `H21 \u2014 ${topicLabel} (${difficultyLabel})\n${dateStr}\n\n${resultLine}${hintsLine}\n${emojis}`;
-}
-
-async function copyToClipboard(text) {
-  if (navigator.clipboard && window.isSecureContext) {
-    try {
-      await navigator.clipboard.writeText(text);
-      return true;
-    } catch { /* fall through to execCommand fallback */ }
-  }
-  const textarea = document.createElement("textarea");
-  textarea.value = text;
-  textarea.style.position = "fixed";
-  textarea.style.opacity = "0";
-  document.body.appendChild(textarea);
-  textarea.select();
-  const copied = document.execCommand("copy");
-  document.body.removeChild(textarea);
-  return copied;
-}
-
-function createShareButton(label, text) {
-  const btn = document.createElement("button");
-  btn.className = "share-btn";
-  btn.textContent = label;
-  btn.addEventListener("click", async () => {
-    const copied = await copyToClipboard(text);
-    btn.textContent = copied ? "Copied!" : "Failed to copy";
-    setTimeout(() => { btn.textContent = label; }, 2000);
-  });
-  return btn;
-}
-
-function showShareButtons(won) {
-  const container = document.createElement("div");
-  container.id = "share-buttons";
-
-  let text = buildShareText(won);
-  if (shareCode) {
-    text += `\nGame ID: ${shareCode}`;
-  }
-  container.appendChild(createShareButton("Share", text));
-
-  gameOverMessage.insertAdjacentElement("afterend", container);
-}
-
-function showSolution(solution) {
-  const solutionEl = document.createElement("div");
-  solutionEl.id = "solution-reveal";
-  solutionEl.textContent = `The answer was: ${solution}`;
-  const shareButtons = document.getElementById("share-buttons");
-  const anchor = shareButtons || gameOverMessage;
-  anchor.insertAdjacentElement("afterend", solutionEl);
-}
-
-function endGame(won) {
+async function endGame(won) {
   gameFinished = true;
   submitBtn.disabled = true;
-
-  if (won) {
-    gameOverMessage.textContent = `You got it in ${questionsAsked} question${questionsAsked === 1 ? "" : "s"}!`;
-    gameOverMessage.className = "win";
-  } else {
-    gameOverMessage.textContent = "Game over — better luck tomorrow!";
-    gameOverMessage.className = "loss";
-  }
-  gameOverMessage.hidden = false;
-
-  revealExplanationButtons();
-  showShareButtons(won);
-  endGameSession(won ? "win" : "loss");
+  statusText.textContent = "Finishing...";
+  await endGameSession(won ? "win" : "loss");
+  window.location.href = `/replay?code=${encodeURIComponent(shareCode)}`;
 }
 
 async function submitQuestion(question) {
@@ -467,7 +302,6 @@ askForm.addEventListener("submit", async (event) => {
   try {
     const { answer, explanation } = await submitQuestion(question);
     questionsAsked++;
-    answerHistory.push(answer);
     updateCounter();
     addLogEntry(question, answer, explanation);
 
@@ -501,7 +335,14 @@ async function tryResumeGame() {
     const data = await response.json();
     gameId = data.game_id;
     shareCode = data.share_code;
-    // Build a map of after_question -> list of hint reveals for interleaving.
+
+    // Finished games redirect to the unified replay page.
+    if (data.result) {
+      window.location.href = `/replay?code=${encodeURIComponent(shareCode)}`;
+      return true;
+    }
+
+    // Resume an in-progress game: replay questions and hint state.
     const hintRevealsAtQuestion = new Map();
     if (data.hint_reveals) {
       for (const reveal of data.hint_reveals) {
@@ -514,26 +355,14 @@ async function tryResumeGame() {
         hintRevealsAtQuestion.get(reveal.after_question).push(reveal.hint_index);
       }
     }
-    // Store revealed hint texts so updateHintPanel can show them.
     if (data.revealed_hints) {
       for (const [index, text] of Object.entries(data.revealed_hints)) {
         revealedHintTexts.set(Number(index), text);
       }
     }
-    // For completed games, hint texts come via data.hints — populate for revealed indices.
-    if (data.hints) {
-      for (const index of revealedHintIndices) {
-        if (index < data.hints.length) {
-          revealedHintTexts.set(index, data.hints[index]);
-        }
-      }
-    }
-    // Replay questions one by one so addLogEntry numbering is correct.
     for (const question of data.questions) {
       questionsAsked++;
-      answerHistory.push(question.answer);
       addLogEntry(question.question, question.answer, question.explanation);
-      // Insert any hint reveals that happened after this question.
       const hintsHere = hintRevealsAtQuestion.get(questionsAsked);
       if (hintsHere) {
         for (const hintIndex of hintsHere) {
@@ -543,28 +372,6 @@ async function tryResumeGame() {
     }
     updateCounter();
     updateHintPanel();
-
-    if (data.result) {
-      const won = data.result === "win";
-      gameFinished = true;
-      submitBtn.disabled = true;
-      if (won) {
-        gameOverMessage.textContent = `You got it in ${questionsAsked} question${questionsAsked === 1 ? "" : "s"}!`;
-        gameOverMessage.className = "win";
-      } else {
-        gameOverMessage.textContent = "Game over — better luck tomorrow!";
-        gameOverMessage.className = "loss";
-      }
-      gameOverMessage.hidden = false;
-      revealExplanationButtons();
-      showShareButtons(won);
-      if (data.solution) {
-        showSolution(data.solution);
-      }
-      if (data.hints) {
-        revealAllHints(data.hints);
-      }
-    }
     return true;
   } catch {
     return false;

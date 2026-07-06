@@ -673,9 +673,9 @@ class GameDatabase:
     def get_game_by_share_code(self, share_code: str) -> Optional[dict[str, Any]]:
         """Return a game by its share code, for replay."""
         row = self._connection.execute(
-            "SELECT g.game_id, g.date, g.topic_slug, g.difficulty, g.started_at, "
-            "g.ended_at, g.result, g.questions_asked, g.share_code, "
-            "a.username "
+            "SELECT g.game_id, g.user_id, g.date, g.topic_slug, g.difficulty, "
+            "g.started_at, g.ended_at, g.result, g.questions_asked, "
+            "g.share_code, a.username "
             "FROM games g "
             "JOIN accounts a ON a.user_id = g.user_id "
             "WHERE g.share_code = ? "
