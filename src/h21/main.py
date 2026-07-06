@@ -356,6 +356,8 @@ async def register(request_body: RegisterRequest) -> JSONResponse:
     except sqlite3.IntegrityError:
         raise HTTPException(status_code=409, detail="Username already taken")
 
+    database.log_activity(user_id, "register", {"invite_code": invite_code})
+
     # Auto-generate a profile picture in the background (best-effort).
     account = database.get_account_by_id(user_id)
     if account and account["player_code"]:
@@ -443,7 +445,20 @@ async def update_me(request_body: UpdateProfileRequest, request: Request) -> dic
     if request_body.anonymous is not None:
         anonymous = request_body.anonymous
 
+    old_display_name = account["display_name"]
+    old_anonymous = bool(account["anonymous"])
+
     database.update_profile(user_id, display_name, anonymous)
+
+    if display_name != old_display_name:
+        database.log_activity(user_id, "update_display_name", {
+            "old": old_display_name, "new": display_name,
+        })
+    if anonymous != old_anonymous:
+        database.log_activity(user_id, "update_anonymous", {
+            "old": old_anonymous, "new": anonymous,
+        })
+
     return {"status": "ok"}
 
 
@@ -509,6 +524,10 @@ async def follow_player(player_code: str, request: Request) -> dict[str, str]:
         raise HTTPException(status_code=400, detail="Cannot follow yourself")
     if not database.add_friend(user_id, target["user_id"]):
         raise HTTPException(status_code=409, detail="Already following this player")
+    database.log_activity(user_id, "follow", {
+        "target_username": target["username"],
+        "target_player_code": target["player_code"],
+    })
     return {"status": "ok"}
 
 
@@ -520,6 +539,10 @@ async def unfollow_player(player_code: str, request: Request) -> dict[str, str]:
     user_id = request.state.user_id
     if not database.remove_friend(user_id, target["user_id"]):
         raise HTTPException(status_code=404, detail="Not following this player")
+    database.log_activity(user_id, "unfollow", {
+        "target_username": target["username"],
+        "target_player_code": target["player_code"],
+    })
     return {"status": "ok"}
 
 
@@ -600,6 +623,7 @@ async def confirm_avatar(request: Request) -> dict[str, Any]:
         raise HTTPException(status_code=404, detail="No pending avatar to confirm")
 
     new_version = database.bump_avatar_version(user_id)
+    database.log_activity(user_id, "change_avatar", {"avatar_version": new_version})
     return {"status": "ok", "avatar_version": new_version}
 
 
@@ -1047,6 +1071,17 @@ async def get_logs(mode: str = "tail", lines: int = 100) -> dict[str, Any]:
     return {"lines": result_lines, "mode": mode}
 
 
+# -- Activity log --
+
+@app.get("/api/activity-log")
+async def get_activity_log(limit: int = 50, offset: int = 0) -> list[dict[str, Any]]:
+    if limit < 1 or limit > 200:
+        limit = 50
+    if offset < 0:
+        offset = 0
+    return database.get_activity_log(limit=limit, offset=offset)
+
+
 # -- Invite requests --
 
 INVITE_REQUEST_COOLDOWN_SECONDS = 300  # 5 minutes
@@ -1129,6 +1164,7 @@ async def create_topic(request_body: NewTopicRequest, request: Request) -> dict[
 
     database.add_topic(slug, name, user_id=user_id)
     database.increment_daily_topic_suggestions(user_id, date_type.today())
+    database.log_activity(user_id, "suggest_topic", {"topic_name": name, "topic_slug": slug})
     return {"slug": slug, "name": name}
 
 
@@ -1169,6 +1205,11 @@ async def new_game(request_body: NewGameRequest, request: Request) -> dict[str, 
 
     await get_today_solution(request_body.topic_slug, request_body.difficulty)
     game = database.create_game(today, request_body.topic_slug, request_body.difficulty, user_id=user_id)
+    database.log_activity(user_id, "start_game", {
+        "game_id": game["game_id"],
+        "topic_slug": request_body.topic_slug,
+        "difficulty": request_body.difficulty,
+    })
     return {"game_id": game["game_id"], "share_code": game["share_code"]}
 
 
@@ -1186,6 +1227,10 @@ async def end_game(request_body: EndGameRequest, request: Request) -> dict[str, 
         raise HTTPException(status_code=410, detail="This puzzle has expired")
 
     database.end_game(request_body.game_id, request_body.result)
+    database.log_activity(request.state.user_id, "end_game", {
+        "game_id": request_body.game_id,
+        "result": request_body.result,
+    })
 
     today = date_type.today()
     solution = database.get_puzzle_solution(
@@ -1306,6 +1351,10 @@ async def ask(request_body: AskRequest, request: Request) -> dict[str, str]:
                 result.explanation,
                 user_id=user_id,
             )
+            database.log_activity(user_id, "ask_question", {
+                "game_id": request_body.game_id,
+                "question_number": request_body.question_number,
+            })
 
     return {"answer": result.answer, "explanation": result.explanation}
 

@@ -120,6 +120,15 @@ class GameDatabase:
                 contact_info TEXT NOT NULL,
                 created_at   TEXT NOT NULL
             );
+
+            CREATE TABLE IF NOT EXISTS activity_log (
+                log_id     INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id    INTEGER NOT NULL,
+                action     TEXT NOT NULL,
+                detail     TEXT,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY (user_id) REFERENCES accounts(user_id)
+            );
         """)
         self._migrate_add_explanation_column()
         self._migrate_daily_puzzles_composite_key()
@@ -140,6 +149,7 @@ class GameDatabase:
         self._migrate_add_friends_table()
         self._migrate_add_avatar_columns()
         self._migrate_add_avatar_limit_to_invites()
+        self._migrate_add_activity_log_table()
         self._seed_default_topics()
 
     def _seed_default_topics(self) -> None:
@@ -1332,6 +1342,46 @@ class GameDatabase:
                 })
 
         return pool
+
+    def _migrate_add_activity_log_table(self) -> None:
+        self._connection.execute("""
+            CREATE TABLE IF NOT EXISTS activity_log (
+                log_id     INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id    INTEGER NOT NULL,
+                action     TEXT NOT NULL,
+                detail     TEXT,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY (user_id) REFERENCES accounts(user_id)
+            )
+        """)
+        self._connection.commit()
+
+    # -- Activity log --
+
+    def log_activity(
+        self, user_id: int, action: str, detail: Optional[dict[str, Any]] = None,
+    ) -> None:
+        now = _utcnow_iso()
+        self._connection.execute(
+            "INSERT INTO activity_log (user_id, action, detail, created_at) "
+            "VALUES (?, ?, ?, ?)",
+            (user_id, action, json.dumps(detail) if detail else None, now),
+        )
+        self._connection.commit()
+
+    def get_activity_log(
+        self, limit: int = 50, offset: int = 0,
+    ) -> list[dict[str, Any]]:
+        rows = self._connection.execute(
+            "SELECT al.log_id, al.user_id, a.username, al.action, "
+            "al.detail, al.created_at "
+            "FROM activity_log al "
+            "JOIN accounts a ON a.user_id = al.user_id "
+            "ORDER BY al.created_at DESC, al.log_id DESC "
+            "LIMIT ? OFFSET ?",
+            (limit, offset),
+        ).fetchall()
+        return [dict(row) for row in rows]
 
     # -- Invites --
 

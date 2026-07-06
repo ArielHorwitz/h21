@@ -213,6 +213,114 @@ async function deleteInviteRequest(requestId) {
   }
 }
 
+// -- Activity Log --
+
+const activityLogContainer = document.getElementById("activity-log");
+const loadMoreActivityBtn = document.getElementById("load-more-activity");
+let activityOffset = 0;
+const ACTIVITY_PAGE_SIZE = 50;
+
+function formatActivityDetail(action, detail) {
+  if (!detail) return "";
+  try {
+    const data = typeof detail === "string" ? JSON.parse(detail) : detail;
+    switch (action) {
+      case "register":
+        return `invite: ${data.invite_code}`;
+      case "follow":
+        return `followed ${data.target_username}`;
+      case "unfollow":
+        return `unfollowed ${data.target_username}`;
+      case "suggest_topic":
+        return data.topic_name;
+      case "start_game":
+        return `${data.topic_slug} (${data.difficulty})`;
+      case "end_game":
+        return `game ${data.game_id}: ${data.result}`;
+      case "ask_question":
+        return `game ${data.game_id}, Q#${data.question_number}`;
+      case "change_avatar":
+        return `v${data.avatar_version}`;
+      case "update_display_name":
+        return `${data.old || "(none)"} → ${data.new || "(none)"}`;
+      case "update_anonymous":
+        return data.new ? "enabled" : "disabled";
+      default:
+        return JSON.stringify(data);
+    }
+  } catch {
+    return String(detail);
+  }
+}
+
+function renderActivityLog(entries, append) {
+  if (!append) {
+    activityLogContainer.innerHTML = "";
+  }
+
+  if (entries.length === 0 && !append) {
+    activityLogContainer.textContent = "No activity yet.";
+    loadMoreActivityBtn.hidden = true;
+    return;
+  }
+
+  let table = activityLogContainer.querySelector("table");
+  let tbody;
+  if (!table) {
+    table = document.createElement("table");
+    table.className = "invites-table";
+    const thead = document.createElement("thead");
+    thead.innerHTML = `<tr><th>Time</th><th>User</th><th>Action</th><th>Detail</th></tr>`;
+    table.appendChild(thead);
+    tbody = document.createElement("tbody");
+    table.appendChild(tbody);
+    activityLogContainer.appendChild(table);
+  } else {
+    tbody = table.querySelector("tbody");
+  }
+
+  for (const entry of entries) {
+    const tr = document.createElement("tr");
+
+    const timeCell = document.createElement("td");
+    timeCell.textContent = new Date(entry.created_at).toLocaleString();
+    tr.appendChild(timeCell);
+
+    const userCell = document.createElement("td");
+    userCell.textContent = entry.username;
+    tr.appendChild(userCell);
+
+    const actionCell = document.createElement("td");
+    actionCell.textContent = entry.action;
+    tr.appendChild(actionCell);
+
+    const detailCell = document.createElement("td");
+    detailCell.textContent = formatActivityDetail(entry.action, entry.detail);
+    tr.appendChild(detailCell);
+
+    tbody.appendChild(tr);
+  }
+
+  loadMoreActivityBtn.hidden = entries.length < ACTIVITY_PAGE_SIZE;
+}
+
+async function loadActivityLog(append) {
+  try {
+    const response = await fetch(`/api/activity-log?limit=${ACTIVITY_PAGE_SIZE}&offset=${activityOffset}`);
+    if (response.ok) {
+      const entries = await response.json();
+      renderActivityLog(entries, append);
+      activityOffset += entries.length;
+    }
+  } catch (error) {
+    console.error("Failed to load activity log:", error);
+  }
+}
+
+loadMoreActivityBtn.addEventListener("click", () => {
+  loadActivityLog(true);
+});
+
 // -- Users --
 
 let expandedUserId = null;
@@ -572,4 +680,5 @@ loadLogsBtn.addEventListener("click", async () => {
 
 loadInvites();
 loadInviteRequests();
+loadActivityLog(false);
 loadUsers();
