@@ -1218,7 +1218,8 @@ class GameDatabase:
             "  WHERE ug.user_id = ? "
             "    AND ug.date = dp.date "
             "    AND ug.topic_slug = dp.topic_slug "
-            "    AND ug.difficulty = dp.difficulty"
+            "    AND ug.difficulty = dp.difficulty "
+            "    AND ug.result IS NOT NULL"
             ") "
             "ORDER BY fa.display_name",
             (user_id, today_str, user_id),
