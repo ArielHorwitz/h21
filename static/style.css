@@ -599,6 +599,7 @@ h1 a.home-link:hover {
 
 #ask-form {
   display: flex;
+  align-items: flex-start;
   gap: 0.5rem;
 }
 
@@ -610,7 +611,11 @@ h1 a.home-link:hover {
   background: #16213e;
   color: #e0e0e0;
   font-size: 1rem;
+  font-family: inherit;
   outline: none;
+  resize: none;
+  overflow: hidden;
+  line-height: 1.4;
 }
 
 #question-input:focus {

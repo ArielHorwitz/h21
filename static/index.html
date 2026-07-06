@@ -33,14 +33,14 @@
     </div>
 
     <form id="ask-form">
-      <input
-        type="text"
+      <textarea
         id="question-input"
         placeholder="Ask a yes/no question or make a guess..."
         autocomplete="off"
         maxlength="500"
         required
-      >
+        rows="1"
+      ></textarea>
       <button type="submit" id="submit-btn">Ask</button>
       <button type="button" id="concede-btn">Give up</button>
     </form>

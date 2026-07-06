@@ -289,6 +289,20 @@ async function submitQuestion(question) {
   return await response.json();
 }
 
+function autoResizeInput() {
+  questionInput.style.height = "auto";
+  questionInput.style.height = questionInput.scrollHeight + "px";
+}
+
+questionInput.addEventListener("input", autoResizeInput);
+
+questionInput.addEventListener("keydown", (event) => {
+  if (event.key === "Enter" && !event.shiftKey) {
+    event.preventDefault();
+    askForm.requestSubmit();
+  }
+});
+
 askForm.addEventListener("submit", async (event) => {
   event.preventDefault();
 
@@ -298,6 +312,7 @@ askForm.addEventListener("submit", async (event) => {
   if (!question) return;
 
   questionInput.value = "";
+  questionInput.style.height = "auto";
   submitBtn.disabled = true;
   statusText.classList.remove("error");
 
