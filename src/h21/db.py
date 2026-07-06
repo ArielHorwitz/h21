@@ -1244,7 +1244,7 @@ class GameDatabase:
         rows = self._connection.execute(
             "SELECT a.user_id, a.username, a.display_name, "
             "a.player_code, a.avatar_version, "
-            "g.questions_asked, "
+            "g.questions_asked, g.share_code, "
             "(SELECT COUNT(*) FROM hint_reveals h "
             " WHERE h.game_id = g.game_id) AS hints_used, "
             "CASE WHEN f.friend_id IS NOT NULL THEN 1 ELSE 0 END AS is_friend "

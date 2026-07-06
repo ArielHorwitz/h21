@@ -852,16 +852,20 @@ async def get_leaderboard(
         if score != previous_score:
             current_rank = position
             previous_score = score
-        players.append({
+        is_self = winner["user_id"] == user_id
+        entry = {
             "rank": current_rank,
             "display_name": winner["display_name"] or winner["username"],
             "player_code": winner.get("player_code"),
             "avatar_version": winner.get("avatar_version", 0),
             "questions_asked": winner["questions_asked"],
             "hints_used": winner["hints_used"],
-            "is_self": winner["user_id"] == user_id,
+            "is_self": is_self,
             "is_friend": bool(winner["is_friend"]),
-        })
+        }
+        if is_self:
+            entry["share_code"] = winner.get("share_code")
+        players.append(entry)
 
     if len(players) > max_players:
         players = _truncate_leaderboard(players, max_players)

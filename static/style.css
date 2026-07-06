@@ -1104,16 +1104,13 @@ h1 a.home-link:hover {
 .result-loss { color: #f44336; }
 .result-in-progress { color: #e2b714; }
 
-.history-replay-link {
-  color: #e2b714;
+.history-result-link {
+  color: inherit;
   text-decoration: none;
-  font-size: 0.85rem;
-  margin-right: 0.75rem;
 }
 
-.history-replay-link:hover {
+.history-result-link:hover {
   text-decoration: underline;
-  color: #fff;
 }
 
 /* -- Control panel -- */
@@ -1386,6 +1383,15 @@ h1 a.home-link:hover {
 .leaderboard-self td {
   color: #e2b714;
   font-weight: bold;
+}
+
+.leaderboard-self-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.leaderboard-self-link:hover {
+  text-decoration: underline;
 }
 
 #leaderboard-empty {

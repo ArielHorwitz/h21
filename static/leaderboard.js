@@ -67,8 +67,16 @@ function renderTable(players) {
       nameCell.appendChild(avatar);
       nameCell.appendChild(document.createTextNode(" "));
     }
-    const nameText = document.createTextNode(player.display_name + (player.is_self ? " (you)" : ""));
-    nameCell.appendChild(nameText);
+    if (player.is_self && player.share_code) {
+      const nameLink = document.createElement("a");
+      nameLink.href = `/replay?code=${encodeURIComponent(player.share_code)}`;
+      nameLink.textContent = player.display_name + " (you)";
+      nameLink.className = "leaderboard-self-link";
+      nameCell.appendChild(nameLink);
+    } else {
+      const nameText = document.createTextNode(player.display_name + (player.is_self ? " (you)" : ""));
+      nameCell.appendChild(nameText);
+    }
     row.appendChild(nameCell);
 
     const questionsCell = document.createElement("td");

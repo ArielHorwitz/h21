@@ -502,7 +502,7 @@ async function loadHistory() {
     table.className = "history-table";
 
     const thead = document.createElement("thead");
-    thead.innerHTML = "<tr><th>Date</th><th>Topic</th><th>Difficulty</th><th>Result</th><th></th></tr>";
+    thead.innerHTML = "<tr><th>Date</th><th>Topic</th><th>Difficulty</th><th>Result</th></tr>";
     table.appendChild(thead);
 
     const tbody = document.createElement("tbody");
@@ -522,34 +522,27 @@ async function loadHistory() {
       row.appendChild(difficultyCell);
 
       const resultCell = document.createElement("td");
+      let resultText;
       if (game.result === "win") {
-        resultCell.textContent = `Won in ${game.questions_asked}`;
+        resultText = `Won in ${game.questions_asked}`;
         resultCell.className = "result-win";
       } else if (game.result === "loss") {
-        resultCell.textContent = "Loss";
+        resultText = "Loss";
         resultCell.className = "result-loss";
       } else {
-        resultCell.textContent = `In progress (${game.questions_asked}/21)`;
+        resultText = `In progress (${game.questions_asked}/21)`;
         resultCell.className = "result-in-progress";
       }
+      if (game.share_code && game.result) {
+        const resultLink = document.createElement("a");
+        resultLink.href = `/replay?code=${encodeURIComponent(game.share_code)}`;
+        resultLink.textContent = resultText;
+        resultLink.className = "history-result-link";
+        resultCell.appendChild(resultLink);
+      } else {
+        resultCell.textContent = resultText;
+      }
       row.appendChild(resultCell);
-
-      const linksCell = document.createElement("td");
-      if (game.share_code) {
-        const replayLink = document.createElement("a");
-        replayLink.href = `/replay?code=${encodeURIComponent(game.share_code)}`;
-        replayLink.textContent = "Replay";
-        replayLink.className = "history-replay-link";
-        linksCell.appendChild(replayLink);
-      }
-      if (game.result === "win") {
-        const leaderboardLink = document.createElement("a");
-        leaderboardLink.href = `/leaderboard?topic=${encodeURIComponent(game.topic_slug)}&difficulty=${encodeURIComponent(game.difficulty)}&date=${encodeURIComponent(game.date)}`;
-        leaderboardLink.textContent = "Leaderboard";
-        leaderboardLink.className = "history-replay-link";
-        linksCell.appendChild(leaderboardLink);
-      }
-      row.appendChild(linksCell);
 
       tbody.appendChild(row);
     }
