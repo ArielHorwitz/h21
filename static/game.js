@@ -294,6 +294,13 @@ function autoResizeInput() {
   questionInput.style.height = questionInput.scrollHeight + "px";
 }
 
+// Measure the placeholder text to set an accurate min-height on mobile
+// where the placeholder wraps to multiple lines.
+questionInput.value = questionInput.placeholder;
+autoResizeInput();
+questionInput.style.minHeight = questionInput.style.height;
+questionInput.value = "";
+
 questionInput.addEventListener("input", autoResizeInput);
 
 questionInput.addEventListener("keydown", (event) => {
