@@ -373,11 +373,13 @@ class GameDatabase:
         return [dict(row) for row in rows]
 
     def get_topics_ranked(self, user_id: int, today: date) -> list[dict[str, Any]]:
-        """Return all topics sorted by popularity with friend activity for today.
+        """Return all topics sorted to surface unplayed puzzles first.
 
         Each topic includes a ``friends`` dict mapping difficulty to a list of
-        friend avatar entries for today's puzzles.  Topics are sorted by total
-        play count plus a boost for friend activity.
+        friend avatar entries for today's puzzles.  Topics are grouped into
+        tiers -- played by a friend but not the user, then unplayed by both,
+        then already played by the user -- with popularity (play count plus a
+        friend-activity boost) as the tiebreak within each tier.
         """
         today_str = today.isoformat()
 
@@ -434,13 +436,29 @@ class GameDatabase:
                     "avatar_version": row["avatar_version"],
                 })
 
+        # Topics the user has already played (any difficulty) today.
+        played_rows = self._connection.execute(
+            "SELECT DISTINCT topic_slug FROM games "
+            "WHERE user_id = ? AND date = ? AND result IS NOT NULL",
+            (user_id, today_str),
+        ).fetchall()
+        played_slugs = {row["topic_slug"] for row in played_rows}
+
         friend_boost_weight = 50
 
-        def sort_key(topic: dict[str, Any]) -> tuple[int, str]:
+        def sort_key(topic: dict[str, Any]) -> tuple[int, int, str]:
             friend_count = sum(len(v) for v in topic["friends"].values())
             score = topic["play_count"] + friend_count * friend_boost_weight
-            # Negate score for descending, then name for alphabetical tiebreak.
-            return (-score, topic["name"])
+            # Tier surfaces unplayed puzzles first: friend-played (0) before
+            # untouched (1) before played by the user (2).  Popularity score
+            # (negated for descending) then name break ties within a tier.
+            if topic["slug"] in played_slugs:
+                tier = 2
+            elif friend_count > 0:
+                tier = 0
+            else:
+                tier = 1
+            return (tier, -score, topic["name"])
 
         return sorted(topics.values(), key=sort_key)
 
