@@ -86,6 +86,7 @@ openai_image_client: AsyncOpenAI
 database: GameDatabase
 signing_secret: str
 invite_request_hint: str
+secure_cookies: bool
 default_daily_question_limit: int
 default_daily_topic_limit: int
 default_monthly_avatar_limit: int
@@ -138,7 +139,7 @@ async def _generate_registration_avatar(
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     global llm_client, openai_image_client, database, signing_secret
-    global invite_request_hint
+    global invite_request_hint, secure_cookies
     global default_daily_question_limit, default_daily_topic_limit
     global default_monthly_avatar_limit, avatar_image_model, data_dir, log_path
 
@@ -172,6 +173,7 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     data_dir = _data_dir()
     signing_secret = _ensure_signing_secret(data_dir)
     invite_request_hint = config.invite_request_hint
+    secure_cookies = config.secure_cookies
     default_daily_question_limit = config.default_daily_question_limit
     default_daily_topic_limit = config.default_daily_topic_limit
     default_monthly_avatar_limit = config.default_monthly_avatar_limit
@@ -366,7 +368,9 @@ async def register(request_body: RegisterRequest) -> JSONResponse:
         ))
 
     response = JSONResponse({"user_id": user_id, "username": username})
-    set_session_cookie(response, user_id, signing_secret)
+    set_session_cookie(
+        response, user_id, signing_secret, secure=secure_cookies,
+    )
     return response
 
 
@@ -378,7 +382,9 @@ async def login(request_body: LoginRequest) -> JSONResponse:
         raise HTTPException(status_code=401, detail="Invalid username or password")
 
     response = JSONResponse({"user_id": user_id, "username": username})
-    set_session_cookie(response, user_id, signing_secret)
+    set_session_cookie(
+        response, user_id, signing_secret, secure=secure_cookies,
+    )
     return response
 
 

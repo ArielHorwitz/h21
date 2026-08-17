@@ -71,13 +71,16 @@ def get_session_user_id(request: Request, secret: str) -> Optional[int]:
     return validate_session_token(token, secret)
 
 
-def set_session_cookie(response: Response, user_id: int, secret: str) -> None:
+def set_session_cookie(
+    response: Response, user_id: int, secret: str, *, secure: bool = False,
+) -> None:
     token = create_session_token(user_id, secret)
     response.set_cookie(
         SESSION_COOKIE_NAME,
         token,
         max_age=SESSION_MAX_AGE,
         httponly=True,
+        secure=secure,
         samesite="lax",
         path="/",
     )
