@@ -1424,14 +1424,23 @@ def cli() -> None:
 
     import uvicorn
 
+    def port(value: str) -> int:
+        parsed = int(value)
+        if not 1 <= parsed <= 65535:
+            raise argparse.ArgumentTypeError("port must be between 1 and 65535")
+        return parsed
+
     parser = argparse.ArgumentParser(description="Run the h21 server")
-    parser.add_argument("--public", action="store_true",
-                        help="Listen on 0.0.0.0:80 (overridden by --host/--port)")
-    parser.add_argument("--host", default=None)
-    parser.add_argument("--port", type=int, default=None)
+    parser.add_argument(
+        "--public",
+        action="store_true",
+        help="Listen on all interfaces (overridden by --host)",
+    )
+    parser.add_argument("--host", help="Interface or address to bind")
+    parser.add_argument("--port", type=port, help="TCP port to bind")
     args = parser.parse_args()
 
     host = args.host or ("0.0.0.0" if args.public else "127.0.0.1")
-    port = args.port or (80 if args.public else 8000)
+    bind_port = args.port if args.port is not None else 8000
 
-    uvicorn.run(app, host=host, port=port, log_config=None)
+    uvicorn.run(app, host=host, port=bind_port, log_config=None)
