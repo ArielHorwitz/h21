@@ -150,7 +150,22 @@ class GameDatabase:
         self._migrate_add_avatar_columns()
         self._migrate_add_avatar_limit_to_invites()
         self._migrate_add_activity_log_table()
+        self._migrate_add_puzzle_pool_table()
         self._seed_default_topics()
+
+
+    def _migrate_add_puzzle_pool_table(self) -> None:
+        self._connection.execute("""
+            CREATE TABLE IF NOT EXISTS puzzle_pool (
+                pool_id      INTEGER PRIMARY KEY AUTOINCREMENT,
+                topic_slug   TEXT NOT NULL REFERENCES topics(slug),
+                difficulty   TEXT NOT NULL,
+                solution     TEXT NOT NULL,
+                generated_at TEXT NOT NULL,
+                UNIQUE(topic_slug, difficulty, solution)
+            )
+        """)
+        self._connection.commit()
 
     def _seed_default_topics(self) -> None:
         default_topics = [
@@ -513,6 +528,90 @@ class GameDatabase:
             (topic_slug, difficulty),
         ).fetchall()
         return [row["solution"] for row in rows]
+
+
+    # -- Puzzle Pool --
+
+    def draw_random_from_pool(
+        self, topic_slug: str, difficulty: str,
+    ) -> Optional[str]:
+        """Draw and remove a random subject from the puzzle pool."""
+        row = self._connection.execute(
+            "SELECT pool_id, solution FROM puzzle_pool "
+            "WHERE topic_slug = ? AND difficulty = ? "
+            "ORDER BY RANDOM() LIMIT 1",
+            (topic_slug, difficulty),
+        ).fetchone()
+        if row is None:
+            return None
+        self._connection.execute(
+            "DELETE FROM puzzle_pool WHERE pool_id = ?",
+            (row["pool_id"],),
+        )
+        self._connection.commit()
+        return row["solution"]
+
+    def pool_count(self, topic_slug: str, difficulty: str) -> int:
+        """Return the number of undrawn subjects in the pool."""
+        row = self._connection.execute(
+            "SELECT COUNT(*) AS cnt FROM puzzle_pool "
+            "WHERE topic_slug = ? AND difficulty = ?",
+            (topic_slug, difficulty),
+        ).fetchone()
+        return row["cnt"]
+
+    def get_all_known_solutions(self, topic_slug: str) -> list[str]:
+        """Return all solutions (used + pooled) for a topic, for dedup."""
+        rows = self._connection.execute(
+            "SELECT solution FROM daily_puzzles WHERE topic_slug = ? "
+            "UNION "
+            "SELECT solution FROM puzzle_pool WHERE topic_slug = ?",
+            (topic_slug, topic_slug),
+        ).fetchall()
+        return [row["solution"] for row in rows]
+
+    def insert_pool_subjects(
+        self,
+        topic_slug: str,
+        difficulty: str,
+        solutions: list[str],
+    ) -> int:
+        """Insert subjects into the pool, skipping duplicates. Returns count inserted."""
+        generated_at = _utcnow_iso()
+        before = self._connection.total_changes
+        self._connection.executemany(
+            "INSERT OR IGNORE INTO puzzle_pool "
+            "(topic_slug, difficulty, solution, generated_at) "
+            "VALUES (?, ?, ?, ?)",
+            [(topic_slug, difficulty, solution, generated_at) for solution in solutions],
+        )
+        self._connection.commit()
+        return self._connection.total_changes - before
+
+    def clear_pool(
+        self,
+        topic_slug: Optional[str] = None,
+        difficulty: Optional[str] = None,
+    ) -> int:
+        """Delete subjects from the pool. Returns count deleted.
+
+        If topic_slug is None, clears all topics. If difficulty is None,
+        clears both difficulties for the given topic(s).
+        """
+        conditions = []
+        params: list[str] = []
+        if topic_slug is not None:
+            conditions.append("topic_slug = ?")
+            params.append(topic_slug)
+        if difficulty is not None:
+            conditions.append("difficulty = ?")
+            params.append(difficulty)
+
+        where = (" WHERE " + " AND ".join(conditions)) if conditions else ""
+        before = self._connection.total_changes
+        self._connection.execute("DELETE FROM puzzle_pool" + where, params)
+        self._connection.commit()
+        return self._connection.total_changes - before
 
     # -- Games --
 
