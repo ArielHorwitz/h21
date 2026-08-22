@@ -105,6 +105,55 @@ sentence.
 Reply with exactly 5 lines, one hint per line, numbered 1-5. No other text.\
 """
 
+GENERATE_SOLUTION_BATCH_PROMPT_TEMPLATE = """\
+You are helping create puzzles for a 21-questions trivia game.
+
+The topic is: {topic}.
+
+Generate exactly {batch_size} subjects related to this topic that would each \
+work well as a 21-questions answer. For most topics, these would be notable \
+figures, events, places, or concepts.
+
+{difficulty_guidance}
+
+Every subject must be distinct — no duplicates or near-duplicates (e.g. do \
+not include both "World War II" and "WWII"). Prefer variety across different \
+eras, regions, and subcategories within the topic.
+
+Reply with exactly {batch_size} lines, one subject per line. No numbering, \
+no bullet points, no extra text — just the name of each subject on its own \
+line.\
+"""
+
+
+
+VALIDATE_SOLUTION_BATCH_PROMPT_TEMPLATE = """\
+You are reviewing puzzle subjects for a 21-questions trivia game.
+
+The topic is: {topic}.
+The target difficulty is: {difficulty_label}.
+
+{difficulty_guidance}
+
+For each subject below, decide whether to KEEP or REJECT it. Reject if:
+- It does not belong to the topic.
+- It does not match the target difficulty (e.g. too obscure for "normal", \
+too obvious for "expert").
+- It is a duplicate or near-duplicate of another subject in the list or in \
+the exclusion list.
+- It is too vague, ambiguous, or not a specific enough answer for a \
+21-questions game (e.g. "A famous battle" is too vague, "Battle of Gettysburg" \
+is specific).
+
+For each subject, reply with exactly one line in this format:
+KEEP subject name
+or:
+REJECT subject name | reason
+
+No other text. Preserve the original subject names exactly.\
+"""
+
+
 NORMALIZE_TOPIC_PROMPT = """\
 You are helping organize topics for a trivia game.
 
@@ -244,6 +293,152 @@ async def generate_solution(
     logger.info("Generated solution for topic=%r difficulty=%r: %r", topic_name, difficulty, solution)
     return solution
 
+
+
+@dataclass
+class BatchResult:
+    """Result of batch generation: parsed subjects and raw LLM response."""
+    subjects: list[str]
+    raw_response: str
+
+
+async def generate_solution_batch(
+    client: LLMClient,
+    exclusion_list: list[str],
+    topic_name: str,
+    difficulty: str,
+    batch_size: int = 100,
+) -> BatchResult:
+    """Ask the LLM to generate a batch of subjects, avoiding repeats.
+
+    Returns a BatchResult with parsed subjects and the raw LLM response.
+    Raises LLMError if the LLM call itself fails.
+    """
+    guidance = DIFFICULTY_GUIDANCE.get(difficulty, DIFFICULTY_GUIDANCE["normal"])
+    prompt = GENERATE_SOLUTION_BATCH_PROMPT_TEMPLATE.format(
+        topic=topic_name,
+        difficulty_guidance=guidance,
+        batch_size=batch_size,
+    )
+    if exclusion_list:
+        formatted = "\n".join(f"- {solution}" for solution in exclusion_list)
+        prompt += (
+            "\n\nThe following subjects have already been used. "
+            "Do NOT include any of them:\n" + formatted
+        )
+
+    response = await client.ask(prompt, "Generate the subjects.")
+
+    subjects = _parse_line_per_subject(response)
+    if not subjects:
+        raise LLMError(
+            "Batch generation returned no valid subjects",
+            "AI returned an empty or unparseable batch response.",
+        )
+
+    logger.info(
+        "Batch generated %d subjects (requested %d) for topic=%r difficulty=%r",
+        len(subjects), batch_size, topic_name, difficulty,
+    )
+    return BatchResult(subjects=subjects, raw_response=response)
+
+
+@dataclass
+class ValidationResult:
+    """Result of validating a single subject."""
+    subject: str
+    kept: bool
+    reason: str
+
+
+@dataclass
+class ValidationBatchResult:
+    """Result of batch validation: per-subject results and raw LLM response."""
+    results: list[ValidationResult]
+    raw_response: str
+
+
+async def validate_solution_batch(
+    client: LLMClient,
+    subjects: list[str],
+    exclusion_list: list[str],
+    topic_name: str,
+    difficulty: str,
+) -> ValidationBatchResult:
+    """Validate a batch of subjects for topic relevance, difficulty, and duplication.
+
+    Returns a ValidationBatchResult with per-subject results and the raw LLM response.
+    """
+    difficulty_label = "well-known (normal)" if difficulty == "normal" else "obscure (expert)"
+    guidance = DIFFICULTY_GUIDANCE.get(difficulty, DIFFICULTY_GUIDANCE["normal"])
+
+    subject_list = "\n".join(f"- {subject}" for subject in subjects)
+
+    prompt = VALIDATE_SOLUTION_BATCH_PROMPT_TEMPLATE.format(
+        topic=topic_name,
+        difficulty_label=difficulty_label,
+        difficulty_guidance=guidance,
+    )
+
+    if exclusion_list:
+        formatted = "\n".join(f"- {solution}" for solution in exclusion_list)
+        prompt += (
+            "\n\nExclusion list (reject duplicates or near-duplicates of these):\n"
+            + formatted
+        )
+
+    prompt += "\n\nSubjects to review:\n" + subject_list
+
+    response = await client.ask(prompt, "Review the subjects.")
+
+    results = []
+    for line in response.strip().splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        if line.upper().startswith("KEEP "):
+            subject = line[5:].strip()
+            results.append(ValidationResult(subject=subject, kept=True, reason=""))
+        elif line.upper().startswith("REJECT "):
+            rest = line[7:].strip()
+            if " | " in rest:
+                subject, reason = rest.split(" | ", 1)
+            else:
+                subject = rest
+                reason = "no reason given"
+            results.append(ValidationResult(
+                subject=subject.strip(), kept=False, reason=reason.strip(),
+            ))
+        else:
+            logger.warning("Unparseable validation line: %r", line)
+
+    kept_count = sum(1 for result in results if result.kept)
+    rejected_count = sum(1 for result in results if not result.kept)
+    logger.info(
+        "Validation for topic=%r difficulty=%r: %d kept, %d rejected out of %d submitted",
+        topic_name, difficulty, kept_count, rejected_count, len(subjects),
+    )
+    return ValidationBatchResult(results=results, raw_response=response)
+
+
+def _parse_line_per_subject(response: str) -> list[str]:
+    """Parse an LLM response with one subject per line."""
+    subjects = []
+    for line in response.strip().splitlines():
+        # Strip numbering like "1. ", "1) ", "- ", "* "
+        cleaned = line.strip()
+        if not cleaned:
+            continue
+        if cleaned[0].isdigit():
+            cleaned = cleaned.lstrip("0123456789").lstrip(".):- ").strip()
+        elif cleaned[0] in "-*":
+            cleaned = cleaned[1:].strip()
+        # Strip surrounding quotes
+        if len(cleaned) >= 2 and cleaned[0] == cleaned[-1] and cleaned[0] in "\"'":
+            cleaned = cleaned[1:-1]
+        if cleaned:
+            subjects.append(cleaned)
+    return subjects
 
 async def generate_hints(
     client: LLMClient,

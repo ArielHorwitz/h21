@@ -1,0 +1,4 @@
+title = "Puzzle generation overhaul: batch pool with validation"
+status = "open"
+created = "2026-07-11T13:59:02.995620"
+keywords = ["puzzle-pool", "batch-generation", "llm", "validation", "difficulty"]

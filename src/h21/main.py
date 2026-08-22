@@ -38,7 +38,9 @@ from h21.llm import (
     ask_question,
     generate_hints,
     generate_solution,
+    generate_solution_batch,
     normalize_topic,
+    validate_solution_batch,
 )
 
 STATIC_DIR = Path(__file__).resolve().parent.parent.parent / "static"
@@ -236,8 +238,18 @@ async def require_auth(request: Request, call_next):
     return await call_next(request)
 
 
+# -- Puzzle pool regeneration --
+
+# Track in-flight pool regeneration tasks to avoid duplicate concurrent
+# regenerations for the same (topic_slug, difficulty) pair.
+_pool_regeneration_tasks: set[tuple[str, str]] = set()
+
+POOL_BATCH_SIZE = 100
+POOL_LOW_THRESHOLD = 50
+
+
 async def get_today_solution(topic_slug: str, difficulty: str) -> str:
-    """Return today's solution for a given topic+difficulty, generating via LLM if needed."""
+    """Return today's solution for a given topic+difficulty, drawing from the pool."""
     today = date_type.today()
     existing = database.get_puzzle_solution(today, topic_slug, difficulty)
     if existing is not None:
@@ -248,15 +260,35 @@ async def get_today_solution(topic_slug: str, difficulty: str) -> str:
     if topic_name is None:
         raise HTTPException(status_code=404, detail="Topic not found")
 
-    previous_solutions = database.get_all_solutions(topic_slug, difficulty)
-    try:
-        solution = await generate_solution(
-            llm_client, previous_solutions, topic_name, difficulty,
-        )
-    except LLMError as exc:
-        logger.error("Failed to generate solution: %s", exc)
-        raise HTTPException(status_code=502, detail=exc.detail)
+    # Try drawing from the pre-generated pool.
+    solution = database.draw_random_from_pool(topic_slug, difficulty)
 
+    if solution is None:
+        # Pool is empty — generate a batch synchronously (first-time cost).
+        logger.info(
+            "Pool empty for topic=%r difficulty=%r, generating batch synchronously",
+            topic_slug, difficulty,
+        )
+        await _regenerate_pool(topic_slug, difficulty, topic_name)
+        solution = database.draw_random_from_pool(topic_slug, difficulty)
+
+    if solution is None:
+        # Fallback: generate a single solution the old way.
+        logger.warning(
+            "Pool still empty after batch generation for topic=%r difficulty=%r, "
+            "falling back to single generation",
+            topic_slug, difficulty,
+        )
+        previous_solutions = database.get_all_known_solutions(topic_slug)
+        try:
+            solution = await generate_solution(
+                llm_client, previous_solutions, topic_name, difficulty,
+            )
+        except LLMError as exc:
+            logger.error("Failed to generate solution: %s", exc)
+            raise HTTPException(status_code=502, detail=exc.detail)
+
+    # Generate hints for the drawn solution.
     try:
         hints = await generate_hints(llm_client, topic_name, solution)
     except LLMError as exc:
@@ -264,7 +296,88 @@ async def get_today_solution(topic_slug: str, difficulty: str) -> str:
         hints = []
 
     database.record_puzzle(today, topic_slug, difficulty, solution, hints=hints)
+
+    # Check if the pool needs background refill.
+    _maybe_regenerate_pool(topic_slug, difficulty, topic_name)
+
     return solution
+
+
+def _maybe_regenerate_pool(
+    topic_slug: str, difficulty: str, topic_name: str,
+) -> None:
+    """Kick off background pool regeneration if the pool is running low."""
+    remaining = database.pool_count(topic_slug, difficulty)
+    if remaining < POOL_LOW_THRESHOLD:
+        key = (topic_slug, difficulty)
+        if key not in _pool_regeneration_tasks:
+            logger.info(
+                "Pool low (%d remaining) for topic=%r difficulty=%r, "
+                "starting background regeneration",
+                remaining, topic_slug, difficulty,
+            )
+            _pool_regeneration_tasks.add(key)
+            task = asyncio.create_task(
+                _regenerate_pool(topic_slug, difficulty, topic_name)
+            )
+            task.add_done_callback(lambda _task: _pool_regeneration_tasks.discard(key))
+
+
+async def _regenerate_pool(
+    topic_slug: str, difficulty: str, topic_name: str,
+) -> None:
+    """Generate a batch of subjects, validate them, and insert into the pool."""
+    exclusion_list = database.get_all_known_solutions(topic_slug)
+    try:
+        batch = await generate_solution_batch(
+            llm_client,
+            exclusion_list,
+            topic_name,
+            difficulty,
+            batch_size=POOL_BATCH_SIZE,
+        )
+    except LLMError as exc:
+        logger.error(
+            "Pool regeneration failed for topic=%r difficulty=%r: %s",
+            topic_slug, difficulty, exc,
+        )
+        return
+
+    subjects = batch.subjects
+    if not subjects:
+        logger.warning(
+            "Batch generation returned no subjects for topic=%r difficulty=%r",
+            topic_slug, difficulty,
+        )
+        return
+
+    # Validate the batch: check topic relevance, difficulty, duplication.
+    try:
+        validation = await validate_solution_batch(
+            llm_client, subjects, exclusion_list, topic_name, difficulty,
+        )
+        validated_subjects = [r.subject for r in validation.results if r.kept]
+    except LLMError as exc:
+        logger.error(
+            "Pool validation failed for topic=%r difficulty=%r: %s — "
+            "inserting unvalidated batch",
+            topic_slug, difficulty, exc,
+        )
+        validated_subjects = subjects
+
+    if not validated_subjects:
+        logger.warning(
+            "All %d subjects rejected by validator for topic=%r difficulty=%r",
+            len(subjects), topic_slug, difficulty,
+        )
+        return
+
+    inserted = database.insert_pool_subjects(topic_slug, difficulty, validated_subjects)
+    logger.info(
+        "Pool regeneration for topic=%r difficulty=%r: "
+        "generated %d, validated %d, inserted %d (duplicates skipped)",
+        topic_slug, difficulty, len(subjects), len(validated_subjects), inserted,
+    )
 
 
 async def ensure_hints_exist(
