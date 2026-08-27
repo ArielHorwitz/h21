@@ -27,13 +27,26 @@ h1 {
   text-align: center;
 }
 
+.brand-heading {
+  line-height: 0;
+}
+
+.brand-logo {
+  display: block;
+  width: min(14.75rem, 72vw);
+  height: auto;
+  margin: 0 auto;
+}
+
 h1 a.home-link {
   color: inherit;
+  display: inline-block;
   text-decoration: none;
+  transition: opacity 0.15s;
 }
 
 h1 a.home-link:hover {
-  text-decoration: underline;
+  opacity: 0.86;
 }
 
 .subtitle {
