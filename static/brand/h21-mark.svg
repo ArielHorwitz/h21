@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 270 180" role="img" aria-labelledby="title">
+  <title id="title">Four paths converging into one answer</title>
+  <g fill="none" stroke-linecap="round" stroke-width="7">
+    <path d="M20 24C117 24 131 90 249 90" stroke="#e0e0e0"/>
+    <path d="M20 68C120 68 143 90 249 90" stroke="#b0b0b0"/>
+    <path d="M20 112C120 112 143 90 249 90" stroke="#7e7e7e"/>
+    <path d="M20 156C117 156 131 90 249 90" stroke="#555568"/>
+  </g>
+  <circle cx="20" cy="24" r="10" fill="#e0e0e0"/>
+  <circle cx="20" cy="68" r="10" fill="#b0b0b0"/>
+  <circle cx="20" cy="112" r="10" fill="#7e7e7e"/>
+  <circle cx="20" cy="156" r="10" fill="#555568"/>
+  <circle cx="249" cy="90" r="14" fill="#e2b714"/>
+</svg>

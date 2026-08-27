@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 240" role="img" aria-labelledby="title">
+  <title id="title">H21, 21 Questions</title>
+  <rect width="1200" height="240" rx="24" fill="#16213e"/>
+  <g transform="translate(48 30)">
+    <g fill="none" stroke-linecap="round" stroke-width="7">
+      <path d="M20 24C117 24 131 90 249 90" stroke="#e0e0e0"/>
+      <path d="M20 68C120 68 143 90 249 90" stroke="#b0b0b0"/>
+      <path d="M20 112C120 112 143 90 249 90" stroke="#7e7e7e"/>
+      <path d="M20 156C117 156 131 90 249 90" stroke="#555568"/>
+    </g>
+    <circle cx="20" cy="24" r="10" fill="#e0e0e0"/>
+    <circle cx="20" cy="68" r="10" fill="#b0b0b0"/>
+    <circle cx="20" cy="112" r="10" fill="#7e7e7e"/>
+    <circle cx="20" cy="156" r="10" fill="#555568"/>
+    <circle cx="249" cy="90" r="14" fill="#e2b714"/>
+  </g>
+  <g transform="translate(350 30)">
+    <path fill="#e0e0e0" d="M0 35h24v43h40V35h24v110H64v-44H24v44H0z"/>
+    <path fill="#e2b714" d="M110 58c0-15 12-23 28-23h37c18 0 29 11 29 28 0 14-7 24-20 33l-40 28h61v21h-96v-18l60-45c7-5 11-10 11-18 0-6-4-9-11-9h-27c-7 0-10 4-10 10v5h-22zm115-7 31-16h21v110h-25V62l-27 14z"/>
+  </g>
+  <path d="M690 64v112" stroke="#333344" stroke-width="2"/>
+  <text x="760" y="137" fill="#999999" font-family="system-ui, -apple-system, sans-serif" font-size="30" font-weight="600" letter-spacing="14">21 QUESTIONS</text>
+</svg>
