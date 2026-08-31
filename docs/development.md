@@ -68,5 +68,4 @@ src/h21/          Backend Python source
 static/           Frontend HTML, JS, CSS (served by FastAPI StaticFiles)
 docs/             Project documentation
 pyproject.toml    Dependencies and entry points
-Dockerfile        Container definition (untested; a Docker Compose deployment is planned)
 ```
