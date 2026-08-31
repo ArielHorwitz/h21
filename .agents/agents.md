@@ -35,4 +35,4 @@ Before modifying a module, read the relevant doc in `docs/` for detailed context
 - **`docs/database.md`** -- full schema, migration pattern, how to add new migrations
 - **`docs/api.md`** -- all API endpoints with methods, paths, auth requirements
 - **`docs/frontend.md`** -- page inventory, JS patterns, game state flow
-- **`docs/development.md`** -- setup, running, Docker, CLI commands, configuration
+- **`docs/development.md`** -- setup, running, CLI commands, configuration

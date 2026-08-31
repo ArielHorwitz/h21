@@ -15,8 +15,13 @@ browser on a live HTTPS login. h21 runs as an enabled systemd service
 (`Restart=always`) that replaced the previous manual `screen` supervision, so
 reboots and crashes recover automatically. The tested reverse-proxy shape is a
 single Caddy site block proxying to loopback:8000, as captured in
-`deploy/Caddyfile.example`. Phases 3 (Dockerization) and 4 (README) are not yet
-started.
+`deploy/Caddyfile.example`. Phase 3 (Dockerization) is not yet started; for
+Phase 4, a minimal top-level README (intro, quick start, doc pointers) now
+exists, but the full deployment guide still awaits the tested Docker setup.
+The existing root `Dockerfile` was found broken during the README pass — its
+build produces an empty wheel and an installed (non-editable) package cannot
+resolve `static/` — so Phase 3 should replace or remove it; the docs no longer
+advertise it as a working path.
 
 The branch contains three application changes:
 

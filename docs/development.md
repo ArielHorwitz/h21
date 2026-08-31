@@ -8,8 +8,15 @@
 ## Local Setup
 
 ```bash
+uv sync
+```
+
+Or with plain pip, install in editable mode (a non-editable install cannot
+locate the repository's `static/` directory):
+
+```bash
 python3 -m venv .venv
-.venv/bin/pip install .
+.venv/bin/pip install -e .
 ```
 
 ## Configuration
@@ -24,8 +31,12 @@ Config is loaded from `~/.config/h21/config.toml` with env var overrides. The da
 | `model` | -- | `gpt-5.4-nano` | OpenAI model name |
 | `reasoning_effort` | -- | `high` | Reasoning effort for the model |
 | `secure_cookies` | -- | `false` | Mark session cookies HTTPS-only; enable behind TLS in deployment |
+| `invite_request_hint` | -- | `Email` | Contact method shown on the login page for requesting an invite |
+| `default_daily_question_limit` | -- | `200` | Default questions per account per day |
+| `default_daily_topic_limit` | -- | `3` | Default topic suggestions per account per day |
 | `avatar_image_model` | -- | `gpt-image-1-mini` | OpenAI model for avatar generation |
 | `default_monthly_avatar_limit` | -- | `3` | Default avatar generations per month |
+| `auto_generate_missing_avatars` | -- | `false` | Generate avatars automatically for accounts without one |
 
 XDG base directories are respected. Override with `XDG_CONFIG_HOME` and `XDG_DATA_HOME`.
 
@@ -50,15 +61,6 @@ h21 --host 0.0.0.0 --port 3000
 | `h21-reset` | Confirm, then delete database, sessions, and logs while preserving avatars |
 | `h21-invite` | Generate an invite code for user registration |
 
-## Docker
-
-```bash
-docker build -t h21 .
-docker run -e OPENAI_API_KEY=sk-... -p 8000:8000 h21
-```
-
-In Docker, config and data directories are `/app/config/h21/` and `/app/data/h21/`.
-
 ## Project Structure
 
 ```
@@ -66,5 +68,5 @@ src/h21/          Backend Python source
 static/           Frontend HTML, JS, CSS (served by FastAPI StaticFiles)
 docs/             Project documentation
 pyproject.toml    Dependencies and entry points
-Dockerfile        Container definition
+Dockerfile        Container definition (untested; a Docker Compose deployment is planned)
 ```
