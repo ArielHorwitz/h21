@@ -1,4 +1,4 @@
-title = "Deployment — Ubuntu VPS setup with uv"
+title = "Deployment — VPS HTTPS, Docker packaging, and public guide"
 status = "open"
 created = "2026-06-29T14:51:06.535733"
-keywords = ["deployment", "ubuntu", "vps", "uv"]
+keywords = ["deployment", "https", "tls", "caddy", "docker", "compose", "ubuntu", "vps", "uv", "sqlite", "readme"]
