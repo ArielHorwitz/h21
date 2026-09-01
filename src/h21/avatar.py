@@ -54,14 +54,19 @@ AVATAR_NOUNS = (
 )
 
 
-def _random_avatar_prompt() -> str:
-    """Build a prompt with a randomly chosen adjective + noun subject."""
-    adjective = random.choice(AVATAR_ADJECTIVES)
-    noun = random.choice(AVATAR_NOUNS)
+def build_avatar_prompt(adjective: str, noun: str) -> str:
+    """Build the standard generation prompt for an adjective + noun subject."""
     return (
         f"Generate a visually striking profile picture of a {adjective} "
         f"{noun}. Colorful, bold, memorable at small sizes. Square "
         f"composition, no text or letters."
+    )
+
+
+def _random_avatar_prompt() -> str:
+    """Build a prompt with a randomly chosen adjective + noun subject."""
+    return build_avatar_prompt(
+        random.choice(AVATAR_ADJECTIVES), random.choice(AVATAR_NOUNS),
     )
 
 REFERENCE_DEFAULT_PROMPT = (

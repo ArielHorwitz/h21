@@ -14,6 +14,7 @@ An AI-powered 21 questions trivia game. Players pick a topic (user-submitted or 
 | `src/h21/avatar.py` | AI-generated profile pictures: OpenAI image API, Pillow resize, file management |
 | `src/h21/invite.py` | CLI utility to generate invite codes |
 | `src/h21/reset.py` | CLI utility to delete database and logs |
+| `src/h21/sandbox.py` | CLI utility to create/run a seeded local sandbox instance for testing |
 
 ## Frontend Layout
 

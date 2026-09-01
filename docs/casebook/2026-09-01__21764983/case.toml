@@ -1,0 +1,4 @@
+title = "Local testing environment: seeded instance with users, play history, and friends"
+status = "closed"
+created = "2026-09-01T10:10:53.235744"
+keywords = ["testing", "seed-data", "fixtures", "local-dev", "friends", "play-history", "debugging"]

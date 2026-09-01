@@ -60,6 +60,40 @@ h21 --host 0.0.0.0 --port 3000
 | `h21` | Start the server |
 | `h21-reset` | Confirm, then delete database, sessions, and logs while preserving avatars |
 | `h21-invite` | Generate an invite code for user registration |
+| `h21-sandbox` | Create and run a seeded local sandbox instance for testing |
+
+## Local Testing Sandbox
+
+`h21-sandbox` creates an isolated instance (default: `./.sandbox`, gitignored)
+with its own XDG config and data directories, seeded with a `dev` account,
+friend personas, friend connections, and fabricated play history — so the app
+can be experienced as a normal user with active friends. The real database is
+never touched.
+
+```bash
+# Create the sandbox and print the seeded accounts
+h21-sandbox
+
+# Create (or reuse) and start the server on it
+h21-sandbox --serve
+
+# Recreate from scratch with custom shape
+h21-sandbox --force --friends 6 --days 14 --seed 42
+```
+
+All seeded accounts share one password (default: `sandbox`) and get real
+AI-generated profile pictures from `assets/sandbox-avatars/` — samples
+produced once by the in-game generator and committed to the repo, so seeding
+itself makes no API calls (personas without a sample fall back to a locally
+rendered identicon). Regenerate the samples with
+`h21-sandbox --generate-samples` (uses the image API). Log in
+as `dev`
+(role `dev`) to see the app with friends, history, and suggestions populated;
+the friend personas (`alice`, `bob`, ...) can be logged into as well. The
+sandbox config copies the real `config.toml` (including the OpenAI key, with
+`secure_cookies` and `auto_generate_missing_avatars` forced off), so playing
+new games live works exactly like production. Seeded history is fabricated
+locally — no API calls, deterministic under `--seed`.
 
 ## Project Structure
 
