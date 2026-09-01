@@ -1,3 +1,6 @@
+# The app builds absolute URLs (Open Graph tags) from the incoming
+# Host and X-Forwarded-Proto headers. Caddy forwards both correctly
+# by default; do not override Host (e.g. header_up Host ...) here.
 h21.example.com {
 	reverse_proxy 127.0.0.1:8000
 }
