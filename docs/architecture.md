@@ -19,7 +19,10 @@
    - All other paths require a valid, non-blocked account
    - Sets `request.state.user_id` and `request.state.role` for downstream handlers
 4. Route handler executes, typically calling `database.*` and/or `llm_client` via helper functions
-5. Response returned as JSON (API) or FileResponse (pages)
+5. Response returned as JSON (API) or HTML (pages). Page routes go through
+   `render_page`, which reads the static HTML file and resolves the
+   `__BASE_URL__` placeholder (used by Open Graph tags, which need absolute
+   URLs) from the request's `Host`/`X-Forwarded-Proto` headers.
 
 ## Auth Model
 

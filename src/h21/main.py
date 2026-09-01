@@ -15,7 +15,7 @@ logger = logging.getLogger("h21")
 import base64
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -287,44 +287,56 @@ async def ensure_hints_exist(
 
 # -- Page routes --
 
+def render_page(request: Request, filename: str) -> HTMLResponse:
+    """Serve a static HTML page, resolving the __BASE_URL__ placeholder.
+
+    Open Graph tags need absolute URLs; the base is derived per-request so
+    the same files work on localhost and behind a reverse proxy.
+    """
+    scheme = request.headers.get("x-forwarded-proto", request.url.scheme)
+    host = request.headers.get("host", request.url.netloc)
+    html = STATIC_DIR.joinpath(filename).read_text()
+    return HTMLResponse(html.replace("__BASE_URL__", f"{scheme}://{host}"))
+
+
 @app.get("/")
-async def home() -> FileResponse:
-    return FileResponse(STATIC_DIR / "home.html")
+async def home(request: Request) -> HTMLResponse:
+    return render_page(request, "home.html")
 
 
 @app.get("/game")
-async def game_page() -> FileResponse:
-    return FileResponse(STATIC_DIR / "index.html")
+async def game_page(request: Request) -> HTMLResponse:
+    return render_page(request, "index.html")
 
 
 @app.get("/account")
-async def account_page() -> FileResponse:
-    return FileResponse(STATIC_DIR / "account.html")
+async def account_page(request: Request) -> HTMLResponse:
+    return render_page(request, "account.html")
 
 
 @app.get("/help")
-async def help_page() -> FileResponse:
-    return FileResponse(STATIC_DIR / "help.html")
+async def help_page(request: Request) -> HTMLResponse:
+    return render_page(request, "help.html")
 
 
 @app.get("/control")
-async def control_page() -> FileResponse:
-    return FileResponse(STATIC_DIR / "control.html")
+async def control_page(request: Request) -> HTMLResponse:
+    return render_page(request, "control.html")
 
 
 @app.get("/replay")
-async def replay_page() -> FileResponse:
-    return FileResponse(STATIC_DIR / "replay.html")
+async def replay_page(request: Request) -> HTMLResponse:
+    return render_page(request, "replay.html")
 
 
 @app.get("/leaderboard")
-async def leaderboard_page() -> FileResponse:
-    return FileResponse(STATIC_DIR / "leaderboard.html")
+async def leaderboard_page(request: Request) -> HTMLResponse:
+    return render_page(request, "leaderboard.html")
 
 
 @app.get("/login")
-async def login_page() -> FileResponse:
-    return FileResponse(STATIC_DIR / "login.html")
+async def login_page(request: Request) -> HTMLResponse:
+    return render_page(request, "login.html")
 
 
 # -- Auth endpoints --
