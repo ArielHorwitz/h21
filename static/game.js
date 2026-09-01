@@ -6,6 +6,7 @@ const submitBtn = document.getElementById("submit-btn");
 const askForm = document.getElementById("ask-form");
 const questionCounter = document.getElementById("question-counter");
 const statusText = document.getElementById("status-text");
+const statusMark = document.getElementById("status-mark");
 const todayDate = document.getElementById("today-date");
 const gameSubtitle = document.getElementById("game-subtitle");
 const hintPanel = document.getElementById("hint-panel");
@@ -255,17 +256,26 @@ async function fetchAndRevealHint(hintIndex) {
   }
 }
 
+function setBusyStatus(message) {
+  statusMark.hidden = false;
+  statusText.textContent = message;
+}
+
+function stopBusyStatus() {
+  statusMark.hidden = true;
+}
+
 async function endGame(won) {
   gameFinished = true;
   submitBtn.disabled = true;
   concedeBtn.disabled = true;
-  statusText.textContent = "Finishing...";
+  setBusyStatus("Finishing...");
   await endGameSession(won ? "win" : "loss");
   window.location.href = `/replay?code=${encodeURIComponent(shareCode)}`;
 }
 
 async function submitQuestion(question) {
-  statusText.textContent = "Thinking...";
+  setBusyStatus("Thinking...");
 
   const response = await fetch("/api/ask", {
     method: "POST",
@@ -340,6 +350,7 @@ askForm.addEventListener("submit", async (event) => {
     statusText.textContent = error.message;
     statusText.classList.add("error");
   } finally {
+    stopBusyStatus();
     if (!statusText.classList.contains("error")) {
       statusText.textContent = "";
     }
@@ -410,16 +421,17 @@ async function tryResumeGame() {
 
 async function init() {
   updateCounter();
-  statusText.textContent = "Loading...";
+  setBusyStatus("Loading...");
   submitBtn.disabled = true;
   concedeBtn.disabled = true;
 
   const resumed = await tryResumeGame();
   if (!resumed) {
-    statusText.textContent = "Generating today's game...";
+    setBusyStatus("Generating today's game...");
     await startGameSession();
   }
 
+  stopBusyStatus();
   if (gameId !== null) {
     statusText.textContent = "";
     submitBtn.disabled = false;

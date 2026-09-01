@@ -6,6 +6,7 @@
   <link rel="apple-touch-icon" href="/static/brand/h21-touch-icon.png">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#1a1a2e">
   <title>H21 — 21 Questions</title>
   <link rel="stylesheet" href="/static/style.css">
 </head>
@@ -31,7 +32,20 @@
 
     <div id="status-bar">
       <span id="question-counter">Question 0 / 21</span>
-      <span id="status-text"></span>
+      <span id="status-activity">
+        <span id="status-mark" hidden>
+          <svg viewBox="0 0 270 180" aria-hidden="true">
+            <g fill="none" stroke-linecap="round" stroke-width="9" class="mark-flow">
+              <path d="M20 24C117 24 131 90 249 90" stroke="#e0e0e0"/>
+              <path d="M20 68C120 68 143 90 249 90" stroke="#b0b0b0"/>
+              <path d="M20 112C120 112 143 90 249 90" stroke="#7e7e7e"/>
+              <path d="M20 156C117 156 131 90 249 90" stroke="#555568"/>
+            </g>
+            <circle cx="249" cy="90" r="16" fill="#e2b714" class="mark-answer"/>
+          </svg>
+        </span>
+        <span id="status-text"></span>
+      </span>
     </div>
 
     <form id="ask-form">
