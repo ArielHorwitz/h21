@@ -15,7 +15,7 @@ Vanilla JavaScript with no frameworks. All files in `static/`. Each page has its
 
 ## Game State Flow
 
-1. `game.js` reads `topic` and `difficulty` from URL query params (e.g. `/game?topic=western-history&difficulty=medium`)
+1. `game.js` reads `topic` and `difficulty` from URL query params (e.g. `/game?topic=western-history&difficulty=normal`)
 2. On init, calls `GET /api/game/existing` to check for an in-progress or completed game for today's puzzle
 3. If a game exists, replays all recorded questions to restore UI state (counter, log, hints)
 4. If no game exists, calls `POST /api/game/new` to start a fresh game (which triggers solution generation on the backend if needed)

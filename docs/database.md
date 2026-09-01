@@ -16,7 +16,7 @@ SQLite database managed by `GameDatabase` in `src/h21/db.py`. Uses WAL journal m
 |--------|------|-------|
 | `date` | TEXT | ISO date |
 | `topic_slug` | TEXT FK | References `topics.slug` |
-| `difficulty` | TEXT | `easy`, `medium`, or `hard` |
+| `difficulty` | TEXT | `normal` or `expert` |
 | `solution` | TEXT | The secret answer |
 | `hints` | TEXT | JSON array of 5 hint strings |
 
