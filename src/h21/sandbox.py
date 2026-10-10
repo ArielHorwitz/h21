@@ -550,12 +550,14 @@ def seed_database(
 
     def seed_game(
         user_id: int, day: date, topic_slug: str, difficulty: str, win: bool,
+        finished: bool = True, question_count: Optional[int] = None,
     ) -> None:
         solution = puzzle_solutions[(day, topic_slug, difficulty)]
         _seed_game(
             database, rng, fixups, now,
             user_id=user_id, day=day, topic_slug=topic_slug,
             difficulty=difficulty, solution=solution, win=win,
+            finished=finished, question_count=question_count,
         )
 
     game_count = 0
@@ -583,9 +585,9 @@ def seed_database(
                 seed_game(extra_id, day, popular_slug, "normal", rng.random() < 0.6)
                 game_count += 1
 
-        # Dev has history on past days but nothing today, leaving today's
-        # puzzles fresh for live play. Wins on the two most recent past days
-        # are forced so recent shared results are guaranteed.
+        # Dev has history on past days; today is covered separately below.
+        # Wins on the two most recent past days are forced so recent shared
+        # results are guaranteed.
         if day_offset > 0:
             win = day_offset <= 2 or rng.random() < 0.7
             seed_game(dev_id, day, popular_slug, "normal", win)
@@ -594,6 +596,42 @@ def seed_database(
                 other_slug = topic_slugs[(day_offset + 2) % len(topic_slugs)]
                 seed_game(dev_id, day, other_slug, rng.choice(difficulties), rng.random() < 0.6)
                 game_count += 1
+
+    # Today, dev has one puzzle in each state (solved, not solved, in
+    # progress) and the rest unplayed for live play. A friend is mid-game
+    # too, and an unfinished game from earlier in the week shows how
+    # abandoned games look in history.
+    def seed_unplayed(user_id: int, day: date, topic_slug: str, difficulty: str, **options: Any) -> int:
+        """Seed a game unless the user already played that puzzle. Returns games added."""
+        if database.get_existing_game(user_id, day, topic_slug, difficulty) is not None:
+            return 0
+        seed_game(user_id, day, topic_slug, difficulty, **options)
+        return 1
+
+    game_count += seed_unplayed(dev_id, today, topic_slugs[1], "normal", win=True)
+    game_count += seed_unplayed(dev_id, today, topic_slugs[2 % len(topic_slugs)], "expert", win=False)
+    game_count += seed_unplayed(
+        dev_id, today, topic_slugs[0], "normal", win=False, finished=False, question_count=6,
+    )
+    game_count += seed_unplayed(
+        friend_ids[0], today, topic_slugs[1], "expert", win=False, finished=False, question_count=4,
+    )
+    if history_days > 3:
+        abandoned_day = today - timedelta(days=3)
+        game_count += seed_unplayed(
+            dev_id, abandoned_day, topic_slugs[3 % len(topic_slugs)], "expert",
+            win=False, finished=False,
+        )
+
+    # A topic dev suggested that was turned down, to show the failed state.
+    database.add_topic(
+        "left-handed-accordion-makers", "Left-Handed Accordion Makers",
+        user_id=dev_id, status="failed",
+    )
+    database.set_topic_status(
+        "left-handed-accordion-makers", "failed",
+        "Not enough puzzles could be made for this topic. Try something broader.",
+    )
 
     pooled_count = _seed_pools(database)
     database.close()
@@ -627,18 +665,30 @@ def _seed_game(
     difficulty: str,
     solution: str,
     win: bool,
+    finished: bool = True,
+    question_count: Optional[int] = None,
 ) -> None:
-    """Fabricate one completed game with a plausible transcript."""
+    """Fabricate one game with a plausible transcript.
+
+    Unfinished games stop after `question_count` questions (default: a
+    random handful) with no guess at the solution.
+    """
     question_pool = QUESTION_POOLS[topic_slug]
     decoys = DECOY_GUESSES[topic_slug]
 
-    transcript = rng.sample(question_pool, rng.randint(5, min(12, len(question_pool))))
-    wrong_guesses = [
-        (f"Is it {decoy}?", "no", f"It is not {decoy}.")
-        for decoy in rng.sample(decoys, rng.randint(1, 3) if win else rng.randint(2, 5))
-    ]
-    transcript.extend(wrong_guesses)
-    rng.shuffle(transcript)
+    if not finished:
+        count = question_count or rng.randint(3, 7)
+        transcript = rng.sample(question_pool, min(count, len(question_pool)))
+        win = False
+    else:
+        transcript = rng.sample(question_pool, rng.randint(5, min(12, len(question_pool))))
+    if finished:
+        wrong_guesses = [
+            (f"Is it {decoy}?", "no", f"It is not {decoy}.")
+            for decoy in rng.sample(decoys, rng.randint(1, 3) if win else rng.randint(2, 5))
+        ]
+        transcript.extend(wrong_guesses)
+        rng.shuffle(transcript)
     if win:
         transcript.append((f"Is it {solution}?", "win", f"Correct — it is {solution}!"))
 
@@ -661,17 +711,22 @@ def _seed_game(
         )
         fixups.questions.append((asked_at.isoformat(), game_id, question_number))
 
-    if rng.random() < 0.5:
+    # A hint unlocks every 4 questions; reveal some of the unlocked ones.
+    hints_unlocked = min(len(transcript) // 4, 5)
+    if hints_unlocked > 0 and rng.random() < 0.5:
         revealed_at = started_at
-        for hint_index in range(rng.randint(1, 3)):
-            after_question = min(2 + hint_index * 3, len(transcript))
+        for hint_index in range(rng.randint(1, min(3, hints_unlocked))):
+            after_question = (hint_index + 1) * 4
             revealed_at += timedelta(seconds=rng.randint(60, 300))
             database.record_hint_reveal(game_id, hint_index, after_question)
             fixups.hint_reveals.append((revealed_at.isoformat(), game_id, hint_index))
 
-    database.end_game(game_id, "win" if win else "loss")
-    ended_at = asked_at + timedelta(seconds=rng.randint(3, 20))
-    fixups.games.append((started_at.isoformat(), ended_at.isoformat(), game_id))
+    if finished:
+        database.end_game(game_id, "win" if win else "loss")
+        ended_at = asked_at + timedelta(seconds=rng.randint(3, 20))
+        fixups.games.append((started_at.isoformat(), ended_at.isoformat(), game_id))
+    else:
+        fixups.games.append((started_at.isoformat(), None, game_id))
 
 
 def _apply_timestamp_fixups(db_path: Path, fixups: _TimestampFixups) -> None:

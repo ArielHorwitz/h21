@@ -89,7 +89,11 @@ itself makes no API calls (personas without a sample fall back to a locally
 rendered identicon). Regenerate the samples with
 `h21-sandbox --generate-samples` (uses the image API). Log in
 as `dev`
-(role `dev`) to see the app with friends, history, and suggestions populated;
+(role `dev`) to see the app with friends, history, and suggestions populated.
+Today, `dev` has one puzzle solved, one not solved and one in progress, with
+the rest unplayed; a friend is mid-game; there is an abandoned game earlier
+in the week and a topic `dev` suggested that was turned down, so every UI
+state has an example;
 the friend personas (`alice`, `bob`, ...) can be logged into as well. The
 sandbox config copies the real `config.toml` (including the OpenAI key, with
 `secure_cookies` and `auto_generate_missing_avatars` forced off), so playing

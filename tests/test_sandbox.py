@@ -91,14 +91,23 @@ class SandboxSeedTests(unittest.TestCase):
         )
         self.assertEqual(mismatched["rows"][0][0], 0)
 
-    def test_dev_has_history_but_not_today(self) -> None:
+    def test_dev_has_history_and_every_state_today(self) -> None:
         history = self.database.get_history(self.summary["dev_user_id"])
-        self.assertGreater(len(history), 0)
-        played_dates = {game["date"] for game in history}
-        self.assertNotIn(self.today.isoformat(), played_dates)
-        self.assertIn(self.today - timedelta(days=1), {
-            date.fromisoformat(played) for played in played_dates
-        })
+        played_dates = {date.fromisoformat(game["date"]) for game in history}
+        self.assertIn(self.today - timedelta(days=1), played_dates)
+
+        today_results = {
+            game["result"] for game in history if game["date"] == self.today.isoformat()
+        }
+        self.assertEqual(today_results, {"win", "loss", None})
+
+        today_games = sum(1 for game in history if game["date"] == self.today.isoformat())
+        today_puzzles = len(self.summary["topic_slugs"]) * 2
+        self.assertLess(today_games, today_puzzles, "some puzzles stay unplayed for live play")
+
+    def test_failed_topic_is_seeded_for_dev(self) -> None:
+        failed = self.database.get_topics_with_status("failed")
+        self.assertEqual([topic["user_id"] for topic in failed], [self.summary["dev_user_id"]])
 
     def test_friends_have_completed_games_today(self) -> None:
         completed_today = self.database.execute_readonly_query(
