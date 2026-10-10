@@ -10,6 +10,32 @@ SQLite database managed by `GameDatabase` in `src/h21/db.py`. Uses WAL journal m
 | `slug` | TEXT PK | URL-friendly identifier, e.g. `western-history` |
 | `name` | TEXT | Display name |
 | `user_id` | INTEGER | User who suggested the topic (nullable) |
+| `status` | TEXT | `generating`, `ready`, or `failed` |
+| `status_detail` | TEXT | User-facing reason when `failed` (nullable) |
+| `created_at` | TEXT | UTC ISO timestamp |
+
+### `puzzle_pool`
+| Column | Type | Notes |
+|--------|------|-------|
+| `pool_id` | INTEGER PK | Auto-increment |
+| `topic_slug` | TEXT FK | References `topics.slug` |
+| `difficulty` | TEXT | `normal` or `expert` |
+| `solution` | TEXT | A validated, undrawn subject |
+| `generated_at` | TEXT | UTC ISO timestamp |
+
+Unique on `(topic_slug, difficulty, solution)`. Drawing a subject deletes its row and records it in `daily_puzzles`.
+
+### `pool_refills`
+| Column | Type | Notes |
+|--------|------|-------|
+| `refill_id` | INTEGER PK | Auto-increment |
+| `topic_slug` | TEXT FK | |
+| `difficulty` | TEXT | |
+| `generated` | INTEGER | Subjects the generation call returned |
+| `kept` | INTEGER | Subjects that passed validation and entered the pool |
+| `finished_at` | TEXT | UTC ISO timestamp |
+
+One row per successful refill. The latest row's `kept` drives the exhaustion guard.
 
 ### `daily_puzzles`
 | Column | Type | Notes |
@@ -29,7 +55,7 @@ Composite primary key: `(date, topic_slug, difficulty)`.
 | `date` | TEXT | ISO date |
 | `topic_slug` | TEXT FK | |
 | `difficulty` | TEXT | |
-| `user_id` | INTEGER | Player (nullable for legacy games) |
+| `user_id` | INTEGER | Player |
 | `started_at` | TEXT | UTC ISO timestamp |
 | `ended_at` | TEXT | Null while in progress |
 | `result` | TEXT | `win`, `loss`, or null |
@@ -86,34 +112,6 @@ Composite primary key: `(date, topic_slug, difficulty)`.
 
 Composite primary key: `(user_id, date)`. Rows created on first use via `INSERT ... ON CONFLICT DO UPDATE`.
 
-## Migrations
+## Schema changes
 
-Migrations are individual methods on `GameDatabase`, called sequentially in `ensure_schema()`. Each migration checks whether it has already been applied (typically by checking for a column's existence via `PRAGMA table_info`) and is idempotent.
-
-Current migrations in order:
-1. `_migrate_add_explanation_column` -- adds `explanation` to `questions`
-2. `_migrate_daily_puzzles_composite_key` -- converts `daily_puzzles` from single-key to composite key
-3. `_migrate_games_topic_difficulty` -- adds `topic_slug` and `difficulty` to `games`
-4. `_migrate_add_hints_column` -- adds `hints` to `daily_puzzles`
-5. `_migrate_add_user_id_to_games` -- adds `user_id` to `games`
-6. `_migrate_invites_multi_use` -- replaces `used_at`/`used_by` with `remaining_uses`/`alias`
-7. `_migrate_add_invite_code_to_accounts` -- adds `invite_code` to `accounts`
-8. `_migrate_add_role_columns` -- adds `role` to `accounts` and `invites`
-9. `_migrate_add_blocked_column` -- adds `blocked` to `accounts`
-10. `_migrate_add_daily_limits` -- adds `daily_question_limit` and `daily_topic_limit` to `accounts`
-11. `_migrate_add_user_id_to_topics` -- adds `user_id` to `topics`
-12. `_migrate_add_user_id_to_questions` -- adds `user_id` to `questions`
-13. `_migrate_add_limits_to_invites` -- adds `daily_question_limit` and `daily_topic_limit` to `invites`
-14. `_migrate_add_share_code_to_games` -- adds `share_code` to `games` with backfill
-15. `_migrate_add_hint_reveals_table` -- creates `hint_reveals` table
-16. `_migrate_add_profile_columns` -- adds `display_name`, `player_code`, `anonymous` to `accounts`
-17. `_migrate_add_friends_table` -- creates `friends` table
-18. `_migrate_add_avatar_columns` -- adds `avatar_version`, `avatar_generations_used`, `avatar_generation_reset`, `monthly_avatar_limit` to `accounts`
-19. `_migrate_add_avatar_limit_to_invites` -- adds `monthly_avatar_limit` to `invites`
-
-### Adding a New Migration
-
-1. Add a new method `_migrate_<description>(self)` to `GameDatabase`
-2. Check idempotency (e.g. check if column already exists before altering)
-3. Call the new method at the end of `ensure_schema()`, after existing migrations
-4. If adding a column, also add it to the `CREATE TABLE` in `ensure_schema()` so fresh databases get the full schema directly
+There are no migrations. `ensure_schema()` creates every table with `CREATE TABLE IF NOT EXISTS`, and the schema was consolidated for the relaunch, so databases from before it are not supported. To change the schema, edit the `CREATE TABLE` statements and recreate the database (`h21-reset`). If production data ever needs preserving across a schema change, reintroduce a migration step then.

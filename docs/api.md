@@ -15,15 +15,16 @@ All API endpoints are defined in `src/h21/main.py`. JSON request/response bodies
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| GET | `/api/topics` | User | List all topics (slug + name). |
-| POST | `/api/topics` | User | Submit a new topic. LLM normalizes the name. Counts against daily topic limit. |
+| GET | `/api/topics` | User | List ready topics, plus the user's own topics that are still generating or failed (`status`, `status_detail`). |
+| POST | `/api/topics` | User | Submit a new topic. LLM normalizes the name, then the topic's puzzle pools are built in the background (status `generating`). Counts against daily topic limit. A failed topic of the same name is replaced. |
+| DELETE | `/api/topics/{slug}` | User | Dismiss a failed topic. Creator only. |
 
 ## Games
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | GET | `/api/game/existing?topic_slug=...&difficulty=...` | User | Get user's existing game for today's puzzle. Returns 204 if none. |
-| POST | `/api/game/new` | User | Start a new game for a topic+difficulty. Generates today's solution if needed. 409 if game already exists. |
+| POST | `/api/game/new` | User | Start a new game for a ready topic+difficulty. Draws today's solution from the pool if needed. 409 if game already exists, 503 if the topic has run out of puzzles. |
 | POST | `/api/game/end` | User | End a game with result (`win`/`loss`). Returns solution and hints. |
 | POST | `/api/ask` | User | Ask a question. LLM judges against secret solution. Counts against daily question limit. Records Q&A if game_id provided. |
 | POST | `/api/hint` | User | Get a hint by index (0-4). Requires `(hint_index + 1) * 4` questions asked. |

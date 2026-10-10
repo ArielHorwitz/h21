@@ -61,6 +61,7 @@ h21 --host 0.0.0.0 --port 3000
 | `h21-reset` | Confirm, then delete database, sessions, and logs while preserving avatars |
 | `h21-invite` | Generate an invite code for user registration |
 | `h21-sandbox` | Create and run a seeded local sandbox instance for testing |
+| `h21-pool` | Evaluate puzzle generation and validation prompts for a topic, without touching the database |
 
 ## Local Testing Sandbox
 
