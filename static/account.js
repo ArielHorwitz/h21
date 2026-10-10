@@ -272,7 +272,8 @@ function todayIso() {
 }
 
 function renderStats(games) {
-  const finished = games.filter((game) => game.result === "win" || game.result === "loss");
+  // Everything but today's in-progress games counts; unfinished is unsolved.
+  const finished = games.filter((game) => game.result || game.date !== todayIso());
   if (finished.length === 0) return;
   const wins = finished.filter((game) => game.result === "win");
   document.getElementById("stat-played").textContent = String(finished.length);
@@ -316,15 +317,13 @@ function renderHistoryRow(game) {
   if (game.result === "win") {
     result.textContent = `✓ ${game.questions_asked}`;
     result.classList.add("is-won");
-  } else if (game.result === "loss") {
-    result.textContent = "✗";
-    result.classList.add("is-lost");
-  } else if (game.date === todayIso()) {
+  } else if (!game.result && game.date === todayIso()) {
     result.textContent = "In progress";
     result.classList.add("is-in-progress");
   } else {
-    result.textContent = "Unfinished";
-    result.classList.add("is-unfinished");
+    // Failed and abandoned games are the same: not solved.
+    result.textContent = "✗";
+    result.classList.add("is-lost");
   }
   row.appendChild(result);
   return row;

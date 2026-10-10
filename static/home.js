@@ -78,7 +78,7 @@ function renderFriendAvatars(friendList) {
     avatars.appendChild(more);
   }
   const names = friendList.map((friend) => friend.display_name).join(", ");
-  avatars.title = `Played by ${names}`;
+  avatars.title = `Solved by ${names}`;
   return avatars;
 }
 
@@ -96,8 +96,8 @@ function renderDifficultyButton(topic, difficulty) {
   return button;
 }
 
-// Friends who played either difficulty today, once each.
-function friendsWhoPlayed(topic) {
+// Friends who solved either difficulty today, once each.
+function friendsWhoSolved(topic) {
   const seen = new Set();
   const friends = [];
   for (const difficulty of DIFFICULTIES) {
@@ -170,13 +170,13 @@ function renderTopics(topics) {
       continue;
     }
 
-    const friends = friendsWhoPlayed(topic);
+    const friends = friendsWhoSolved(topic);
     if (friends.length > 0) {
       const friendsLine = document.createElement("div");
       friendsLine.className = "topic-friends";
       friendsLine.appendChild(renderFriendAvatars(friends));
       const label = document.createElement("span");
-      label.textContent = "played";
+      label.textContent = "solved";
       friendsLine.appendChild(label);
       info.appendChild(friendsLine);
     }

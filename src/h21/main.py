@@ -851,18 +851,18 @@ def _select_friends_for_result(
     """Select up to 2 friends for a recent results mini-leaderboard.
 
     The frontend adds the player as a 3rd entry, so we return at most 2
-    friends: the top scorers among those who solved it, then those who
-    didn't.
+    friends — always the top scorers among the player's friends.
     """
     if not friends:
         return []
 
-    def sort_key(friend: dict[str, Any]) -> tuple[int, int, str]:
-        unsolved = 0 if friend.get("result") == "win" else 1
-        score = _compute_score(friend["questions_asked"], friend["hints_used"])
-        return (unsolved, score, friend.get("username", ""))
+    scored_friends = []
+    for friend in friends:
+        friend_score = _compute_score(friend["questions_asked"], friend["hints_used"])
+        scored_friends.append((friend_score, friend))
+    scored_friends.sort(key=lambda entry: (entry[0], entry[1].get("username", "")))
 
-    return sorted(friends, key=sort_key)[:2]
+    return [friend for _, friend in scored_friends[:2]]
 
 
 @app.get("/api/recent-results")
@@ -883,7 +883,6 @@ async def get_recent_results(request: Request) -> list[dict[str, Any]]:
                 "avatar_version": friend.get("avatar_version", 0),
                 "questions_asked": friend["questions_asked"],
                 "hints_used": friend["hints_used"],
-                "solved": friend.get("result") == "win",
             })
 
         result.append({
@@ -894,7 +893,6 @@ async def get_recent_results(request: Request) -> list[dict[str, Any]]:
             "my_result": {
                 "questions_asked": game["questions_asked"],
                 "hints_used": game["hints_used"],
-                "solved": game["result"] == "win",
             },
             "friends": friend_entries,
         })
@@ -1010,8 +1008,7 @@ async def get_leaderboard(
         raise HTTPException(status_code=404, detail="Topic not found")
 
     user_id = request.state.user_id
-    finishers = database.get_puzzle_finishers(puzzle_date, topic_slug, difficulty, user_id)
-    winners = [finisher for finisher in finishers if finisher["result"] == "win"]
+    winners = database.get_puzzle_winners(puzzle_date, topic_slug, difficulty, user_id)
 
     # Score, sort, and rank.
     scored = []
@@ -1046,36 +1043,12 @@ async def get_leaderboard(
     if len(players) > max_players:
         players = _truncate_leaderboard(players, max_players)
 
-    # Players who didn't solve it, listed after the ranking: you first, then
-    # friends, then everyone else, alphabetically.
-    non_solvers = []
-    for finisher in finishers:
-        if finisher["result"] == "win":
-            continue
-        is_self = finisher["user_id"] == user_id
-        entry = {
-            "display_name": finisher["display_name"] or finisher["username"],
-            "player_code": finisher.get("player_code"),
-            "avatar_version": finisher.get("avatar_version", 0),
-            "questions_asked": finisher["questions_asked"],
-            "hints_used": finisher["hints_used"],
-            "is_self": is_self,
-            "is_friend": bool(finisher["is_friend"]),
-        }
-        if is_self:
-            entry["share_code"] = finisher.get("share_code")
-        non_solvers.append(entry)
-    non_solvers.sort(key=lambda entry: (
-        not entry["is_self"], not entry["is_friend"], entry["display_name"].lower(),
-    ))
-
     return {
         "topic_name": topic_name,
         "topic_slug": topic_slug,
         "difficulty": difficulty,
         "date": date,
         "players": players,
-        "non_solvers": non_solvers[:max_players],
     }
 
 

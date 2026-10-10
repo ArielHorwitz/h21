@@ -6,8 +6,6 @@ const leaderboardList = document.getElementById("leaderboard-list");
 const leaderboardEmpty = document.getElementById("leaderboard-empty");
 const filterEveryone = document.getElementById("filter-everyone");
 const filterFriends = document.getElementById("filter-friends");
-const nonSolversSection = document.getElementById("non-solvers-section");
-const nonSolversList = document.getElementById("non-solvers-list");
 
 const urlParams = new URLSearchParams(window.location.search);
 const topicSlug = urlParams.get("topic");
@@ -15,7 +13,6 @@ const difficulty = urlParams.get("difficulty");
 const puzzleDate = urlParams.get("date");
 
 let allPlayers = [];
-let allNonSolvers = [];
 let showFriendsOnly = false;
 
 function pluralize(count, word) {
@@ -38,7 +35,7 @@ function renderRow(player) {
 
   const rank = document.createElement("span");
   rank.className = "leaderboard-rank";
-  rank.textContent = player.rank ?? "–";
+  rank.textContent = player.rank;
   item.appendChild(rank);
 
   if (player.player_code && player.avatar_version > 0) {
@@ -61,13 +58,9 @@ function renderRow(player) {
 
   const score = document.createElement("span");
   score.className = "leaderboard-score";
-  if (player.rank == null) {
-    score.textContent = player.questions_asked >= 21 ? "✗ 21" : `✗ gave up at ${player.questions_asked}`;
-  } else {
-    score.textContent = player.hints_used > 0
-      ? `${player.questions_asked} · ${pluralize(player.hints_used, "hint")}`
-      : String(player.questions_asked);
-  }
+  score.textContent = player.hints_used > 0
+    ? `${player.questions_asked} · ${pluralize(player.hints_used, "hint")}`
+    : String(player.questions_asked);
   item.appendChild(score);
 
   const listItem = document.createElement("li");
@@ -75,23 +68,13 @@ function renderRow(player) {
   return listItem;
 }
 
-function visible(players) {
-  return showFriendsOnly
-    ? players.filter((player) => player.is_friend || player.is_self)
-    : players;
-}
-
 function render() {
-  const players = visible(allPlayers);
+  const players = showFriendsOnly
+    ? allPlayers.filter((player) => player.is_friend || player.is_self)
+    : allPlayers;
   leaderboardList.innerHTML = "";
   for (const player of players) leaderboardList.appendChild(renderRow(player));
   leaderboardEmpty.hidden = players.length > 0;
-  leaderboardList.hidden = players.length === 0;
-
-  const nonSolvers = visible(allNonSolvers);
-  nonSolversList.innerHTML = "";
-  for (const player of nonSolvers) nonSolversList.appendChild(renderRow(player));
-  nonSolversSection.hidden = nonSolvers.length === 0;
   filterEveryone.setAttribute("aria-selected", String(!showFriendsOnly));
   filterFriends.setAttribute("aria-selected", String(showFriendsOnly));
 }
@@ -125,7 +108,6 @@ async function init() {
     leaderboardMeta.textContent = `${difficultyLabel} · ${date}`;
 
     allPlayers = data.players;
-    allNonSolvers = data.non_solvers || [];
     render();
     leaderboardContent.hidden = false;
   } catch {

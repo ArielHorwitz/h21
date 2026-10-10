@@ -160,18 +160,6 @@ h1 {
   font-weight: bold;
 }
 
-.recent-results-rank-unsolved {
-  counter-increment: none;
-}
-
-.recent-results-rank-unsolved::before {
-  content: "–";
-}
-
-.recent-results-rank-unsolved .recent-results-rank-result {
-  color: #ff6b6b;
-}
-
 .recent-results-rank-name {
   flex: 1;
 }
@@ -1895,7 +1883,6 @@ a.history-row:hover {
 
 .history-result.is-won { color: var(--yes); }
 .history-result.is-lost { color: var(--no); }
-.history-result.is-unfinished { color: var(--text-faint); font-weight: normal; font-size: 0.85rem; }
 .history-result.is-in-progress { color: var(--accent); }
 
 .show-more-btn {
@@ -2223,15 +2210,4 @@ a.history-row:hover {
 .topic-pending-status button {
   font-style: normal;
   flex-shrink: 0;
-}
-
-#non-solvers-section {
-  display: flex;
-  flex-direction: column;
-  gap: 0.6rem;
-  margin-top: 0.5rem;
-}
-
-#non-solvers-section .leaderboard-score {
-  color: #ff6b6b;
 }

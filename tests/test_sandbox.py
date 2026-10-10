@@ -123,15 +123,29 @@ class SandboxSeedTests(unittest.TestCase):
         self.assertGreater(len(results), 0)
         self.assertTrue(all(result["friends"] for result in results))
 
-    def test_friends_lost_puzzles_dev_finished(self) -> None:
+    def test_friends_lost_puzzles_dev_solved(self) -> None:
+        for day in (self.today, self.today - timedelta(days=1)):
+            losses = self.database.execute_readonly_query(
+                "SELECT COUNT(*) FROM games g "
+                "JOIN friends f ON f.friend_id = g.user_id "
+                "JOIN games mine ON mine.user_id = f.user_id AND mine.date = g.date "
+                "  AND mine.topic_slug = g.topic_slug AND mine.difficulty = g.difficulty "
+                f"WHERE f.user_id = {self.summary['dev_user_id']} "
+                f"AND g.date = '{day.isoformat()}' AND g.result = 'loss' AND mine.result = 'win'"
+            )
+            self.assertGreater(losses["rows"][0][0], 0, day)
+
+    def test_unsolved_games_stay_out_of_recent_results(self) -> None:
         results = self.database.get_recent_results(self.summary["dev_user_id"], limit=10)
-        friend_results = {
-            (result["date"], friend["result"])
-            for result in results for friend in result["friends"]
-        }
-        self.assertIn((self.today.isoformat(), "loss"), friend_results)
-        yesterday = (self.today - timedelta(days=1)).isoformat()
-        self.assertIn((yesterday, "loss"), friend_results)
+        self.assertGreater(len(results), 0)
+        for result in results:
+            for friend in result["friends"]:
+                outcome = self.database.execute_readonly_query(
+                    "SELECT g.result FROM games g JOIN accounts a ON a.user_id = g.user_id "
+                    f"WHERE a.player_code = '{friend['player_code']}' AND g.date = '{result['date']}' "
+                    f"AND g.topic_slug = '{result['topic_slug']}' AND g.difficulty = '{result['difficulty']}'"
+                )
+                self.assertEqual(outcome["rows"], [["win"]])
 
     def test_answers_use_llm_vocabulary(self) -> None:
         invalid = self.database.execute_readonly_query(

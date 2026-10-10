@@ -110,10 +110,9 @@ function renderSummary(game) {
 
   if (won) {
     resultHeading.textContent = owner ? `${owner} solved it` : "Solved!";
-  } else if (game.result === "loss") {
-    resultHeading.textContent = owner ? `${owner} didn't solve it` : "Not this time";
   } else {
-    resultHeading.textContent = "Unfinished";
+    // Failed and abandoned games are the same: not solved.
+    resultHeading.textContent = owner ? `${owner} didn't solve it` : "Not this time";
   }
   replaySummary.classList.add(won ? "is-won" : "is-lost");
   resultAnswer.textContent = game.solution || "";

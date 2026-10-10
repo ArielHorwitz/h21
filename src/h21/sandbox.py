@@ -616,8 +616,8 @@ def seed_database(
     game_count += seed_unplayed(
         friend_ids[0], today, topic_slugs[1], "expert", win=False, finished=False, question_count=4,
     )
-    # Friends who didn't solve a puzzle dev solved, today and yesterday, so
-    # losses show up in recent games and on leaderboards.
+    # Friends who didn't solve a puzzle dev solved, today and yesterday, to
+    # check that unsolved games stay out of every social view.
     def seed_friend_loss(day: date, topic_slug: str, difficulty: str) -> int:
         for friend_id in friend_ids[1:]:
             added = seed_unplayed(friend_id, day, topic_slug, difficulty, win=False)
