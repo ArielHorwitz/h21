@@ -271,6 +271,7 @@ function renderRecentResults(games) {
       name: "You",
       questionsAsked: game.my_result.questions_asked,
       hintsUsed: game.my_result.hints_used,
+      solved: game.my_result.solved,
       score: playerScore,
       isPlayer: true,
       playerCode: currentUserPlayerCode,
@@ -281,13 +282,15 @@ function renderRecentResults(games) {
         name: friend.display_name,
         questionsAsked: friend.questions_asked,
         hintsUsed: friend.hints_used,
+        solved: friend.solved,
         score: computeScore(friend.questions_asked, friend.hints_used),
         isPlayer: false,
         playerCode: friend.player_code,
         avatarVersion: friend.avatar_version || 0,
       });
     }
-    entries.sort((a, b) => a.score - b.score);
+    // Solvers ranked by score, then those who didn't solve it.
+    entries.sort((a, b) => (a.solved === b.solved ? a.score - b.score : a.solved ? -1 : 1));
 
     const rankingList = document.createElement("ol");
     rankingList.className = "recent-results-ranking";
@@ -314,7 +317,12 @@ function renderRecentResults(games) {
 
       const resultSpan = document.createElement("span");
       resultSpan.className = "recent-results-rank-result";
-      resultSpan.textContent = formatResult(entry.questionsAsked, entry.hintsUsed);
+      if (entry.solved) {
+        resultSpan.textContent = formatResult(entry.questionsAsked, entry.hintsUsed);
+      } else {
+        resultSpan.textContent = "Didn't solve";
+        li.classList.add("recent-results-rank-unsolved");
+      }
       li.appendChild(resultSpan);
 
       rankingList.appendChild(li);

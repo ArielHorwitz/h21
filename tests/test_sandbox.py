@@ -123,6 +123,16 @@ class SandboxSeedTests(unittest.TestCase):
         self.assertGreater(len(results), 0)
         self.assertTrue(all(result["friends"] for result in results))
 
+    def test_friends_lost_puzzles_dev_finished(self) -> None:
+        results = self.database.get_recent_results(self.summary["dev_user_id"], limit=10)
+        friend_results = {
+            (result["date"], friend["result"])
+            for result in results for friend in result["friends"]
+        }
+        self.assertIn((self.today.isoformat(), "loss"), friend_results)
+        yesterday = (self.today - timedelta(days=1)).isoformat()
+        self.assertIn((yesterday, "loss"), friend_results)
+
     def test_answers_use_llm_vocabulary(self) -> None:
         invalid = self.database.execute_readonly_query(
             "SELECT COUNT(*) FROM questions "

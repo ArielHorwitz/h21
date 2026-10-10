@@ -113,10 +113,13 @@ function renderSummary(game) {
   } else if (game.result === "loss") {
     resultHeading.textContent = owner ? `${owner} didn't solve it` : "Not this time";
   } else {
-    resultHeading.textContent = "In progress";
+    resultHeading.textContent = "Unfinished";
   }
   replaySummary.classList.add(won ? "is-won" : "is-lost");
   resultAnswer.textContent = game.solution || "";
+  for (const element of [resultAnswer, document.querySelector(".result-answer-label")]) {
+    element.hidden = !game.solution;
+  }
 
   const answers = game.questions.map((question) => question.answer);
   renderMeter(resultMeter, answers, MAX_QUESTIONS, -1);
@@ -148,12 +151,13 @@ function renderSummary(game) {
     leaderboardLink.textContent = "Leaderboard";
     resultActions.appendChild(leaderboardLink);
 
-    const homeLink = document.createElement("a");
-    homeLink.className = "secondary-btn";
-    homeLink.href = "/";
-    homeLink.textContent = "More puzzles";
-    resultActions.appendChild(homeLink);
   }
+
+  const homeLink = document.createElement("a");
+  homeLink.className = "secondary-btn";
+  homeLink.href = "/";
+  homeLink.textContent = "More puzzles";
+  resultActions.appendChild(homeLink);
 
   replaySummary.hidden = false;
 }

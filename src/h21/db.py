@@ -671,8 +671,10 @@ class GameDatabase:
         game["hint_reveals"] = self.get_hint_reveals(game["game_id"])
         topic_name = self.get_topic_name(game["topic_slug"])
         game["topic_name"] = topic_name
-        if game["ended_at"] is not None:
-            puzzle_date = date.fromisoformat(game["date"])
+        # The answer is revealed once the game ends, or once its day is over
+        # for games left unfinished.
+        puzzle_date = date.fromisoformat(game["date"])
+        if game["ended_at"] is not None or puzzle_date < date.today():
             game["solution"] = self.get_puzzle_solution(
                 puzzle_date, game["topic_slug"], game["difficulty"],
             )
@@ -1003,11 +1005,11 @@ class GameDatabase:
     # -- Recent results --
 
     def get_recent_results(self, user_id: int, limit: int = 3) -> list[dict[str, Any]]:
-        """Get the user's most recent won games where at least one friend also played.
+        """Get the user's most recent finished games that a friend also finished.
 
         Returns up to `limit` games, each with the user's own result and ALL
-        friends who also won the same puzzle. The API layer handles friend
-        selection/filtering.
+        friends who also finished the same puzzle, solved or not. The API
+        layer handles friend selection/filtering.
 
         Returns empty list if the user is anonymous.
         """
@@ -1018,21 +1020,21 @@ class GameDatabase:
         if account is None or account["anonymous"]:
             return []
 
-        # Find the user's most recent wins where at least one non-anonymous
-        # friend also won the same puzzle.
+        # Find the user's most recent finished games where at least one
+        # non-anonymous friend also finished the same puzzle.
         user_games = self._connection.execute(
             "SELECT g.game_id, g.topic_slug, t.name AS topic_name, "
-            "g.difficulty, g.date, g.questions_asked "
+            "g.difficulty, g.date, g.questions_asked, g.result "
             "FROM games g "
             "LEFT JOIN topics t ON g.topic_slug = t.slug "
-            "WHERE g.user_id = ? AND g.result = 'win' "
+            "WHERE g.user_id = ? AND g.result IS NOT NULL "
             "AND EXISTS ("
             "  SELECT 1 FROM friends f "
             "  JOIN games fg ON fg.user_id = f.friend_id "
             "    AND fg.date = g.date "
             "    AND fg.topic_slug = g.topic_slug "
             "    AND fg.difficulty = g.difficulty "
-            "    AND fg.result = 'win' "
+            "    AND fg.result IS NOT NULL "
             "  JOIN accounts fa ON fa.user_id = f.friend_id "
             "  WHERE f.user_id = ? AND fa.anonymous = 0"
             ") "
@@ -1056,10 +1058,10 @@ class GameDatabase:
             ).fetchone()["cnt"]
             game["hints_used"] = hint_count
 
-            # Get friends' won games on the same puzzle.
+            # Get friends' finished games on the same puzzle.
             friend_games = self._connection.execute(
                 "SELECT a.display_name, a.username, a.player_code, "
-                "a.avatar_version, g.questions_asked, "
+                "a.avatar_version, g.questions_asked, g.result, "
                 "(SELECT COUNT(*) FROM hint_reveals h "
                 " WHERE h.game_id = g.game_id) AS hints_used "
                 "FROM friends f "
@@ -1068,7 +1070,7 @@ class GameDatabase:
                 "  AND g.date = ? "
                 "  AND g.topic_slug = ? "
                 "  AND g.difficulty = ? "
-                "  AND g.result = 'win' "
+                "  AND g.result IS NOT NULL "
                 "WHERE f.user_id = ? AND a.anonymous = 0",
                 (game["date"], game["topic_slug"],
                  game["difficulty"], user_id),
@@ -1079,11 +1081,12 @@ class GameDatabase:
 
         return results
 
-    def get_puzzle_winners(
+    def get_puzzle_finishers(
         self, puzzle_date: date, topic_slug: str, difficulty: str,
         requesting_user_id: int,
     ) -> list[dict[str, Any]]:
-        """Return all non-anonymous accounts that won a specific puzzle.
+        """Return all non-anonymous accounts that finished a specific puzzle,
+        with their result (`win` or `loss`).
 
         Each row includes is_friend (whether the requesting user follows them).
         Scoring and sorting are left to the caller.
@@ -1091,7 +1094,7 @@ class GameDatabase:
         rows = self._connection.execute(
             "SELECT a.user_id, a.username, a.display_name, "
             "a.player_code, a.avatar_version, "
-            "g.questions_asked, g.share_code, "
+            "g.questions_asked, g.share_code, g.result, "
             "(SELECT COUNT(*) FROM hint_reveals h "
             " WHERE h.game_id = g.game_id) AS hints_used, "
             "CASE WHEN f.friend_id IS NOT NULL THEN 1 ELSE 0 END AS is_friend "
@@ -1099,7 +1102,7 @@ class GameDatabase:
             "JOIN accounts a ON g.user_id = a.user_id "
             "LEFT JOIN friends f ON f.user_id = ? AND f.friend_id = a.user_id "
             "WHERE g.date = ? AND g.topic_slug = ? AND g.difficulty = ? "
-            "AND g.result = 'win' AND a.anonymous = 0",
+            "AND g.result IS NOT NULL AND a.anonymous = 0",
             (requesting_user_id, puzzle_date.isoformat(), topic_slug, difficulty),
         ).fetchall()
         return [dict(row) for row in rows]

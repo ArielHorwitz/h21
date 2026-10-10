@@ -287,10 +287,10 @@ function renderStats(games) {
 function renderHistoryRow(game) {
   const finished = game.result === "win" || game.result === "loss";
   let href = null;
-  if (finished && game.share_code) {
-    href = `/replay?code=${encodeURIComponent(game.share_code)}`;
-  } else if (!finished && game.date === todayIso()) {
+  if (!finished && game.date === todayIso()) {
     href = `/game?topic=${encodeURIComponent(game.topic_slug)}&difficulty=${encodeURIComponent(game.difficulty)}`;
+  } else if (game.share_code) {
+    href = `/replay?code=${encodeURIComponent(game.share_code)}`;
   }
   const row = document.createElement(href ? "a" : "div");
   row.className = "history-row";
@@ -319,9 +319,12 @@ function renderHistoryRow(game) {
   } else if (game.result === "loss") {
     result.textContent = "✗";
     result.classList.add("is-lost");
-  } else {
-    result.textContent = `Q${game.questions_asked + 1}`;
+  } else if (game.date === todayIso()) {
+    result.textContent = "In progress";
     result.classList.add("is-in-progress");
+  } else {
+    result.textContent = "Unfinished";
+    result.classList.add("is-unfinished");
   }
   row.appendChild(result);
   return row;

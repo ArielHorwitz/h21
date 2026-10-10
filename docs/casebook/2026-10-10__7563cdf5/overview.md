@@ -34,6 +34,11 @@ Screenshots of every page at phone (390px) and desktop widths, on a seeded sandb
 - **Help** rewritten for the new UI and inlined (`help-content.html` removed). **Leaderboard** is a ranked list with an Everyone / Friends switch, and `/leaderboard` without a puzzle redirects to Friends. The **control panel** is split into tabs (Invites, Users, Activity, Query, Logs; remembered in the URL hash) and restyled with the shared inputs, buttons and a `data-table` component.
 - `question-log.js` shares log rendering between the game and results pages. Dead CSS from the old layouts was swept (about 740 lines).
 
+- **Losses are visible socially.** Leaderboards list solvers ranked as before, then a "Didn't solve" group (you, then friends, then everyone, alphabetically). Recent games include puzzles where you or a friend didn't solve it, with non-solvers shown last as "Didn't solve". Previously only wins appeared anywhere social.
+- **Today's buttons are color-only** (user preference for a clean, aligned look): outline for unplayed, filled gold in progress, filled green solved, filled red not solved. Details are in the button's tooltip and accessible label.
+- **Unfinished games from past days open on the results page** as "Unfinished", with the answer revealed since the puzzle's day is over.
+- **The sandbox covers every state on purpose:** dev has a solved, an unsolved and an in-progress puzzle today with the rest unplayed, an abandoned game earlier in the week, and a turned-down topic; friends are mid-game today and didn't solve puzzles dev solved today and yesterday.
+
 ## Status
 
 - All pages redesigned.

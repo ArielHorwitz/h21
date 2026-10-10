@@ -40,16 +40,17 @@ function pluralize(count, word) {
   return `${count} ${word}${count === 1 ? "" : "s"}`;
 }
 
-// The badge a difficulty button shows for the user's game today, if any.
+// A difficulty button shows the user's game today by color alone; the
+// title spells it out.
 function describeGame(game) {
-  if (!game) return { className: "", badge: "", title: "Play" };
+  if (!game) return { className: "", title: "Play" };
   if (game.result === "win") {
-    return { className: "is-won", badge: `✓ ${game.questions_asked}`, title: `Solved in ${pluralize(game.questions_asked, "question")}` };
+    return { className: "is-won", title: `Solved in ${pluralize(game.questions_asked, "question")}` };
   }
   if (game.result === "loss") {
-    return { className: "is-lost", badge: "✗", title: "Not solved" };
+    return { className: "is-lost", title: "Not solved" };
   }
-  return { className: "is-in-progress", badge: `Q${game.questions_asked + 1}`, title: `Continue at question ${game.questions_asked + 1}` };
+  return { className: "is-in-progress", title: `In progress, ${pluralize(game.questions_asked, "question")} asked` };
 }
 
 function renderFriendAvatars(friendList) {
@@ -83,23 +84,15 @@ function renderFriendAvatars(friendList) {
 
 function renderDifficultyButton(topic, difficulty) {
   const game = gameStatuses[`${topic.slug}:${difficulty}`];
-  const { className, badge, title } = describeGame(game);
+  const { className, title } = describeGame(game);
 
   const button = document.createElement("a");
   button.className = `play-btn ${difficulty} ${className}`.trim();
   button.href = `/game?topic=${encodeURIComponent(topic.slug)}&difficulty=${difficulty}`;
   button.title = `${capitalize(difficulty)}: ${title}`;
 
-  const name = document.createElement("span");
-  name.textContent = capitalize(difficulty);
-  button.appendChild(name);
-
-  if (badge) {
-    const badgeEl = document.createElement("span");
-    badgeEl.className = "play-btn-badge";
-    badgeEl.textContent = badge;
-    button.appendChild(badgeEl);
-  }
+  button.setAttribute("aria-label", button.title);
+  button.textContent = capitalize(difficulty);
   return button;
 }
 
