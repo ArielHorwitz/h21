@@ -113,22 +113,6 @@ h1 a.home-link:hover {
   margin-bottom: 2rem;
 }
 
-.topic-card {
-  display: flex;
-  flex-direction: column;
-  background: #16213e;
-  border: 1px solid #333;
-  border-radius: 6px;
-  padding: 0.8rem 1rem;
-  gap: 0.5rem;
-}
-
-.topic-card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
 .topic-pending-status {
   display: flex;
   align-items: center;
@@ -146,75 +130,6 @@ h1 a.home-link:hover {
 .topic-dismiss-btn {
   padding: 0.25rem 0.6rem;
   font-size: 0.8rem;
-}
-
-.topic-friends-row {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding-left: 0.15rem;
-}
-
-.topic-friends-label {
-  font-size: 0.75rem;
-  color: #999;
-  min-width: 4rem;
-}
-
-.topic-friends-avatars {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.3rem;
-}
-
-.topic-name {
-  font-size: 1rem;
-  color: #e0e0e0;
-  font-weight: 500;
-}
-
-.difficulty-buttons {
-  display: flex;
-  gap: 0.4rem;
-}
-
-.difficulty-btn {
-  padding: 0.35rem 0.7rem;
-  border: 1px solid #444;
-  border-radius: 4px;
-  font-size: 0.8rem;
-  text-decoration: none;
-  color: #ccc;
-  cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
-}
-
-.difficulty-btn:hover {
-  border-color: #888;
-}
-
-.difficulty-btn.normal:hover {
-  background: #3a3a1b;
-  border-color: #ff9800;
-  color: #ff9800;
-}
-
-.difficulty-btn.expert:hover {
-  background: #3a1b1b;
-  border-color: #f44336;
-  color: #f44336;
-}
-
-.difficulty-btn.game-in-progress {
-  border-color: #e2b714;
-  color: #e2b714;
-  background: rgba(226, 183, 20, 0.1);
-}
-
-.difficulty-btn.game-played {
-  border-color: #4caf50;
-  color: #4caf50;
 }
 
 /* -- Recent results -- */
@@ -1923,96 +1838,104 @@ body[data-tab="profile"] .tab-bar a[data-tab="profile"] .tab-avatar img {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 0.9rem;
+  padding: 0.75rem 0.75rem 0.75rem 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.topic-card.is-pending {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.topic-info {
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.7rem;
+  gap: 0.3rem;
 }
 
 .topic-card .topic-name {
-  font-size: 1.05rem;
+  font-size: 1rem;
   font-weight: 600;
   color: var(--text);
+  line-height: 1.3;
 }
 
-.difficulty-tiles {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.6rem;
-}
-
-.difficulty-tile {
-  position: relative;
+.topic-friends {
   display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
-  min-height: 4.4rem;
-  padding: 0.65rem 0.75rem;
-  border-radius: 8px;
-  background: var(--surface-raised);
-  border: 1px solid var(--border);
-  color: var(--text);
-  text-decoration: none;
-  transition: border-color 0.15s, transform 0.1s;
-}
-
-.difficulty-tile:hover {
-  border-color: var(--text-faint);
-}
-
-.difficulty-tile:active {
-  transform: scale(0.98);
-}
-
-.difficulty-tile-name {
-  font-size: 0.75rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
+  align-items: center;
+  gap: 0.6rem;
+  white-space: nowrap;
+  font-size: 0.78rem;
   color: var(--text-muted);
 }
 
-.difficulty-tile.expert .difficulty-tile-name::after {
-  content: " ◆";
-  color: var(--accent);
+.play-buttons {
+  display: flex;
+  flex-shrink: 0;
+  gap: 0.4rem;
 }
 
-.difficulty-tile-state {
+.play-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  min-width: 4.6rem;
+  height: 2.4rem;
+  padding: 0 0.7rem;
+  border-radius: 8px;
+  border: 1px solid rgba(226, 183, 20, 0.6);
+  color: var(--accent);
+  font-size: 0.88rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background 0.15s, transform 0.1s;
+}
+
+.play-btn:hover {
+  background: rgba(226, 183, 20, 0.1);
+}
+
+.play-btn:active {
+  transform: scale(0.97);
+}
+
+.play-btn-badge {
+  font-size: 0.75rem;
   font-weight: 700;
-  font-size: 1rem;
+  font-variant-numeric: tabular-nums;
 }
 
-.difficulty-tile:not(.is-won):not(.is-lost):not(.is-in-progress) .difficulty-tile-state {
-  color: var(--accent);
+.play-btn.is-in-progress {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: var(--accent);
 }
 
-.difficulty-tile.is-in-progress {
-  border-color: rgba(226, 183, 20, 0.55);
-}
-
-.difficulty-tile.is-in-progress .difficulty-tile-state {
-  color: var(--accent);
-  font-size: 0.9rem;
-}
-
-.difficulty-tile.is-won .difficulty-tile-state {
+.play-btn.is-won {
+  border-color: rgba(76, 175, 80, 0.6);
   color: var(--yes);
 }
 
-.difficulty-tile.is-lost .difficulty-tile-state {
-  color: var(--text-muted);
+.play-btn.is-lost {
+  border-color: var(--border);
+  color: var(--text-faint);
 }
 
 .avatar-stack {
   display: flex;
   align-items: center;
-  margin-top: 0.15rem;
 }
 
 .avatar-stack .avatar-xs {
   width: 1.3rem;
   height: 1.3rem;
   border-radius: 50%;
-  border: 2px solid var(--surface-raised);
+  border: 2px solid var(--surface);
   margin-right: -0.35rem;
   object-fit: cover;
   font-size: 0.65rem;

@@ -40,16 +40,16 @@ function pluralize(count, word) {
   return `${count} ${word}${count === 1 ? "" : "s"}`;
 }
 
-// What a difficulty tile says about the user's game today.
+// The badge a difficulty button shows for the user's game today, if any.
 function describeGame(game) {
-  if (!game) return { className: "", label: "Play" };
+  if (!game) return { className: "", badge: "", title: "Play" };
   if (game.result === "win") {
-    return { className: "is-won", label: `Solved in ${game.questions_asked}` };
+    return { className: "is-won", badge: `✓ ${game.questions_asked}`, title: `Solved in ${pluralize(game.questions_asked, "question")}` };
   }
   if (game.result === "loss") {
-    return { className: "is-lost", label: "Not solved" };
+    return { className: "is-lost", badge: "✗", title: "Not solved" };
   }
-  return { className: "is-in-progress", label: `Continue · ${pluralize(game.questions_asked, "question")}` };
+  return { className: "is-in-progress", badge: `Q${game.questions_asked + 1}`, title: `Continue at question ${game.questions_asked + 1}` };
 }
 
 function renderFriendAvatars(friendList) {
@@ -81,29 +81,41 @@ function renderFriendAvatars(friendList) {
   return avatars;
 }
 
-function renderDifficultyTile(topic, difficulty) {
+function renderDifficultyButton(topic, difficulty) {
   const game = gameStatuses[`${topic.slug}:${difficulty}`];
-  const { className, label } = describeGame(game);
+  const { className, badge, title } = describeGame(game);
 
-  const tile = document.createElement("a");
-  tile.className = `difficulty-tile ${difficulty} ${className}`.trim();
-  tile.href = `/game?topic=${encodeURIComponent(topic.slug)}&difficulty=${difficulty}`;
+  const button = document.createElement("a");
+  button.className = `play-btn ${difficulty} ${className}`.trim();
+  button.href = `/game?topic=${encodeURIComponent(topic.slug)}&difficulty=${difficulty}`;
+  button.title = `${capitalize(difficulty)}: ${title}`;
 
   const name = document.createElement("span");
-  name.className = "difficulty-tile-name";
   name.textContent = capitalize(difficulty);
-  tile.appendChild(name);
+  button.appendChild(name);
 
-  const state = document.createElement("span");
-  state.className = "difficulty-tile-state";
-  state.textContent = label;
-  tile.appendChild(state);
-
-  const friendList = (topic.friends || {})[difficulty];
-  if (friendList && friendList.length > 0) {
-    tile.appendChild(renderFriendAvatars(friendList));
+  if (badge) {
+    const badgeEl = document.createElement("span");
+    badgeEl.className = "play-btn-badge";
+    badgeEl.textContent = badge;
+    button.appendChild(badgeEl);
   }
-  return tile;
+  return button;
+}
+
+// Friends who played either difficulty today, once each.
+function friendsWhoPlayed(topic) {
+  const seen = new Set();
+  const friends = [];
+  for (const difficulty of DIFFICULTIES) {
+    for (const friend of (topic.friends || {})[difficulty] || []) {
+      const key = friend.player_code || friend.display_name;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      friends.push(friend);
+    }
+  }
+  return friends;
 }
 
 // Status shown to a topic's creator while it is being built, or after it failed.
@@ -150,22 +162,38 @@ function renderTopics(topics) {
     const card = document.createElement("article");
     card.className = "topic-card";
 
+    const info = document.createElement("div");
+    info.className = "topic-info";
     const name = document.createElement("h2");
     name.className = "topic-name";
     name.textContent = topic.name;
-    card.appendChild(name);
+    info.appendChild(name);
+    card.appendChild(info);
 
     if (topic.status && topic.status !== "ready") {
       card.classList.add("is-pending");
       card.appendChild(renderPendingTopicStatus(topic));
-    } else {
-      const tiles = document.createElement("div");
-      tiles.className = "difficulty-tiles";
-      for (const difficulty of DIFFICULTIES) {
-        tiles.appendChild(renderDifficultyTile(topic, difficulty));
-      }
-      card.appendChild(tiles);
+      topicsList.appendChild(card);
+      continue;
     }
+
+    const friends = friendsWhoPlayed(topic);
+    if (friends.length > 0) {
+      const friendsLine = document.createElement("div");
+      friendsLine.className = "topic-friends";
+      friendsLine.appendChild(renderFriendAvatars(friends));
+      const label = document.createElement("span");
+      label.textContent = "played";
+      friendsLine.appendChild(label);
+      info.appendChild(friendsLine);
+    }
+
+    const buttons = document.createElement("div");
+    buttons.className = "play-buttons";
+    for (const difficulty of DIFFICULTIES) {
+      buttons.appendChild(renderDifficultyButton(topic, difficulty));
+    }
+    card.appendChild(buttons);
 
     topicsList.appendChild(card);
   }
