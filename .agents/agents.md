@@ -7,7 +7,7 @@ An AI-powered 21 questions trivia game. Players pick a topic (user-submitted or 
 | File | Purpose |
 |------|---------|
 | `src/h21/main.py` | FastAPI app, all route handlers, middleware, CLI entry point |
-| `src/h21/db.py` | SQLite database layer, schema, migrations, all data access |
+| `src/h21/db.py` | SQLite database layer, schema, all data access |
 | `src/h21/llm.py` | OpenAI client wrapper, prompt templates, answer parsing |
 | `src/h21/auth.py` | HMAC-signed session cookies, token creation/validation |
 | `src/h21/config.py` | XDG-compliant config loading (env vars + TOML file) |
@@ -15,25 +15,31 @@ An AI-powered 21 questions trivia game. Players pick a topic (user-submitted or 
 | `src/h21/invite.py` | CLI utility to generate invite codes |
 | `src/h21/reset.py` | CLI utility to delete database and logs |
 | `src/h21/sandbox.py` | CLI utility to create/run a seeded local sandbox instance for testing |
+| `src/h21/generate.py` | `h21-pool` CLI to evaluate puzzle generation and validation prompts |
 
 ## Frontend Layout
 
 | File | Purpose |
 |------|---------|
-| `static/home.html/js` | Landing page: topic selection, difficulty picker |
+| `static/home.html/js` | Today: topic list with per-difficulty play buttons, topic suggestion |
 | `static/index.html`, `static/game.js` | Main gameplay: Q&A loop, hints, game state |
-| `static/login.html/js` | Registration and login |
-| `static/account.html/js` | User profile and stats |
+| `static/replay.html/js` | Game results and replays |
+| `static/friends.html/js` | Recent games with friends, search, suggestions, following |
+| `static/leaderboard.html/js` | Per-puzzle leaderboard |
+| `static/login.html/js` | Log in, join with invite, invite requests |
+| `static/account.html/js` | Profile: picture, name, stats, history, settings |
 | `static/control.html/js` | Dev-only admin panel: SQL queries, account management |
 | `static/help.html` | Game rules and instructions |
-| `static/nav.js` | Shared nav bar script: replaces account icon with avatar |
+| `static/partials/*.html` | Shared top bar and tab bar, included by `render_page` |
+| `static/question-log.js` | Question log rendering shared by game and results |
+| `static/nav.js` | Shared script: replaces the Profile tab icon with the avatar |
 
 ## Progressive Discovery
 
 Before modifying a module, read the relevant doc in `docs/` for detailed context:
 
 - **`docs/architecture.md`** -- module responsibilities, request flow, auth model, middleware
-- **`docs/database.md`** -- full schema, migration pattern, how to add new migrations
+- **`docs/database.md`** -- full schema, how schema changes work
 - **`docs/api.md`** -- all API endpoints with methods, paths, auth requirements
 - **`docs/frontend.md`** -- page inventory, JS patterns, game state flow
 - **`docs/development.md`** -- setup, running, CLI commands, configuration
