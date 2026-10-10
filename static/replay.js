@@ -24,7 +24,7 @@ const shareCode = urlParams.get("code");
 const ANSWER_EMOJI = {
   yes: "\u{1F7E2}",
   no: "\u{1F534}",
-  partially: "\u{1F7E1}",
+  partially: "\u{1F535}",
   depends: "\u{1F535}",
   win: "\u{1F3C6}",
 };

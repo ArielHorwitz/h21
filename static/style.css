@@ -21,7 +21,8 @@
   --accent-ink: #1a1a2e;
   --yes: #4caf50;
   --no: #f44336;
-  --partially: #ff9800;
+  /* Partially and Depends share a color: both mean neither yes nor no. */
+  --partially: #2196f3;
   --depends: #2196f3;
   --radius: 10px;
   --top-bar-height: 3.25rem;
@@ -1367,7 +1368,7 @@ body[data-tab="profile"] .tab-bar a[data-tab="profile"] .tab-avatar img {
 
 .answer-chip.yes { background: var(--yes); }
 .answer-chip.no { background: var(--no); color: #fff; }
-.answer-chip.partially { background: var(--partially); }
+.answer-chip.partially { background: var(--partially); color: #fff; }
 .answer-chip.depends { background: var(--depends); color: #fff; }
 .answer-chip.win { background: var(--accent); }
 
