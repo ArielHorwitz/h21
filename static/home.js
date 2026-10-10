@@ -6,6 +6,21 @@ const requestStatus = document.getElementById("request-topic-status");
 const recentResultsSection = document.getElementById("recent-results-section");
 
 const DIFFICULTIES = ["normal", "expert"];
+const TOPIC_STATUS_POLL_MS = 4000;
+
+// The brand mark, animated as a thinking indicator (same as the game page).
+const THINKING_MARK_SVG = `
+  <svg viewBox="0 0 270 180" aria-hidden="true">
+    <g fill="none" stroke-linecap="round" stroke-width="9" class="mark-flow">
+      <path d="M20 24C117 24 131 90 249 90" stroke="#e0e0e0"/>
+      <path d="M20 68C120 68 143 90 249 90" stroke="#b0b0b0"/>
+      <path d="M20 112C120 112 143 90 249 90" stroke="#7e7e7e"/>
+      <path d="M20 156C117 156 131 90 249 90" stroke="#555568"/>
+    </g>
+    <circle cx="249" cy="90" r="16" fill="#e2b714" class="mark-answer"/>
+  </svg>`;
+
+let topicStatusPollTimer = null;
 
 let gameStatuses = {};
 
@@ -23,6 +38,13 @@ function renderTopics(topics) {
     name.className = "topic-name";
     name.textContent = topic.name;
     header.appendChild(name);
+
+    if (topic.status && topic.status !== "ready") {
+      header.appendChild(renderPendingTopicStatus(topic));
+      card.appendChild(header);
+      topicsList.appendChild(card);
+      continue;
+    }
 
     const buttons = document.createElement("div");
     buttons.className = "difficulty-buttons";
@@ -88,6 +110,43 @@ function renderTopics(topics) {
   }
 }
 
+// Status shown to a topic's creator while it is being built, or after it failed.
+function renderPendingTopicStatus(topic) {
+  const status = document.createElement("div");
+  status.className = "topic-pending-status";
+
+  if (topic.status === "generating") {
+    const mark = document.createElement("span");
+    mark.className = "thinking-mark";
+    mark.innerHTML = THINKING_MARK_SVG;
+    status.appendChild(mark);
+    const text = document.createElement("span");
+    text.textContent = "Creating puzzles…";
+    status.appendChild(text);
+    return status;
+  }
+
+  const text = document.createElement("span");
+  text.className = "topic-failed-text";
+  text.textContent = topic.status_detail || "This topic could not be created.";
+  status.appendChild(text);
+
+  const dismissBtn = document.createElement("button");
+  dismissBtn.className = "topic-dismiss-btn";
+  dismissBtn.textContent = "Dismiss";
+  dismissBtn.addEventListener("click", async () => {
+    dismissBtn.disabled = true;
+    try {
+      await fetch("/api/topics/" + encodeURIComponent(topic.slug), { method: "DELETE" });
+    } catch (error) {
+      console.error("Failed to dismiss topic:", error);
+    }
+    await loadTopics();
+  });
+  status.appendChild(dismissBtn);
+  return status;
+}
+
 async function loadGameStatuses() {
   try {
     const response = await fetch("/api/game/statuses");
@@ -113,6 +172,11 @@ async function loadTopics() {
     if (response.ok) {
       const topics = await response.json();
       renderTopics(topics);
+      // Keep checking while any of the user's topics is still being created.
+      clearTimeout(topicStatusPollTimer);
+      if (topics.some((topic) => topic.status === "generating")) {
+        topicStatusPollTimer = setTimeout(loadTopics, TOPIC_STATUS_POLL_MS);
+      }
     }
   } catch (error) {
     console.error("Failed to load topics:", error);
@@ -139,7 +203,7 @@ requestForm.addEventListener("submit", async (event) => {
     const data = await response.json();
 
     if (response.ok) {
-      requestStatus.textContent = `"${data.name}" has been added!`;
+      requestStatus.textContent = `Creating "${data.name}". This takes a minute or two.`;
       requestStatus.className = "status-success";
       topicNameInput.value = "";
       await loadTopics();
