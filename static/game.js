@@ -265,10 +265,10 @@ askForm.addEventListener("submit", async (event) => {
   const entry = addQuestionEntry(question);
 
   try {
-    const { answer, explanation } = await submitQuestion(question);
+    const { answer } = await submitQuestion(question);
     questionsAsked++;
     answers.push(answer);
-    fillAnswer(entry, answer, explanation);
+    fillAnswer(entry, answer);
     updateProgress();
 
     if (answer === "win") {
@@ -339,7 +339,7 @@ async function tryResumeGame() {
     addHintsAfter(0);
     for (const question of data.questions) {
       const entry = addQuestionEntry(question.question);
-      fillAnswer(entry, question.answer, question.explanation);
+      fillAnswer(entry, question.answer);
       questionsAsked++;
       answers.push(question.answer);
       addHintsAfter(questionsAsked);

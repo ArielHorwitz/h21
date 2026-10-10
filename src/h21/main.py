@@ -1344,6 +1344,10 @@ async def get_existing_game(request: Request, topic_slug: str, difficulty: str) 
     game = database.get_existing_game(user_id, today, topic_slug, difficulty)
     if game is None:
         return Response(status_code=204)
+    if game.get("result") is None:
+        # Explanations would act as free hints while the game is in progress.
+        for question in game.get("questions", []):
+            question.pop("explanation", None)
     return JSONResponse(game)
 
 
@@ -1524,7 +1528,9 @@ async def ask(request_body: AskRequest, request: Request) -> dict[str, str]:
                 "question_number": request_body.question_number,
             })
 
-    return {"answer": result.answer, "explanation": result.explanation}
+    # The explanation is stored but not returned: during a game each one is
+    # effectively a hint. It is shown on the results page once the game ends.
+    return {"answer": result.answer}
 
 
 class HintRequest(BaseModel):
