@@ -39,6 +39,10 @@ Screenshots of every page at phone (390px) and desktop widths, on a seeded sandb
 - **Unfinished games from past days open on the results page**, reading like a failed game, with the answer revealed since the puzzle's day is over.
 - **The sandbox covers every state on purpose:** dev has a solved, an unsolved and an in-progress puzzle today with the rest unplayed, an abandoned game earlier in the week, and a turned-down topic; friends are mid-game today and didn't solve puzzles dev solved today and yesterday (tests check these stay out of social views).
 
+- **Partially vs Depends redefined in the host prompt** (they overlapped: "partly correct or context-dependent" vs "varies based on interpretation"). Partially: the question is clear but the true answer is mixed (true for part of the subject or to some degree). Depends: the question can't be answered as asked (interpretation, context left open, or not answerable as true/false). Tie-break given to the model: if a more precise question would still be mixed, partially; if it would be a clean yes/no, depends. Help describes each with what to try next and no longer implies either means "close". Checked on 20 borderline questions x 3 runs with `gpt-6-luna`/medium: 51/60 answers as expected vs 38/60 with the old prompt. Depends cases are now unanimous (old prompt answered "Is it old?" for the telephone "yes" and mixed partially/depends for "Was he successful?" for Napoleon). Mixed-nationality questions (Einstein "American?", Curie "French?") still waver between yes and partially, which is arguably defensible.
+- **Answer explanations stay hidden until the game ends** (each is effectively a hint): not returned by the ask endpoint, stripped from in-progress games, no Why? in the game screen; shown on the results page.
+- Partially shares Depends' blue (chips, meter, share emoji), and the hint button moved to the left of the composer, away from send.
+
 ## Status
 
 - All pages redesigned.
