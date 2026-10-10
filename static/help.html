@@ -17,30 +17,74 @@
   <meta name="twitter:card" content="summary_large_image">
   <link rel="stylesheet" href="/static/style.css">
 </head>
-<body>
-  <nav class="nav-bar">
-    <a href="/" title="Home"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12L12 3l9 9"/><path d="M5 10v9a1 1 0 001 1h4v-5h4v5h4a1 1 0 001-1v-9"/></svg></a>
-    <a href="/help" title="Help"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9 9a3 3 0 115.12 2.12C13.24 12 12 12.5 12 14"/><circle cx="12" cy="18" r="0.5" fill="currentColor"/></svg></a>
-    <a href="/account" title="Account" id="nav-account"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.418 3.582-7 8-7s8 2.582 8 7"/></svg></a>
-  </nav>
-  <main>
-    <h1 class="brand-heading"><a href="/" class="home-link"><img class="brand-logo" src="/static/brand/h21-logo.svg" alt="H21" width="590" height="180"></a></h1>
-    <p class="subtitle">How to Play</p>
+<body data-tab="help">
+  <!--TOP_BAR-->
+  <main class="page help-page">
+    <header class="page-header">
+      <h1 class="page-title">How to play</h1>
+    </header>
 
-    <div id="help-body"></div>
+    <section class="help-card">
+      <p class="help-lead">
+        Every day, each topic has a secret subject at two difficulties.
+        Work out what it is by asking up to <strong>21 yes-or-no questions</strong>.
+        Everyone gets the same puzzle, so you can compare with friends.
+      </p>
+    </section>
 
-    <div class="settings-actions">
-      <button type="button" id="back-btn" class="secondary-btn">Back</button>
-    </div>
+    <section class="help-card">
+      <h2>Answers</h2>
+      <ul class="answer-legend">
+        <li><span class="answer-chip yes">Yes</span> clearly true</li>
+        <li><span class="answer-chip no">No</span> clearly false</li>
+        <li><span class="answer-chip partially">Partially</span> partly true, you're close</li>
+        <li><span class="answer-chip depends">Depends</span> it depends on how you mean it</li>
+        <li><span class="answer-chip win">Correct!</span> you got it</li>
+      </ul>
+      <p class="field-hint">Tap <em>Why?</em> next to any answer to see the reasoning.</p>
+    </section>
+
+    <section class="help-card">
+      <h2>Difficulty</h2>
+      <p><strong>Normal</strong> subjects are ones most people would recognize. <strong>Expert</strong> subjects need real knowledge of the topic.</p>
+    </section>
+
+    <section class="help-card">
+      <h2>Hints</h2>
+      <p>
+        A hint unlocks every 4 questions, up to 5, from vague to specific.
+        They're optional, and any you use show up in your shared result as &#x1F4A1;.
+      </p>
+    </section>
+
+    <section class="help-card">
+      <h2>Sharing</h2>
+      <p>
+        After a game, <em>Share result</em> sends a spoiler-free summary,
+        one emoji per question, with a link to your game. Friends who haven't
+        played that puzzle yet are asked to play it first.
+      </p>
+      <p class="share-legend">&#x1F7E2; yes &nbsp; &#x1F534; no &nbsp; &#x1F7E1; partially &nbsp; &#x1F535; depends &nbsp; &#x1F3C6; solved &nbsp; &#x1F4A1; hint</p>
+    </section>
+
+    <section class="help-card">
+      <h2>Topics</h2>
+      <p>
+        Suggest your own topic at the bottom of <a href="/">Today</a>. Puzzles for
+        it take a minute or two to create, and very narrow topics may be turned down.
+      </p>
+    </section>
+
+    <section class="help-card">
+      <h2>Tips</h2>
+      <ul class="help-tips">
+        <li>Start broad (era, place, field) before narrowing down.</li>
+        <li><em>Partially</em> and <em>Depends</em> usually mean you're on the right track.</li>
+        <li>Ask in any language. Answers come back in English.</li>
+      </ul>
+    </section>
   </main>
-  <script>
-    fetch("/static/help-content.html")
-      .then(response => response.text())
-      .then(html => { document.getElementById("help-body").innerHTML = html; });
-    document.getElementById("back-btn").addEventListener("click", () => {
-      if (history.length > 1) { history.back(); } else { location.href = "/"; }
-    });
-  </script>
+  <!--TAB_BAR-->
   <script src="/static/nav.js"></script>
 </body>
 </html>

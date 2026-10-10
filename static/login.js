@@ -102,3 +102,33 @@ inviteRequestForm.addEventListener("submit", async (event) => {
     inviteRequestStatus.hidden = false;
   }
 });
+
+// -- Switching between logging in, joining and requesting an invite --
+
+const loginTab = document.getElementById("login-tab");
+const registerTab = document.getElementById("register-tab");
+const inviteRequestToggle = document.getElementById("invite-request-toggle");
+
+function showForm(name) {
+  const joining = name === "register";
+  loginTab.setAttribute("aria-selected", String(!joining));
+  registerTab.setAttribute("aria-selected", String(joining));
+  loginForm.hidden = joining;
+  registerForm.hidden = !joining;
+}
+
+loginTab.addEventListener("click", () => showForm("login"));
+registerTab.addEventListener("click", () => showForm("register"));
+
+inviteRequestToggle.addEventListener("click", () => {
+  inviteRequestToggle.hidden = true;
+  inviteRequestForm.hidden = false;
+  document.getElementById("invite-request-contact").focus();
+});
+
+// An invite link (/login?invite=CODE) opens the join form with the code filled in.
+const inviteFromUrl = new URLSearchParams(window.location.search).get("invite");
+if (inviteFromUrl) {
+  document.getElementById("register-invite").value = inviteFromUrl;
+  showForm("register");
+}

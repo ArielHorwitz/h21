@@ -18,57 +18,48 @@
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-  <main>
+  <main class="login-page">
     <h1 class="brand-heading"><img class="brand-logo" src="/static/brand/h21-logo.svg" alt="H21" width="590" height="180"></h1>
-    <p class="subtitle">21 Questions</p>
+    <p class="login-tagline">A daily game of 21 questions. Guess what the AI is thinking of.</p>
 
-    <div id="login-section" class="auth-section">
-      <h2>Log in</h2>
-      <form id="login-form">
-        <div class="settings-field">
-          <label for="login-username">Username</label>
-          <input type="text" id="login-username" autocomplete="username" maxlength="40" required>
-        </div>
-        <div class="settings-field">
-          <label for="login-password">Password</label>
-          <input type="password" id="login-password" autocomplete="current-password" required>
-        </div>
-        <button type="submit" id="login-btn">Log in</button>
+    <section class="login-card">
+      <div class="segmented" role="tablist">
+        <button type="button" role="tab" id="login-tab" aria-selected="true">Log in</button>
+        <button type="button" role="tab" id="register-tab" aria-selected="false">Join with an invite</button>
+      </div>
+
+      <form id="login-form" class="login-form">
+        <label for="login-username">Username</label>
+        <input type="text" id="login-username" autocomplete="username" maxlength="40" required>
+        <label for="login-password">Password</label>
+        <input type="password" id="login-password" autocomplete="current-password" required>
+        <button type="submit" id="login-btn" class="primary-btn">Log in</button>
         <p id="login-status" hidden></p>
       </form>
-    </div>
 
-    <div id="register-section" class="auth-section">
-      <h2>Register</h2>
-      <form id="register-form">
-        <div class="settings-field">
-          <label for="register-username">Username</label>
-          <input type="text" id="register-username" autocomplete="username" maxlength="40" required>
-        </div>
-        <div class="settings-field">
-          <label for="register-password">Password</label>
-          <input type="password" id="register-password" autocomplete="new-password" minlength="4" required>
-        </div>
-        <div class="settings-field">
-          <label for="register-invite">Invite code</label>
-          <input type="text" id="register-invite" autocomplete="off" maxlength="20" required>
-        </div>
-        <button type="submit" id="register-btn">Register</button>
+      <form id="register-form" class="login-form" hidden>
+        <label for="register-invite">Invite code</label>
+        <input type="text" id="register-invite" autocomplete="off" maxlength="20" required>
+        <label for="register-username">Choose a username</label>
+        <input type="text" id="register-username" autocomplete="username" maxlength="40" required>
+        <label for="register-password">Choose a password</label>
+        <input type="password" id="register-password" autocomplete="new-password" minlength="4" required>
+        <button type="submit" id="register-btn" class="primary-btn">Join</button>
         <p id="register-status" hidden></p>
       </form>
-    </div>
+    </section>
 
-    <div id="invite-request-section" class="auth-section">
-      <h2>Request an Invite</h2>
-      <form id="invite-request-form">
-        <div class="settings-field">
-          <label for="invite-request-contact" id="invite-request-label">Email</label>
+    <section class="invite-request">
+      <button type="button" class="text-btn" id="invite-request-toggle">No invite? Request one</button>
+      <form id="invite-request-form" class="login-form" hidden>
+        <label for="invite-request-contact" id="invite-request-label">Email</label>
+        <div class="inline-form">
           <input type="text" id="invite-request-contact" autocomplete="off" maxlength="200" required>
+          <button type="submit" id="invite-request-btn" class="primary-btn">Request</button>
         </div>
-        <button type="submit" id="invite-request-btn">Request</button>
         <p id="invite-request-status" hidden></p>
       </form>
-    </div>
+    </section>
   </main>
   <script src="/static/login.js"></script>
 </body>
