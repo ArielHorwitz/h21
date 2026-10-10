@@ -17,40 +17,45 @@
   <meta name="twitter:card" content="summary_large_image">
   <link rel="stylesheet" href="/static/style.css">
 </head>
-<body>
-  <nav class="nav-bar">
-    <a href="/" title="Home"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12L12 3l9 9"/><path d="M5 10v9a1 1 0 001 1h4v-5h4v5h4a1 1 0 001-1v-9"/></svg></a>
-    <a href="/help" title="Help"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9 9a3 3 0 115.12 2.12C13.24 12 12 12.5 12 14"/><circle cx="12" cy="18" r="0.5" fill="currentColor"/></svg></a>
-    <a href="/account" title="Account" id="nav-account"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.418 3.582-7 8-7s8 2.582 8 7"/></svg></a>
-  </nav>
-  <main>
-    <h1 class="brand-heading"><a href="/" class="home-link"><img class="brand-logo" src="/static/brand/h21-logo.svg" alt="H21" width="590" height="180"></a></h1>
-    <p class="subtitle" id="replay-subtitle">Game Replay</p>
+<body data-tab="results">
+  <!--TOP_BAR-->
+  <main class="page">
+    <p id="replay-error" class="empty-state" hidden></p>
 
-    <div id="replay-error" hidden></div>
-
-    <div id="replay-content" hidden>
-      <div id="replay-meta"></div>
-
-      <div id="replay-gated" hidden>
-        <p id="gated-message"></p>
-        <a id="gated-play-btn" class="share-btn" href="#">Play this puzzle</a>
+    <section id="replay-gated" class="result-card" hidden>
+      <p class="result-eyebrow" id="gated-meta"></p>
+      <h1 class="result-heading">Spoilers ahead</h1>
+      <p class="result-lead" id="gated-message"></p>
+      <div class="result-actions">
+        <a id="gated-play-btn" class="primary-btn" href="#">Play this puzzle</a>
       </div>
+    </section>
 
-      <div id="replay-details" hidden>
-        <div id="replay-result"></div>
-        <div id="replay-question-log"></div>
+    <section id="replay-summary" class="result-card" hidden>
+      <p class="result-eyebrow" id="result-meta"></p>
+      <h1 class="result-heading" id="result-heading"></h1>
+      <p class="result-answer-label">The answer was</p>
+      <p class="result-answer" id="result-answer"></p>
+      <div class="question-meter result-meter" id="result-meter" role="img"></div>
+      <p class="result-stats" id="result-stats"></p>
+      <div class="result-actions" id="result-actions"></div>
+    </section>
 
-        <aside id="replay-hints">
-          <h3>Hints</h3>
-          <ol id="replay-hint-list"></ol>
-        </aside>
-
-        <div id="replay-solution"></div>
+    <section id="replay-log-section" hidden>
+      <div class="section-header">
+        <h2 class="section-title">Questions</h2>
+        <button type="button" class="text-btn" id="toggle-reasoning-btn" hidden>Show all reasoning</button>
       </div>
-    </div>
+      <div id="question-log"></div>
+      <details id="unrevealed-hints" class="unrevealed-hints" hidden>
+        <summary>Hints that weren't used</summary>
+        <ol id="unrevealed-hint-list"></ol>
+      </details>
+    </section>
   </main>
+  <!--TAB_BAR-->
   <script src="/static/nav.js"></script>
+  <script src="/static/question-log.js"></script>
   <script src="/static/replay.js"></script>
 </body>
 </html>

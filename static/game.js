@@ -18,26 +18,6 @@ const gameIntro = document.getElementById("game-intro");
 const gameIntroTopic = document.getElementById("game-intro-topic");
 const suggestionChips = document.getElementById("suggestion-chips");
 
-// The brand mark, animated as a thinking indicator.
-const THINKING_MARK_SVG = `
-  <svg viewBox="0 0 270 180" aria-hidden="true">
-    <g fill="none" stroke-linecap="round" stroke-width="9" class="mark-flow">
-      <path d="M20 24C117 24 131 90 249 90" stroke="#e0e0e0"/>
-      <path d="M20 68C120 68 143 90 249 90" stroke="#b0b0b0"/>
-      <path d="M20 112C120 112 143 90 249 90" stroke="#7e7e7e"/>
-      <path d="M20 156C117 156 131 90 249 90" stroke="#555568"/>
-    </g>
-    <circle cx="249" cy="90" r="16" fill="#e2b714" class="mark-answer"/>
-  </svg>`;
-
-const ANSWER_LABELS = {
-  yes: "Yes",
-  no: "No",
-  partially: "Partially",
-  depends: "Depends",
-  win: "Correct!",
-};
-
 // Parse topic and difficulty from URL query params.
 const urlParams = new URLSearchParams(window.location.search);
 const topicSlug = urlParams.get("topic");
@@ -84,25 +64,10 @@ async function loadTopicName() {
 
 // -- Progress --
 
-function renderMeter() {
-  questionMeter.innerHTML = "";
-  for (let index = 0; index < MAX_QUESTIONS; index++) {
-    const segment = document.createElement("span");
-    segment.className = "meter-segment";
-    if (index < answers.length) {
-      segment.classList.add(answers[index]);
-    } else if (index === answers.length && !gameFinished) {
-      segment.classList.add("current");
-    }
-    questionMeter.appendChild(segment);
-  }
-  questionMeter.setAttribute("aria-label", `${answers.length} of ${MAX_QUESTIONS} questions used`);
-}
-
 function updateProgress() {
   const remaining = MAX_QUESTIONS - questionsAsked;
   questionCounter.textContent = remaining === 1 ? "Last question" : `${remaining} questions left`;
-  renderMeter();
+  renderMeter(questionMeter, answers, MAX_QUESTIONS, gameFinished ? -1 : answers.length);
   updateHintButton();
   gameIntro.hidden = questionsAsked > 0 || gameId === null;
 }
@@ -114,72 +79,14 @@ function scrollToLatest() {
 }
 
 function addQuestionEntry(question) {
-  const entry = document.createElement("div");
-  entry.className = "log-entry";
-
-  const questionEl = document.createElement("div");
-  questionEl.className = "log-question";
-  const number = document.createElement("span");
-  number.className = "log-number";
-  number.textContent = String(questionsAsked + 1);
-  questionEl.appendChild(number);
-  const text = document.createElement("span");
-  text.textContent = question;
-  questionEl.appendChild(text);
-  entry.appendChild(questionEl);
-
-  const answerRow = document.createElement("div");
-  answerRow.className = "log-answer-row";
-  const pending = document.createElement("span");
-  pending.className = "thinking-mark";
-  pending.innerHTML = THINKING_MARK_SVG;
-  answerRow.appendChild(pending);
-  entry.appendChild(answerRow);
-
+  const entry = createQuestionEntry(questionsAsked + 1, question);
   questionLog.appendChild(entry);
   scrollToLatest();
   return entry;
 }
 
-function fillAnswer(entry, answer, explanation) {
-  const answerRow = entry.querySelector(".log-answer-row");
-  answerRow.innerHTML = "";
-
-  const answerChip = document.createElement("span");
-  answerChip.className = `answer-chip ${answer}`;
-  answerChip.textContent = ANSWER_LABELS[answer] || answer;
-  answerRow.appendChild(answerChip);
-
-  if (explanation) {
-    const explanationEl = document.createElement("p");
-    explanationEl.className = "log-explanation";
-    explanationEl.textContent = explanation;
-    explanationEl.hidden = true;
-
-    const whyBtn = document.createElement("button");
-    whyBtn.type = "button";
-    whyBtn.className = "why-btn";
-    whyBtn.textContent = "Why?";
-    whyBtn.addEventListener("click", () => {
-      explanationEl.hidden = !explanationEl.hidden;
-      whyBtn.textContent = explanationEl.hidden ? "Why?" : "Hide";
-    });
-    answerRow.appendChild(whyBtn);
-    entry.appendChild(explanationEl);
-  }
-}
-
 function addHintEntry(hintIndex, hintText) {
-  const entry = document.createElement("div");
-  entry.className = "log-entry hint-entry";
-  const label = document.createElement("span");
-  label.className = "hint-entry-label";
-  label.textContent = `Hint ${hintIndex + 1}`;
-  entry.appendChild(label);
-  const text = document.createElement("p");
-  text.textContent = hintText || "";
-  entry.appendChild(text);
-  questionLog.appendChild(entry);
+  questionLog.appendChild(createHintEntry(hintIndex, hintText));
   scrollToLatest();
 }
 
@@ -422,14 +329,8 @@ async function tryResumeGame() {
 
     // Rebuild the log, placing each revealed hint after the question it followed.
     const revealedHints = data.revealed_hints || {};
-    const hintsAfterQuestion = new Map();
-    for (const reveal of data.hint_reveals || []) {
-      if (!hintsAfterQuestion.has(reveal.after_question)) {
-        hintsAfterQuestion.set(reveal.after_question, []);
-      }
-      hintsAfterQuestion.get(reveal.after_question).push(reveal.hint_index);
-      hintsRevealed++;
-    }
+    const hintsAfterQuestion = groupHintReveals(data.hint_reveals);
+    hintsRevealed = (data.hint_reveals || []).length;
     const addHintsAfter = (questionNumber) => {
       for (const hintIndex of hintsAfterQuestion.get(questionNumber) || []) {
         addHintEntry(hintIndex, revealedHints[hintIndex]);
