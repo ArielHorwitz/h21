@@ -96,6 +96,12 @@ sandbox config copies the real `config.toml` (including the OpenAI key, with
 new games live works exactly like production. Seeded history is fabricated
 locally — no API calls, deterministic under `--seed`.
 
+The sandbox topics' puzzle pools are filled from `assets/sandbox-pools.json`,
+pre-generated once by the real generation and validation pipeline and
+committed, so drawing new puzzles makes no API calls either (answering
+questions and hints still do). Regenerate it with `h21-sandbox
+--generate-pools`.
+
 ## Project Structure
 
 ```

@@ -41,6 +41,13 @@ class SandboxSeedTests(unittest.TestCase):
             self.summary["dev_user_id"],
         )
 
+    def test_topics_are_ready_with_pooled_puzzles(self) -> None:
+        self.assertGreater(self.summary["pooled_count"], 0)
+        for topic_slug in self.summary["topic_slugs"]:
+            self.assertEqual(self.database.get_topic(topic_slug)["status"], "ready")
+            for difficulty in ("normal", "expert"):
+                self.assertGreater(self.database.pool_count(topic_slug, difficulty), 0)
+
     def test_friend_connections_are_mutual(self) -> None:
         dev_id = self.summary["dev_user_id"]
         friends = self.database.get_friends(dev_id)

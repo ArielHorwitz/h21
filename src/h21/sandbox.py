@@ -3,8 +3,9 @@
 The sandbox lives in its own directory (default: ./.sandbox) holding isolated
 XDG config and data directories, so it never touches the real database. It is
 seeded with a dev account, friend personas, and fabricated play history so the
-app can be experienced as a normal user with active friends. Live play works
-normally through the OpenAI API using the real config/key.
+app can be experienced as a normal user with active friends. Puzzles are drawn
+from committed, pre-generated pools; live play (answering questions, hints)
+works through the OpenAI API using the real config/key.
 """
 
 from __future__ import annotations
@@ -86,6 +87,18 @@ SAMPLE_AVATAR_SUBJECTS: dict[str, tuple[str, str]] = {
 }
 
 EXTRA_TOPICS = ["Movie Classics", "Great Inventions"]
+
+# Pre-generated puzzle pools for the sandbox topics (topic slug -> difficulty
+# -> subjects), produced once by the real generation and validation pipeline
+# and committed, so playing in the sandbox draws puzzles without API calls.
+SAMPLE_POOLS_PATH = Path(__file__).resolve().parents[2].joinpath(
+    "assets", "sandbox-pools.json",
+)
+SANDBOX_TOPIC_NAMES = {
+    "notable-people": "Notable People",
+    "world-geography": "World Geography",
+    **{slugify(name): name for name in EXTRA_TOPICS},
+}
 
 # Fabricated puzzles: topic slug -> list of (solution, five hints).
 SOLUTION_POOLS: dict[str, list[tuple[str, list[str]]]] = {
@@ -321,6 +334,74 @@ def _generate_samples() -> None:
     print(f"Samples written to {SAMPLE_AVATARS_DIR}")
 
 
+def _generate_pools() -> None:
+    """Regenerate the committed sandbox puzzle pools via the real pipeline.
+
+    One generation batch and one validation call per topic and difficulty,
+    as when a topic is created in the app. Requires a real key.
+    """
+    import asyncio
+
+    from h21.config import load_config
+    from h21.db import VALID_DIFFICULTIES
+    from h21.llm import OpenAIClient, generate_solution_batch, validate_solution_batch
+
+    config = load_config()
+    client = OpenAIClient(
+        config.openai_api_key, model=config.model, reasoning_effort=config.reasoning_effort,
+    )
+
+    async def generate_one(topic_slug: str, difficulty: str) -> list[str]:
+        topic_name = SANDBOX_TOPIC_NAMES[topic_slug]
+        exclusion_list = [solution for solution, _ in SOLUTION_POOLS.get(topic_slug, [])]
+        batch = await generate_solution_batch(
+            client, exclusion_list, topic_name, difficulty, batch_size=100,
+        )
+        validation = await validate_solution_batch(
+            client, batch.subjects, exclusion_list, topic_name, difficulty,
+        )
+        kept = [result.subject for result in validation.results if result.kept]
+        print(f"  {topic_slug} {difficulty}: kept {len(kept)} of {len(batch.subjects)}")
+        return kept
+
+    async def generate_all() -> dict[str, dict[str, list[str]]]:
+        keys = [
+            (topic_slug, difficulty)
+            for topic_slug in SANDBOX_TOPIC_NAMES
+            for difficulty in sorted(VALID_DIFFICULTIES)
+        ]
+        results = await asyncio.gather(*(generate_one(*key) for key in keys))
+        pools: dict[str, dict[str, list[str]]] = {}
+        for (topic_slug, difficulty), subjects in zip(keys, results):
+            pools.setdefault(topic_slug, {})[difficulty] = subjects
+        return pools
+
+    print(f"Generating sandbox puzzle pools with {config.model}...")
+    pools = asyncio.run(generate_all())
+    SAMPLE_POOLS_PATH.write_text(json.dumps(pools, indent=2, ensure_ascii=False) + "\n")
+    print(f"Pools written to {SAMPLE_POOLS_PATH}")
+
+
+def _seed_pools(database: GameDatabase) -> int:
+    """Fill the sandbox topics' puzzle pools from the committed sample pools.
+
+    Subjects already used as fabricated puzzles, or already pooled at the
+    other difficulty, are skipped. Returns the number of subjects pooled.
+    """
+    if not SAMPLE_POOLS_PATH.is_file():
+        return 0
+    pools = json.loads(SAMPLE_POOLS_PATH.read_text())
+    pooled = 0
+    for topic_slug, subjects_by_difficulty in pools.items():
+        if database.get_topic(topic_slug) is None:
+            continue
+        for difficulty, subjects in subjects_by_difficulty.items():
+            known = set(database.get_all_known_solutions(topic_slug))
+            fresh_subjects = [subject for subject in subjects if subject not in known]
+            pooled += database.insert_pool_subjects(topic_slug, difficulty, fresh_subjects)
+    return pooled
+
+
 def _shrink_sample(image_bytes: bytes) -> bytes:
     """Downscale a generated image to keep committed samples small."""
     image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
@@ -514,6 +595,7 @@ def seed_database(
                 seed_game(dev_id, day, other_slug, rng.choice(difficulties), rng.random() < 0.6)
                 game_count += 1
 
+    pooled_count = _seed_pools(database)
     database.close()
     _apply_timestamp_fixups(db_path, fixups)
 
@@ -527,6 +609,7 @@ def seed_database(
         "topic_slugs": topic_slugs,
         "game_count": game_count,
         "puzzle_count": len(puzzle_solutions),
+        "pooled_count": pooled_count,
         "history_days": history_days,
         "invite_code": invite_code,
     }
@@ -699,6 +782,10 @@ def main() -> None:
         help="Port for --serve (default: 8000)",
     )
     parser.add_argument(
+        "--generate-pools", action="store_true",
+        help="Regenerate the committed sandbox puzzle pools via the LLM, then exit",
+    )
+    parser.add_argument(
         "--generate-samples", action="store_true",
         help="Regenerate the committed sample avatars via the image API, then exit",
     )
@@ -706,6 +793,9 @@ def main() -> None:
 
     if args.generate_samples:
         _generate_samples()
+        return
+    if args.generate_pools:
+        _generate_pools()
         return
 
     sandbox_dir = Path(args.dir).resolve()
@@ -745,7 +835,8 @@ def _print_summary(
     friends = ", ".join(summary["friend_usernames"])
     print(f"Sandbox created at {sandbox_dir}")
     print(f"Seeded {summary['game_count']} games and {summary['puzzle_count']} puzzles "
-          f"over {summary['history_days']} days.")
+          f"over {summary['history_days']} days, with {summary['pooled_count']} "
+          f"pre-generated subjects in the puzzle pools.")
     print()
     print(f"Accounts (password for all: {password!r}):")
     print(f"  {summary['dev_username']:12s} your account (role: dev)")
