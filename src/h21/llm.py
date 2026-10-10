@@ -33,9 +33,18 @@ one answer — one of: yes, no, partially, depends, win.
 
 - "yes" if the answer to their question is clearly yes.
 - "no" if the answer is clearly no.
-- "partially" if the answer is partly correct or context-dependent.
-- "depends" if the answer varies based on interpretation or framing.
+- "partially" if the question is clear but the true answer is mixed: it is \
+true for part of the subject or only to some degree (e.g. "Is it in Europe?" \
+for Russia).
+- "depends" if the question can't be answered as asked: the answer hinges on \
+how a word or phrase is interpreted, on context the question leaves open, or \
+it is otherwise not answerable as true or false (e.g. "Was he wealthy?", \
+"Is it good?").
 - "win" ONLY if the player has correctly identified the secret solution.
+
+To choose between "partially" and "depends": if a more precise version of the \
+question would still have a mixed answer, use "partially". If it would have a \
+clear yes or no, use "depends".
 
 The player can see the topic, all previous answers, and any revealed hints. \
 They may ask follow-up questions that build on this context. \
