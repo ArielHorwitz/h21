@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass
 from typing import Any, Optional, Protocol
 
@@ -378,20 +379,19 @@ def _parse_line_per_subject(response: str) -> list[str]:
     """Parse an LLM response with one subject per line."""
     subjects = []
     for line in response.strip().splitlines():
-        # Strip numbering like "1. ", "1) ", "- ", "* "
-        cleaned = line.strip()
-        if not cleaned:
-            continue
-        if cleaned[0].isdigit():
-            cleaned = cleaned.lstrip("0123456789").lstrip(".):- ").strip()
-        elif cleaned[0] in "-*":
-            cleaned = cleaned[1:].strip()
-        # Strip surrounding quotes
-        if len(cleaned) >= 2 and cleaned[0] == cleaned[-1] and cleaned[0] in "\"'":
-            cleaned = cleaned[1:-1]
+        # Strip list markers like "1. ", "1) ", "- ", "* ", but not digits
+        # that belong to the subject, as in "1984" or "2001: A Space Odyssey".
+        cleaned = _LIST_MARKER_PATTERN.sub("", line.strip(), count=1).strip()
+        if len(cleaned) >= 2 and (cleaned[0], cleaned[-1]) in _QUOTE_PAIRS:
+            cleaned = cleaned[1:-1].strip()
         if cleaned:
             subjects.append(cleaned)
     return subjects
+
+
+_LIST_MARKER_PATTERN = re.compile(r"^(?:\d+[.)]|[-*•])\s+")
+_QUOTE_PAIRS = frozenset({('"', '"'), ("'", "'"), ("\u201c", "\u201d"), ("\u2018", "\u2019")})
+
 
 async def generate_hints(
     client: LLMClient,
