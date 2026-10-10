@@ -6,7 +6,8 @@ The current puzzle generation system creates one subject at a time via LLM when 
 
 1. **First-come bias**: New topics always get the most obvious subjects first (e.g. "Marie Curie" for Notable People) because the LLM defaults to the most prominent answer when the exclusion list is empty.
 2. **Degrading consistency**: As the exclusion list grows, the LLM is forced into increasingly obscure territory even for "normal" difficulty, making difficulty inconsistent day-to-day.
-3. **Fragile dedup**: Relies entirely on the LLM reading a growing text list and not repeating -- no structural guarantee.
+3. **Momentum**: Each generation sees the previous solutions, so one category snowballs. Israeli History produced a week of consecutive prime ministers.
+4. **Fragile dedup**: Relies entirely on the LLM reading a growing text list and not repeating -- no structural guarantee.
 
 ## Solution
 
@@ -15,7 +16,7 @@ Replace on-demand single-subject generation with a pre-generated pool:
 1. **Batch generation**: Generate 100 subjects per (topic, difficulty) in one LLM call, stored in a `puzzle_pool` table.
 2. **Validation step**: A second LLM call reviews each batch for topic relevance, difficulty appropriateness, and duplication (KEEP/REJECT with reasons).
 3. **Random draw**: When a puzzle is needed, draw randomly from the pool rather than generating sequentially.
-4. **Background regeneration**: When pool drops below 50, kick off a background `asyncio.create_task` to refill.
+4. **Background regeneration**: When the pool drops below a low threshold (50), kick off a background `asyncio.create_task` to top it up. Refill is triggered by running low, not by running empty, so players never wait on generation except for the very first draw of a new (topic, difficulty), when the pool is empty.
 
 ## Design decisions
 
@@ -31,7 +32,7 @@ Replace on-demand single-subject generation with a pre-generated pool:
 
 ## Implementation
 
-All work is on the `puzzle-pool` branch (worktree at `../h21-puzzle-pool`).
+All work is on the `puzzle-pool` branch.
 
 ### Files changed
 
@@ -60,14 +61,22 @@ h21-pool "Notable People" --count 50 -e previous-run.txt -o new-run.txt
 
 ## Status
 
-- Core implementation complete (db, llm, main.py, CLI tool)
-- Not yet tested against live LLM -- need to run `h21-pool` to evaluate prompt quality
-- Exhaustion detection logic in `_regenerate_pool()` (main.py) not yet implemented (only in CLI tool)
-- No admin/control panel integration for viewing or managing the pool
+- Core implementation complete (db, llm, main.py, CLI tool). Branch is a single WIP commit based on July master; master has since moved 18 commits, none touching puzzle generation, so a rebase should be light.
+- Evaluated against a live LLM and looks good on variety, difficulty and validation parsing (see below).
+
+### Evaluation run (2026-10-10)
+
+`h21-pool "Israeli History" --difficulty normal --count 100` with `gpt-6-luna`, reasoning effort `medium`, default CLI batch size 25. Five batches, about 1m40s, 105 kept and 20 rejected.
+
+- **Variety**: good spread across modern leaders, wars and accords, ancient history, pre-state militias, institutions and cities. Prime ministers are 12 of 105, so the momentum problem is gone.
+- **Validation**: parses cleanly. 18 of 20 rejections were "too obscure for normal", some arguably wrong for the likely audience (e.g. Moshe Sharett, a prime minister).
+- **Weak keeps**: a few abstract subjects make awkward 21-questions answers ("Zionism", "Aliyah", "The 1950s Israeli austerity period").
 
 ## Open items
 
-- Run `h21-pool` against live LLM to evaluate generation and validation prompt quality
-- Tune batch generation prompt if needed based on evaluation results
-- Add exhaustion detection to `_regenerate_pool()` in main.py (currently only the CLI tool has it)
-- Consider admin panel integration for pool visibility
+- Rebase onto master.
+- Server path generates `POOL_BATCH_SIZE=100` in one call, while the evaluated CLI path used 25 per call. Either evaluate the 100 path or have the server generate in batches of 25.
+- Exhaustion detection exists only in the CLI tool, not in `_regenerate_pool()`. On a narrow topic, every draw below the threshold can trigger another paid batch.
+- The initial synchronous fill (empty pool) has no lock, so concurrent first players of a new topic can each generate a batch.
+- Consider tuning the validator's obscurity bar and rejecting abstract, hard-to-pin-down subjects.
+- Consider admin panel integration for pool visibility.

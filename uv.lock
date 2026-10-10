@@ -2,10 +2,6 @@ version = 1
 revision = 3
 requires-python = ">=3.12"
 
-[options]
-exclude-newer = "2026-06-21T12:19:52.786037872Z"
-exclude-newer-span = "P14D"
-
 [[package]]
 name = "annotated-doc"
 version = "0.0.4"
