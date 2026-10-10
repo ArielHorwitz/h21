@@ -107,4 +107,5 @@ The app never gained traction, and the few accounts are family and friends, so a
 - Proper exhaustion handling to replace the interim guard: a user-facing notice that a topic has run dry, and possibly an earlier "running low" notice. Calibrate by running a few narrow topics until they genuinely run out.
 - Rejected subjects are not remembered, so refills may propose them again. Storing them would sharpen exclusion lists and feed pool visibility.
 - A failed topic still consumes the creator's daily topic suggestion.
+- **New-topic threshold may be too strict for expert.** Rebuilding the sandbox topics on the lab rejected "Movie Classics": normal kept 96, expert only 41 (World Geography expert kept 63). Likely lower the expert bar or judge on normal only; to be decided.
 - Consider admin panel integration for pool visibility.
