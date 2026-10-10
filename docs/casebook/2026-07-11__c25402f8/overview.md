@@ -72,13 +72,25 @@ h21-pool "Notable People" --count 50 -e previous-run.txt -o new-run.txt
 - **Validation**: parses cleanly. 18 of 20 rejections were "too obscure for normal", some arguably wrong for the likely audience (e.g. Moshe Sharett, a prime minister).
 - **Weak keeps**: a few abstract subjects make awkward 21-questions answers ("Zionism", "Aliyah", "The 1950s Israeli austerity period").
 
+### Batch-size comparison (2026-10-10)
+
+19 runs of `h21-pool --count 100` with `gpt-6-luna`/`medium`: five topics (Israeli History, Notable People, World Geography, Space Exploration, The Beatles) at normal difficulty with batch sizes 25, 50 and 100, plus Israeli History and Notable People at expert with 25 and 100. Logs and kept lists are in `/tmp/h21-pool-eval/runs/` (ephemeral).
+
+- **Batch size barely matters for quality.** Generators returned the requested count (98-100 for size 100), no exact duplicates in any run, and similar category spread (Israeli History prime ministers: 12/101 at 25, 11/129 at 50, 10/115 at 100).
+- **Depth into the topic is what drives rejection, not batch size.** First batches keep 80-100% for most topics at any size. Rejection climbs as the exclusion list grows past roughly 100 subjects, almost all as "too obscure": Israeli History normal kept 82/99 then 33/98 at size 100, and 23/25 falling to 17/25 at size 25. Space Exploration is shallowest (55/100 kept on the first size-100 batch, 13/25 by the fifth size-25 batch). Broad topics (Notable People, World Geography) barely reject at all past 200.
+- **Larger batches are cheaper and faster** (fewer calls, the exclusion list is sent fewer times). Wall time per run was similar or lower at size 100.
+- **The CLI exhaustion rule never fired**, even when Space Exploration batches hovered around 50% rejection. As a running-dry signal, the per-batch keep rate is informative but noisy around the threshold.
+- The CLI overshoots `--count` because it adds a whole validated batch at once (e.g. 195 kept for a count of 100).
+
+**Conclusion**: keep the server's `POOL_BATCH_SIZE=100`. A narrow topic's normal-difficulty capacity is on the order of 100-150 subjects, i.e. a few months of daily puzzles, so running dry is a realistic event for user-submitted topics.
+
 ## Decisions from evaluation
 
+- **Keep batch size 100** on the server (see batch-size comparison).
 - **Trust the validator's difficulty calls.** Its "too obscure for normal" rejections (e.g. Moshe Sharett) were judged acceptable; no tuning of the obscurity bar.
 
 ## Open items
 
-- Server path generates `POOL_BATCH_SIZE=100` in one call, while the evaluated CLI path used 25 per call. Either evaluate the 100 path or have the server generate in batches of 25.
 - Exhaustion detection exists only in the CLI tool, not in `_regenerate_pool()`. On a narrow topic, every draw below the threshold can trigger another paid batch. Deferred, but when handled it needs a user-facing notice in the app that a topic has run dry, and possibly an earlier "running low" notice.
 - The initial synchronous fill (empty pool) has no lock, so concurrent first players of a new topic can each generate a batch.
 - Consider admin panel integration for pool visibility.
