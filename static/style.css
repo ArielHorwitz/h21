@@ -1441,6 +1441,11 @@ body[data-tab="profile"] .tab-bar a[data-tab="profile"] .tab-avatar img {
   color: var(--text-muted);
 }
 
+.composer-status #question-counter {
+  margin-left: auto;
+  white-space: nowrap;
+}
+
 .composer-status #status-text {
   flex: 1;
   font-style: italic;
@@ -1452,7 +1457,6 @@ body[data-tab="profile"] .tab-bar a[data-tab="profile"] .tab-avatar img {
 }
 
 .hint-btn {
-  margin-left: auto;
   font: inherit;
   font-size: 0.82rem;
   padding: 0.3rem 0.7rem;
