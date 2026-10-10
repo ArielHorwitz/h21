@@ -61,7 +61,7 @@ h21-pool "Notable People" --count 50 -e previous-run.txt -o new-run.txt
 
 ## Status
 
-- Core implementation complete (db, llm, main.py, CLI tool). Branch is a single WIP commit based on July master; master has since moved 18 commits, none touching puzzle generation, so a rebase should be light.
+- Core implementation complete (db, llm, main.py, CLI tool). Rebased onto master on 2026-10-10 (only a `pyproject.toml` scripts conflict).
 - Evaluated against a live LLM and looks good on variety, difficulty and validation parsing (see below).
 
 ### Evaluation run (2026-10-10)
@@ -72,11 +72,13 @@ h21-pool "Notable People" --count 50 -e previous-run.txt -o new-run.txt
 - **Validation**: parses cleanly. 18 of 20 rejections were "too obscure for normal", some arguably wrong for the likely audience (e.g. Moshe Sharett, a prime minister).
 - **Weak keeps**: a few abstract subjects make awkward 21-questions answers ("Zionism", "Aliyah", "The 1950s Israeli austerity period").
 
+## Decisions from evaluation
+
+- **Trust the validator's difficulty calls.** Its "too obscure for normal" rejections (e.g. Moshe Sharett) were judged acceptable; no tuning of the obscurity bar.
+
 ## Open items
 
-- Rebase onto master.
 - Server path generates `POOL_BATCH_SIZE=100` in one call, while the evaluated CLI path used 25 per call. Either evaluate the 100 path or have the server generate in batches of 25.
-- Exhaustion detection exists only in the CLI tool, not in `_regenerate_pool()`. On a narrow topic, every draw below the threshold can trigger another paid batch.
+- Exhaustion detection exists only in the CLI tool, not in `_regenerate_pool()`. On a narrow topic, every draw below the threshold can trigger another paid batch. Deferred, but when handled it needs a user-facing notice in the app that a topic has run dry, and possibly an earlier "running low" notice.
 - The initial synchronous fill (empty pool) has no lock, so concurrent first players of a new topic can each generate a batch.
-- Consider tuning the validator's obscurity bar and rejecting abstract, hard-to-pin-down subjects.
 - Consider admin panel integration for pool visibility.
