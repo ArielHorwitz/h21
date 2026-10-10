@@ -2210,3 +2210,8 @@ a.history-row:hover {
 .field-status:empty {
   display: none;
 }
+
+.topic-pending-status button {
+  font-style: normal;
+  flex-shrink: 0;
+}
