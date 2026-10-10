@@ -7,7 +7,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#1a1a2e">
-  <title>H21 — Account</title>
+  <title>Profile — H21</title>
   <meta property="og:title" content="H21 — Account">
   <meta property="og:description" content="A daily 21 Questions trivia game powered by AI.">
   <meta property="og:type" content="website">
@@ -17,17 +17,10 @@
   <meta name="twitter:card" content="summary_large_image">
   <link rel="stylesheet" href="/static/style.css">
 </head>
-<body>
-  <nav class="nav-bar">
-    <a href="/" title="Home"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12L12 3l9 9"/><path d="M5 10v9a1 1 0 001 1h4v-5h4v5h4a1 1 0 001-1v-9"/></svg></a>
-    <a href="/help" title="Help"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9 9a3 3 0 115.12 2.12C13.24 12 12 12.5 12 14"/><circle cx="12" cy="18" r="0.5" fill="currentColor"/></svg></a>
-    <a href="/account" title="Account" id="nav-account"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.418 3.582-7 8-7s8 2.582 8 7"/></svg></a>
-  </nav>
-  <main>
-    <h1 class="brand-heading"><a href="/" class="home-link"><img class="brand-logo" src="/static/brand/h21-logo.svg" alt="H21" width="590" height="180"></a></h1>
-    <p class="subtitle">Account</p>
-
-    <div id="account-info" class="auth-section">
+<body data-tab="profile">
+  <!--TOP_BAR-->
+  <main class="page">
+    <section class="profile-card">
       <div id="avatar-section">
         <div id="avatar-display">
           <img id="avatar-img" class="avatar-large" alt="Profile picture" hidden>
@@ -46,7 +39,7 @@
             <input type="text" id="avatar-prompt-input" maxlength="500" placeholder="Describe the picture you want...">
           </div>
           <div id="avatar-gen-actions">
-            <button type="button" id="avatar-generate-btn">Generate</button>
+            <button type="button" id="avatar-generate-btn" class="primary-btn">Generate</button>
             <button type="button" id="avatar-cancel-btn" class="secondary-btn">Cancel</button>
             <span id="avatar-gen-counter" class="field-hint"></span>
           </div>
@@ -69,80 +62,52 @@
             </div>
           </div>
           <div id="avatar-confirm-actions">
-            <button type="button" id="avatar-use-btn">Use this</button>
+            <button type="button" id="avatar-use-btn" class="primary-btn">Use this</button>
             <button type="button" id="avatar-retry-btn" class="secondary-btn">Try again</button>
             <button type="button" id="avatar-discard-btn" class="secondary-btn">Cancel</button>
           </div>
         </div>
       </div>
-      <div class="settings-field">
-        <label>Username</label>
-        <p id="account-username" class="account-value"></p>
-      </div>
-      <div class="settings-field">
-        <label>Display Name</label>
-        <div class="profile-inline-edit">
-          <input type="text" id="display-name-input" maxlength="40" placeholder="(same as username)">
-          <button type="button" id="save-display-name-btn" class="secondary-btn">Save</button>
+      <div class="profile-identity">
+        <div class="profile-name-row">
+          <input type="text" id="display-name-input" class="profile-name-input" maxlength="40" aria-label="Display name">
+          <button type="button" id="save-display-name-btn" class="secondary-btn small-btn" hidden>Save</button>
         </div>
+        <p class="profile-meta">@<span id="account-username"></span> · code <span id="player-code-value" class="player-code-text"></span></p>
         <p id="display-name-status" class="field-status"></p>
       </div>
-      <div class="settings-field">
-        <label>Player Code</label>
-        <div class="profile-inline-edit">
-          <span id="player-code-value" class="account-value player-code-text"></span>
-          <button type="button" id="copy-code-btn" class="secondary-btn">Copy</button>
-        </div>
+    </section>
+
+    <section class="stats-grid" id="stats-grid" hidden>
+      <div class="stat"><span class="stat-value" id="stat-played">0</span><span class="stat-label">Played</span></div>
+      <div class="stat"><span class="stat-value" id="stat-solved">0%</span><span class="stat-label">Solved</span></div>
+      <div class="stat"><span class="stat-value" id="stat-average">–</span><span class="stat-label">Avg. questions</span></div>
+    </section>
+
+    <section id="history-section" hidden>
+      <div class="section-header">
+        <h2 class="section-title">History</h2>
       </div>
-      <div class="settings-field">
-        <label class="toggle-label">
-          <input type="checkbox" id="anonymous-toggle">
+      <div id="history-list" class="history-list"></div>
+      <button type="button" class="text-btn show-more-btn" id="history-more-btn" hidden>Show more</button>
+    </section>
+
+    <section class="settings-list">
+      <h2 class="section-title">Settings</h2>
+      <label class="setting-row">
+        <span class="setting-text">
           <span>Anonymous mode</span>
-        </label>
-        <p class="field-hint">Hides you from others and disables social features.</p>
-      </div>
-      <div class="settings-actions">
-        <a href="/control" id="control-link" class="secondary-btn" hidden>Control Panel</a>
-        <button type="button" id="logout-btn">Log out</button>
-        <button type="button" id="back-btn" class="secondary-btn">Back</button>
-      </div>
-    </div>
-
-    <div id="friends-section" class="auth-section" style="margin-top: 1.5rem;">
-      <h2>Friends</h2>
-      <div id="friends-disabled-message" hidden>
-        <p class="field-hint">Social features are disabled while anonymous mode is on.</p>
-      </div>
-      <div id="friends-controls">
-        <div class="settings-field">
-          <label>Add by player code</label>
-          <div class="profile-inline-edit">
-            <input type="text" id="add-friend-input" placeholder="e.g. A1B2" style="text-transform: uppercase; font-family: monospace;">
-            <button type="button" id="add-friend-btn">Add</button>
-          </div>
-          <p id="add-friend-status" class="field-status"></p>
-        </div>
-        <div class="settings-field">
-          <label>Search players</label>
-          <input type="text" id="search-players-input" placeholder="Search by name...">
-          <div id="search-results"></div>
-        </div>
-        <div id="friends-list-container">
-          <label>Following</label>
-          <div id="friends-list"></div>
-        </div>
-        <div id="friend-suggestions-container" hidden>
-          <label>Suggested</label>
-          <div id="account-friend-suggestions"></div>
-        </div>
-      </div>
-    </div>
-
-    <div id="history-section" class="auth-section" style="margin-top: 1.5rem;" hidden>
-      <h2>Game History</h2>
-      <div id="history-list"></div>
-    </div>
+          <span class="field-hint">Hide your name and results from others, and turn off social features.</span>
+        </span>
+        <input type="checkbox" id="anonymous-toggle" class="switch">
+      </label>
+      <a href="/control" id="control-link" class="setting-row setting-link" hidden>
+        <span>Control panel</span><span aria-hidden="true">›</span>
+      </a>
+      <button type="button" id="logout-btn" class="setting-row setting-link logout-row">Log out</button>
+    </section>
   </main>
+  <!--TAB_BAR-->
   <script src="/static/nav.js"></script>
   <script src="/static/account.js"></script>
 </body>

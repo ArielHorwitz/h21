@@ -948,16 +948,17 @@ class GameDatabase:
         return dict(row)
 
     def search_players(self, query: str, exclude_user_id: int) -> list[dict[str, Any]]:
-        """Search non-anonymous accounts by username or display_name (LIKE match).
-        Excludes the searching user and anonymous players. Returns up to 20 results."""
+        """Search non-anonymous accounts by username or display_name (LIKE match),
+        or by exact player code. Excludes the searching user and anonymous
+        players. Returns up to 20 results."""
         pattern = f"%{query}%"
         rows = self._connection.execute(
             "SELECT user_id, username, display_name, player_code, avatar_version "
             "FROM accounts "
             "WHERE anonymous = 0 AND user_id != ? "
-            "AND (username LIKE ? OR display_name LIKE ?) "
+            "AND (username LIKE ? OR display_name LIKE ? OR player_code = ?) "
             "LIMIT 20",
-            (exclude_user_id, pattern, pattern),
+            (exclude_user_id, pattern, pattern, query.strip().upper()),
         ).fetchall()
         return [dict(row) for row in rows]
 

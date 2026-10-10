@@ -1,21 +1,222 @@
 const recentResultsSection = document.getElementById("recent-results-section");
-const friendsEmpty = document.getElementById("friends-empty");
+const anonymousNotice = document.getElementById("anonymous-notice");
+const socialContent = document.getElementById("social-content");
+const myPlayerCode = document.getElementById("my-player-code");
+const copyCodeBtn = document.getElementById("copy-code-btn");
+const searchPlayersInput = document.getElementById("search-players-input");
+const searchResults = document.getElementById("search-results");
+const friendSuggestionsSection = document.getElementById("friend-suggestions-section");
+const friendSuggestionsList = document.getElementById("friend-suggestions-list");
+const followingList = document.getElementById("following-list");
+
+const SEARCH_DEBOUNCE_MS = 300;
 
 let currentUserPlayerCode = null;
 let currentUserAvatarVersion = 0;
+let searchTimeout = null;
+
+function avatarUrl(playerCode, avatarVersion) {
+  return "/avatars/" + encodeURIComponent(playerCode) + ".webp?v=" + avatarVersion;
+}
+
+// A row for a person: avatar, name, a detail line, and an optional action.
+function renderPersonRow({ name, detail, playerCode, avatarVersion, actionLabel, actionClass, onAction }) {
+  const row = document.createElement("div");
+  row.className = "person-row";
+
+  if (playerCode && avatarVersion > 0) {
+    const avatar = document.createElement("img");
+    avatar.className = "avatar-sm";
+    avatar.src = avatarUrl(playerCode, avatarVersion);
+    avatar.alt = "";
+    row.appendChild(avatar);
+  } else {
+    const placeholder = document.createElement("span");
+    placeholder.className = "avatar-sm avatar-placeholder";
+    placeholder.textContent = name.charAt(0).toUpperCase();
+    row.appendChild(placeholder);
+  }
+
+  const info = document.createElement("span");
+  info.className = "person-info";
+  const nameEl = document.createElement("span");
+  nameEl.className = "person-name";
+  nameEl.textContent = name;
+  info.appendChild(nameEl);
+  if (detail) {
+    const detailEl = document.createElement("span");
+    detailEl.className = "person-detail";
+    detailEl.textContent = detail;
+    info.appendChild(detailEl);
+  }
+  row.appendChild(info);
+
+  if (actionLabel) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `${actionClass || "secondary-btn"} small-btn`;
+    button.textContent = actionLabel;
+    button.addEventListener("click", async () => {
+      button.disabled = true;
+      const keepEnabled = await onAction(button);
+      if (keepEnabled) button.disabled = false;
+    });
+    row.appendChild(button);
+  }
+  return row;
+}
+
+async function follow(playerCode) {
+  const response = await fetch("/api/friends/" + encodeURIComponent(playerCode), { method: "POST" });
+  return response.ok || response.status === 409;
+}
+
+async function unfollow(playerCode) {
+  const response = await fetch("/api/friends/" + encodeURIComponent(playerCode), { method: "DELETE" });
+  return response.ok;
+}
+
+function refreshSocialLists() {
+  loadFollowing();
+  loadFriendSuggestions();
+}
 
 async function loadCurrentUser() {
   try {
     const response = await fetch("/api/me");
-    if (response.ok) {
-      const data = await response.json();
-      currentUserPlayerCode = data.player_code;
-      currentUserAvatarVersion = data.avatar_version;
-    }
+    if (!response.ok) return null;
+    const data = await response.json();
+    currentUserPlayerCode = data.player_code;
+    currentUserAvatarVersion = data.avatar_version;
+    myPlayerCode.textContent = data.player_code;
+    return data;
   } catch {
-    // Non-critical.
+    return null;
   }
 }
+
+copyCodeBtn.addEventListener("click", async () => {
+  try {
+    await navigator.clipboard.writeText(myPlayerCode.textContent);
+    copyCodeBtn.textContent = "Copied";
+  } catch {
+    copyCodeBtn.textContent = "Couldn't copy";
+  }
+  setTimeout(() => { copyCodeBtn.textContent = "Copy"; }, 1500);
+});
+
+// -- Following --
+
+async function loadFollowing() {
+  try {
+    const response = await fetch("/api/friends");
+    if (!response.ok) return;
+    const friends = await response.json();
+    followingList.innerHTML = "";
+    if (friends.length === 0) {
+      followingList.innerHTML = '<p class="field-hint">You aren\'t following anyone yet. Search above, or share your player code.</p>';
+      return;
+    }
+    for (const friend of friends) {
+      const name = friend.display_name || friend.username;
+      followingList.appendChild(renderPersonRow({
+        name,
+        detail: friend.anonymous ? "Playing anonymously" : `Code ${friend.player_code}`,
+        playerCode: friend.anonymous ? null : friend.player_code,
+        avatarVersion: friend.avatar_version,
+        actionLabel: "Unfollow",
+        onAction: async () => {
+          if (!confirm(`Unfollow ${name}?`)) return true;
+          if (await unfollow(friend.player_code)) {
+            refreshSocialLists();
+            return false;
+          }
+          return true;
+        },
+      }));
+    }
+  } catch (error) {
+    console.error("Failed to load friends:", error);
+  }
+}
+
+// -- Search --
+
+searchPlayersInput.addEventListener("input", () => {
+  clearTimeout(searchTimeout);
+  const query = searchPlayersInput.value.trim();
+  if (!query) {
+    searchResults.innerHTML = "";
+    return;
+  }
+  searchTimeout = setTimeout(() => searchPlayers(query), SEARCH_DEBOUNCE_MS);
+});
+
+async function searchPlayers(query) {
+  try {
+    const response = await fetch("/api/players/search?q=" + encodeURIComponent(query));
+    searchResults.innerHTML = "";
+    if (!response.ok) return;
+    const players = await response.json();
+    if (players.length === 0) {
+      searchResults.innerHTML = '<p class="field-hint">No players found.</p>';
+      return;
+    }
+    for (const player of players) {
+      searchResults.appendChild(renderPersonRow({
+        name: player.display_name || player.username,
+        detail: `Code ${player.player_code}`,
+        playerCode: player.player_code,
+        avatarVersion: player.avatar_version,
+        actionLabel: "Follow",
+        actionClass: "primary-btn",
+        onAction: async (button) => {
+          if (await follow(player.player_code)) {
+            button.textContent = "Following";
+            refreshSocialLists();
+            return false;
+          }
+          return true;
+        },
+      }));
+    }
+  } catch {
+    searchResults.innerHTML = "";
+  }
+}
+
+// -- Suggestions --
+
+async function loadFriendSuggestions() {
+  try {
+    const response = await fetch("/api/friend-suggestions");
+    if (!response.ok) return;
+    const suggestions = await response.json();
+    friendSuggestionsList.innerHTML = "";
+    friendSuggestionsSection.hidden = suggestions.length === 0;
+    for (const suggestion of suggestions) {
+      friendSuggestionsList.appendChild(renderPersonRow({
+        name: suggestion.display_name || suggestion.username,
+        detail: suggestion.reason,
+        playerCode: suggestion.player_code,
+        avatarVersion: suggestion.avatar_version,
+        actionLabel: "Follow",
+        actionClass: "primary-btn",
+        onAction: async () => {
+          if (await follow(suggestion.player_code)) {
+            refreshSocialLists();
+            return false;
+          }
+          return true;
+        },
+      }));
+    }
+  } catch (error) {
+    console.error("Failed to load friend suggestions:", error);
+  }
+}
+
+// -- Recent games --
 
 function formatResult(questionsAsked, hintsUsed) {
   let text = `${questionsAsked} question${questionsAsked !== 1 ? "s" : ""}`;
@@ -39,7 +240,7 @@ function renderRecentResults(games) {
   recentResultsSection.innerHTML = "";
 
   const heading = document.createElement("h2");
-  heading.className = "recent-results-heading";
+  heading.className = "section-title";
   heading.textContent = "Recent games";
   recentResultsSection.appendChild(heading);
 
@@ -144,93 +345,15 @@ async function loadRecentResults() {
   }
 }
 
-const friendSuggestionsSection = document.getElementById("friend-suggestions-section");
-
-function renderFriendSuggestions(suggestions) {
-  if (!suggestions || suggestions.length === 0) {
-    friendSuggestionsSection.hidden = true;
+async function init() {
+  const user = await loadCurrentUser();
+  if (user && user.anonymous) {
+    anonymousNotice.hidden = false;
     return;
   }
-
-  friendSuggestionsSection.hidden = false;
-  friendSuggestionsSection.innerHTML = "";
-
-  const heading = document.createElement("h2");
-  heading.className = "friend-suggestions-heading";
-  heading.textContent = "People you may know";
-  friendSuggestionsSection.appendChild(heading);
-
-  for (const suggestion of suggestions) {
-    const card = document.createElement("div");
-    card.className = "friend-suggestion-card";
-
-    if (suggestion.player_code && suggestion.avatar_version > 0) {
-      const avatar = document.createElement("img");
-      avatar.className = "avatar-sm";
-      avatar.src = "/avatars/" + encodeURIComponent(suggestion.player_code) + ".webp?v=" + suggestion.avatar_version;
-      avatar.alt = "";
-      card.appendChild(avatar);
-    }
-
-    const info = document.createElement("div");
-    info.className = "friend-suggestion-info";
-
-    const name = document.createElement("span");
-    name.className = "friend-suggestion-name";
-    name.textContent = suggestion.display_name || suggestion.username;
-    info.appendChild(name);
-
-    const reason = document.createElement("span");
-    reason.className = "friend-suggestion-reason";
-    reason.textContent = suggestion.reason;
-    info.appendChild(reason);
-
-    card.appendChild(info);
-
-    const followBtn = document.createElement("button");
-    followBtn.className = "friend-suggestion-follow-btn";
-    followBtn.textContent = "Follow";
-    followBtn.addEventListener("click", async () => {
-      followBtn.disabled = true;
-      try {
-        const response = await fetch("/api/friends/" + encodeURIComponent(suggestion.player_code), {
-          method: "POST",
-        });
-        if (response.ok || response.status === 409) {
-          card.classList.add("friend-suggestion-fade-out");
-          card.addEventListener("animationend", () => {
-            card.remove();
-            // Re-fetch to fill the slot.
-            loadFriendSuggestions();
-          });
-        }
-      } catch {
-        followBtn.disabled = false;
-      }
-    });
-    card.appendChild(followBtn);
-
-    friendSuggestionsSection.appendChild(card);
-  }
-
+  socialContent.hidden = false;
+  loadRecentResults();
+  refreshSocialLists();
 }
 
-async function loadFriendSuggestions() {
-  try {
-    const response = await fetch("/api/friend-suggestions");
-    if (response.ok) {
-      const data = await response.json();
-      renderFriendSuggestions(data);
-    }
-  } catch (error) {
-    console.error("Failed to load friend suggestions:", error);
-  }
-}
-
-function updateEmptyState() {
-  friendsEmpty.hidden = !(recentResultsSection.hidden && friendSuggestionsSection.hidden);
-}
-
-loadCurrentUser()
-  .then(() => Promise.all([loadRecentResults(), loadFriendSuggestions()]))
-  .then(updateEmptyState);
+init();

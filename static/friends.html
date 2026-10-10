@@ -24,13 +24,35 @@
       <h1 class="page-title">Friends</h1>
     </header>
 
-    <section id="recent-results-section" hidden></section>
-
-    <section id="friend-suggestions-section" hidden></section>
-
-    <p id="friends-empty" class="empty-state" hidden>
-      Follow friends to compare results on the puzzles you both played.
+    <p id="anonymous-notice" class="empty-state" hidden>
+      Friends are turned off while you're in anonymous mode.
+      You can change this on your <a href="/account">profile</a>.
     </p>
+
+    <div id="social-content" hidden>
+      <section id="recent-results-section" hidden></section>
+
+      <section class="find-friends">
+        <h2 class="section-title">Find friends</h2>
+        <div class="my-code">
+          <span>Your player code</span>
+          <strong id="my-player-code" class="player-code-text"></strong>
+          <button type="button" class="secondary-btn small-btn" id="copy-code-btn">Copy</button>
+        </div>
+        <input type="search" id="search-players-input" placeholder="Search by name or player code" autocomplete="off">
+        <div id="search-results" class="person-list"></div>
+      </section>
+
+      <section id="friend-suggestions-section" hidden>
+        <h2 class="section-title">People you may know</h2>
+        <div id="friend-suggestions-list" class="person-list"></div>
+      </section>
+
+      <section id="following-section">
+        <h2 class="section-title">Following</h2>
+        <div id="following-list" class="person-list"></div>
+      </section>
+    </div>
   </main>
   <!--TAB_BAR-->
   <script src="/static/nav.js"></script>

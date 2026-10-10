@@ -2411,3 +2411,341 @@ body[data-tab="profile"] .tab-bar a[data-tab="profile"] .tab-avatar img {
   gap: 0.4rem;
   line-height: 1.45;
 }
+
+/* ===================================================================
+   Shared lists and inputs
+   =================================================================== */
+
+.page input[type="search"],
+.page input[type="text"]:not(.profile-name-input) {
+  width: 100%;
+  padding: 0.65rem 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 1rem;
+  outline: none;
+}
+
+.page input[type="search"]:focus,
+.page input[type="text"]:focus {
+  border-color: var(--accent);
+}
+
+.person-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.person-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 0.75rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.person-row .avatar-sm {
+  width: 2.25rem;
+  height: 2.25rem;
+  flex-shrink: 0;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.person-row .avatar-placeholder {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface-raised);
+  color: var(--text-muted);
+  font-weight: 700;
+}
+
+.person-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.person-name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.person-detail {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.player-code-text {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.08em;
+  color: var(--accent);
+}
+
+/* ===================================================================
+   Friends
+   =================================================================== */
+
+#social-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+#social-content > section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.my-code {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.my-code strong {
+  font-size: 1.05rem;
+  margin-right: auto;
+}
+
+.empty-state a {
+  color: var(--accent);
+}
+
+/* ===================================================================
+   Profile
+   =================================================================== */
+
+.profile-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1.25rem 1rem 1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  text-align: center;
+}
+
+.profile-identity {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  width: 100%;
+}
+
+.profile-name-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.profile-name-input {
+  min-width: 0;
+  max-width: 16rem;
+  width: 100%;
+  text-align: center;
+  font: inherit;
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--text);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 0.2rem 0.5rem;
+}
+
+.profile-name-input:hover {
+  border-color: var(--border);
+}
+
+.profile-name-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.profile-meta {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  padding: 0.75rem 0.5rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.stat-value {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.history-list {
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.history-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.65rem 0.85rem;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.history-row + .history-row {
+  border-top: 1px solid var(--border);
+}
+
+a.history-row:hover {
+  background: var(--surface-raised);
+}
+
+.history-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.history-topic {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.history-meta {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.history-result {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.history-result.is-won { color: var(--yes); }
+.history-result.is-lost { color: var(--text-faint); }
+.history-result.is-in-progress { color: var(--accent); }
+
+.show-more-btn {
+  align-self: center;
+}
+
+#history-section {
+  display: flex;
+  flex-direction: column;
+}
+
+.settings-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.8rem 0.9rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.setting-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.logout-row {
+  color: #ff6b6b;
+  width: 100%;
+}
+
+.switch {
+  appearance: none;
+  flex-shrink: 0;
+  width: 2.6rem;
+  height: 1.5rem;
+  border-radius: 999px;
+  background: var(--border);
+  position: relative;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.switch::after {
+  content: "";
+  position: absolute;
+  top: 0.15rem;
+  left: 0.15rem;
+  width: 1.2rem;
+  height: 1.2rem;
+  border-radius: 50%;
+  background: var(--text);
+  transition: transform 0.15s;
+}
+
+.switch:checked {
+  background: var(--accent);
+}
+
+.switch:checked::after {
+  transform: translateX(1.1rem);
+}
+
+.profile-card #avatar-section {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
