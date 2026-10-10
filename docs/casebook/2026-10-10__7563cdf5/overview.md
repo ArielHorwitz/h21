@@ -28,10 +28,10 @@ Screenshots of every page at phone (390px) and desktop widths, on a seeded sandb
 ## Later decisions
 
 - **Compact topic rows** (after user feedback that the tiles were too tall and "Play" was redundant): one row per topic, name and friends who played on the left, Normal/Expert buttons on the right whose look carries the state (gold outline: unplayed; filled gold "Q6": in progress; green "✓ 12": solved; muted "✗": not solved).
-- **Results page** leads with outcome, the answer, the answer meter and stats, then Share / Leaderboard / More puzzles, then the log with revealed hints inline and unused hints collapsed. Share uses the native share sheet when available and links to the results page (spoiler-gated) instead of quoting a game ID, so the home page's replay-by-ID box isn't needed.
+- **Results page** leads with outcome, the answer, the answer meter and stats, then Share / Leaderboard / More puzzles, then the log with revealed hints inline and unused hints collapsed. Share keeps the Wordle-style emoji teaser (one colored dot per answer, a bulb per hint) and passes that text, plus a link, to the native share sheet when available (clipboard otherwise); the link goes to the results page (spoiler-gated) instead of quoting a game ID, so the home page's replay-by-ID box isn't needed.
 - **Profile vs Friends split.** Profile is about you: picture, inline-editable display name, stats (played, solved %, average questions on wins), tappable history, settings (anonymous mode, control panel, log out). Friends holds all social features: recent games, one search box for names and player codes (search now matches exact codes), suggestions, following with unfollow.
 - **Login** is one card with a Log in / Join switch, invite requests behind a link, and `?invite=CODE` prefilling Join so invites can be shared as links.
-- **Help** rewritten for the new UI and inlined (`help-content.html` removed). **Leaderboard** is a ranked list with an Everyone / Friends switch, and `/leaderboard` without a puzzle redirects to Friends. The **control panel** only moved into the shell.
+- **Help** rewritten for the new UI and inlined (`help-content.html` removed). **Leaderboard** is a ranked list with an Everyone / Friends switch, and `/leaderboard` without a puzzle redirects to Friends. The **control panel** is split into tabs (Invites, Users, Activity, Query, Logs; remembered in the URL hash) and restyled with the shared inputs, buttons and a `data-table` component.
 - `question-log.js` shares log rendering between the game and results pages. Dead CSS from the old layouts was swept (about 740 lines).
 
 ## Status
@@ -43,4 +43,3 @@ Screenshots of every page at phone (390px) and desktop widths, on a seeded sandb
 - Starter questions are generic ("Is it a person?" reads oddly for World Geography). Consider topic-aware starters.
 - Not yet checked on a real phone: the pinned composer with the on-screen keyboard, and iPhone safe areas.
 - Leaderboard and results show usernames for other players where display names would read better (the replay API only returns `username`).
-- The control panel's internals still use the old styling.

@@ -14,7 +14,7 @@ function renderInvites(invites) {
   }
 
   const table = document.createElement("table");
-  table.className = "invites-table";
+  table.className = "data-table";
 
   const thead = document.createElement("thead");
   thead.innerHTML = `<tr>
@@ -63,7 +63,7 @@ function renderInvites(invites) {
 
     const actionCell = document.createElement("td");
     const deleteBtn = document.createElement("button");
-    deleteBtn.className = "delete-invite-btn";
+    deleteBtn.className = "danger-btn small-btn";
     deleteBtn.textContent = "Delete";
     deleteBtn.addEventListener("click", () => deleteInvite(invite.code));
     actionCell.appendChild(deleteBtn);
@@ -156,7 +156,7 @@ function renderInviteRequests(requests) {
   }
 
   const table = document.createElement("table");
-  table.className = "invites-table";
+  table.className = "data-table";
 
   const thead = document.createElement("thead");
   thead.innerHTML = `<tr>
@@ -180,7 +180,7 @@ function renderInviteRequests(requests) {
 
     const actionCell = document.createElement("td");
     const deleteBtn = document.createElement("button");
-    deleteBtn.className = "delete-invite-btn";
+    deleteBtn.className = "danger-btn small-btn";
     deleteBtn.textContent = "Delete";
     deleteBtn.addEventListener("click", () => deleteInviteRequest(request.request_id));
     actionCell.appendChild(deleteBtn);
@@ -275,7 +275,7 @@ function renderActivityLog(entries, append) {
   let tbody;
   if (!table) {
     table = document.createElement("table");
-    table.className = "invites-table";
+    table.className = "data-table";
     const thead = document.createElement("thead");
     thead.innerHTML = `<tr><th>Time</th><th>User</th><th>Action</th><th>Detail</th></tr>`;
     table.appendChild(thead);
@@ -346,7 +346,7 @@ function renderUsers(users) {
   }
 
   const table = document.createElement("table");
-  table.className = "invites-table users-table";
+  table.className = "data-table users-table";
 
   const thead = document.createElement("thead");
   thead.innerHTML = `<tr>
@@ -380,13 +380,13 @@ function renderUsers(users) {
     actionCell.className = "user-actions";
     if (user.blocked) {
       const unblockBtn = document.createElement("button");
-      unblockBtn.className = "unblock-btn";
+      unblockBtn.className = "secondary-btn small-btn";
       unblockBtn.textContent = "Unblock";
       unblockBtn.addEventListener("click", (event) => { event.stopPropagation(); toggleBlock(user.user_id, false); });
       actionCell.appendChild(unblockBtn);
     } else {
       const blockBtn = document.createElement("button");
-      blockBtn.className = "delete-invite-btn";
+      blockBtn.className = "danger-btn small-btn";
       blockBtn.textContent = "Block";
       blockBtn.addEventListener("click", (event) => { event.stopPropagation(); toggleBlock(user.user_id, true); });
       actionCell.appendChild(blockBtn);
@@ -439,7 +439,7 @@ function renderUserDetail(user) {
     row.appendChild(value);
 
     const editBtn = document.createElement("button");
-    editBtn.className = "unblock-btn";
+    editBtn.className = "secondary-btn small-btn";
     editBtn.textContent = "Edit";
     editBtn.addEventListener("click", (event) => {
       event.stopPropagation();
@@ -448,7 +448,7 @@ function renderUserDetail(user) {
     row.appendChild(editBtn);
 
     const resetBtn = document.createElement("button");
-    resetBtn.className = "unblock-btn";
+    resetBtn.className = "secondary-btn small-btn";
     resetBtn.textContent = "Reset";
     resetBtn.addEventListener("click", (event) => {
       event.stopPropagation();
@@ -475,7 +475,7 @@ function renderUserDetail(user) {
   avatarRow.appendChild(fileInput);
 
   const uploadBtn = document.createElement("button");
-  uploadBtn.className = "unblock-btn";
+  uploadBtn.className = "secondary-btn small-btn";
   uploadBtn.textContent = "Upload";
   uploadBtn.addEventListener("click", (event) => {
     event.stopPropagation();
@@ -618,7 +618,7 @@ queryForm.addEventListener("submit", async (event) => {
     }
 
     const table = document.createElement("table");
-    table.className = "invites-table";
+    table.className = "data-table";
 
     const thead = document.createElement("thead");
     const headerRow = document.createElement("tr");
@@ -697,3 +697,25 @@ loadInvites();
 loadInviteRequests();
 loadActivityLog(false);
 loadUsers();
+
+// -- Tabs --
+
+const controlTabs = document.querySelectorAll(".control-tabs [data-panel]");
+const controlSections = document.querySelectorAll(".control-section[data-panel]");
+
+function showPanel(panel) {
+  for (const tab of controlTabs) {
+    tab.setAttribute("aria-selected", String(tab.dataset.panel === panel));
+  }
+  for (const section of controlSections) {
+    section.hidden = section.dataset.panel !== panel;
+  }
+  history.replaceState(null, "", "#" + panel);
+}
+
+for (const tab of controlTabs) {
+  tab.addEventListener("click", () => showPanel(tab.dataset.panel));
+}
+
+const initialPanel = location.hash.slice(1);
+showPanel(Array.from(controlTabs).some((tab) => tab.dataset.panel === initialPanel) ? initialPanel : "invites");

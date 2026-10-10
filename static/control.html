@@ -24,8 +24,16 @@
       <h1 class="page-title">Control panel</h1>
     </header>
 
-    <div class="control-section">
-      <h2>Create Invite</h2>
+    <nav class="control-tabs" role="tablist" aria-label="Control panel sections">
+      <button type="button" role="tab" data-panel="invites">Invites</button>
+      <button type="button" role="tab" data-panel="users">Users</button>
+      <button type="button" role="tab" data-panel="activity">Activity</button>
+      <button type="button" role="tab" data-panel="query">Query</button>
+      <button type="button" role="tab" data-panel="logs">Logs</button>
+    </nav>
+
+    <div class="control-section" data-panel="invites">
+      <h2>Create invite</h2>
       <form id="create-invite-form">
         <div class="control-row">
           <div class="settings-field">
@@ -52,46 +60,46 @@
             <input type="number" id="invite-topic-limit" min="0" max="1000">
           </div>
         </div>
-        <button type="submit" id="create-invite-btn">Create</button>
+        <button type="submit" id="create-invite-btn" class="primary-btn">Create</button>
         <p id="create-invite-status" hidden></p>
       </form>
     </div>
 
-    <div class="control-section">
+    <div class="control-section" data-panel="invites">
       <h2>Invites</h2>
       <div id="invites-list"></div>
     </div>
 
-    <div class="control-section">
-      <h2>Invite Requests</h2>
+    <div class="control-section" data-panel="invites">
+      <h2>Invite requests</h2>
       <div id="invite-requests-list"></div>
     </div>
 
-    <div class="control-section">
-      <h2>Activity Log</h2>
+    <div class="control-section" data-panel="activity">
+      <h2>Activity log</h2>
       <div id="activity-log"></div>
-      <button type="button" id="load-more-activity" hidden>Load more</button>
+      <button type="button" id="load-more-activity" class="secondary-btn" hidden>Load more</button>
     </div>
 
-    <div class="control-section">
+    <div class="control-section" data-panel="users">
       <h2>Users</h2>
       <div id="users-list"></div>
     </div>
 
-    <div class="control-section">
+    <div class="control-section" data-panel="query">
       <h2>Query</h2>
       <form id="query-form">
         <textarea id="query-input" rows="3" placeholder="SELECT * FROM accounts LIMIT 10" spellcheck="false"></textarea>
         <div class="query-buttons">
-          <button type="submit" id="query-btn">Run</button>
-          <button type="button" id="tables-btn">Tables</button>
-          <button type="button" id="select-btn">Select</button>
+          <button type="submit" id="query-btn" class="primary-btn">Run</button>
+          <button type="button" id="tables-btn" class="secondary-btn">Tables</button>
+          <button type="button" id="select-btn" class="secondary-btn">Select</button>
         </div>
       </form>
       <div id="query-result"></div>
     </div>
 
-    <div class="control-section">
+    <div class="control-section" data-panel="logs">
       <h2>Logs</h2>
       <div class="control-row">
         <div class="settings-field">
@@ -105,8 +113,8 @@
           <label for="log-lines">Lines</label>
           <input type="number" id="log-lines" value="100" min="1" max="10000">
         </div>
-        <div class="settings-field" style="align-self: end;">
-          <button type="button" id="load-logs-btn">Load</button>
+        <div class="settings-field control-field-action">
+          <button type="button" id="load-logs-btn" class="primary-btn">Load</button>
         </div>
       </div>
       <pre id="log-output" class="log-output" hidden></pre>
