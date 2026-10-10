@@ -26,9 +26,8 @@ Replace on-demand single-subject generation with a pre-generated pool:
 - **Lazy hint generation**: Hints are still generated when a game starts, not at batch time.
 - **Separate tables**: `puzzle_pool` holds undrawn subjects, `daily_puzzles` holds used ones. Drawing deletes from pool and inserts into daily_puzzles. Exclusion list for regeneration is the UNION of both tables (across both difficulties for a topic).
 - **Pool lifecycle**: generate batch -> validate -> store in pool -> draw randomly -> record in daily_puzzles. Pool row is deleted on draw.
-- **Exhaustion detection**: If 2 consecutive batches have >= 50% rejection rate, stop regenerating (topic is running dry at that difficulty).
-- **Fallback**: If pool is empty and batch generation fails, fall back to single-subject generation (existing code path).
-- **Validation failure graceful degradation**: If the validation LLM call fails, insert the unvalidated batch rather than losing the generation.
+- **Exhaustion detection (CLI tool)**: If 2 consecutive batches have >= 50% rejection rate, stop. The server uses a different interim guard (see integration decisions).
+- ~~Fallback to single-subject generation~~ and ~~inserting unvalidated batches on validation failure~~: both dropped in the relaunch integration (see below).
 
 ## Implementation
 
@@ -61,7 +60,7 @@ h21-pool "Notable People" --count 50 -e previous-run.txt -o new-run.txt
 
 ## Status
 
-- Core implementation complete (db, llm, main.py, CLI tool). Rebased onto master on 2026-10-10 (only a `pyproject.toml` scripts conflict).
+- Integrated for the relaunch and running on the lab (red slot) with a fresh database. Rebased onto master on 2026-10-10. To be merged into a new `dev` branch (created from master), not master, since this is a clean relaunch.
 - Evaluated against a live LLM and looks good on variety, difficulty and validation parsing (see below).
 
 ### Evaluation run (2026-10-10)
@@ -89,8 +88,23 @@ h21-pool "Notable People" --count 50 -e previous-run.txt -o new-run.txt
 - **Keep batch size 100** on the server (see batch-size comparison).
 - **Trust the validator's difficulty calls.** Its "too obscure for normal" rejections (e.g. Moshe Sharett) were judged acceptable; no tuning of the obscurity bar.
 
+## Relaunch integration (2026-10-10)
+
+The app never gained traction, and the few accounts are family and friends, so all game data will be wiped at relaunch. That freed the integration from backwards compatibility.
+
+- **No migrations.** The 21 migration methods were collapsed into one `CREATE TABLE IF NOT EXISTS` schema (taken from a freshly created database). Old databases are unsupported.
+- **The pool is the only puzzle source.** The single-subject generator and its prompt are deleted. Unvalidated subjects never enter the pool: a failed generation or validation call adds nothing.
+- **Topic status** (`generating`, `ready`, `failed`, plus a user-facing `status_detail`). Creating a topic returns immediately and builds both difficulty pools in the background, concurrently, then removes expert subjects that duplicate normal ones. Only the creator sees a topic before it is ready; the home page shows the animated brand mark with "Creating puzzles…" and polls `/api/topics` every 4s. A failed topic shows its reason and a Dismiss button (`DELETE /api/topics/{slug}`), and anyone may suggest the same name again. Builds interrupted by a restart, and the seeded default topics, are built at startup.
+- **New-topic threshold: 50 kept subjects at every difficulty**, separate from the refill threshold (also 50). Rejection of the whole topic if either difficulty falls short.
+- **Interim exhaustion guard**: every successful refill is logged in `pool_refills`; once a refill keeps fewer than 10, that pool is not refilled again, and when it empties the topic answers 503 "This topic has run out of puzzles." The real design (notice in the app, maybe a "running low" warning) is still open.
+- **Per-puzzle draw lock**, so concurrent first players of the day share one draw instead of racing.
+- **Background tasks are strongly referenced** (the branch's `asyncio.create_task` results could be garbage collected mid-flight).
+- **Lab verification**: World Geography, Notable People and The Beatles each built in about a minute (normal 94-99 kept, expert 74-91); "Left-Handed Accordion Makers from Moldova" was rejected with 0 kept; a game drew from the pool; dismissal worked.
+- Parser fix: list markers are only stripped when followed by whitespace (so "2001: A Space Odyssey" survives) and curly quotes are stripped.
+
 ## Open items
 
-- Exhaustion detection exists only in the CLI tool, not in `_regenerate_pool()`. On a narrow topic, every draw below the threshold can trigger another paid batch. Deferred, but when handled it needs a user-facing notice in the app that a topic has run dry, and possibly an earlier "running low" notice.
-- The initial synchronous fill (empty pool) has no lock, so concurrent first players of a new topic can each generate a batch.
+- Proper exhaustion handling to replace the interim guard: a user-facing notice that a topic has run dry, and possibly an earlier "running low" notice. Calibrate by running a few narrow topics until they genuinely run out.
+- Rejected subjects are not remembered, so refills may propose them again. Storing them would sharpen exclusion lists and feed pool visibility.
+- A failed topic still consumes the creator's daily topic suggestion.
 - Consider admin panel integration for pool visibility.
