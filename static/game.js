@@ -1,55 +1,268 @@
 const MAX_QUESTIONS = 21;
+const HINTS_TOTAL = 5;
+const QUESTIONS_PER_HINT = 4;
+const STARTER_QUESTIONS = ["Is it a person?", "Is it from before 1900?", "Is it in Europe?"];
 
 const questionLog = document.getElementById("question-log");
 const questionInput = document.getElementById("question-input");
 const submitBtn = document.getElementById("submit-btn");
 const askForm = document.getElementById("ask-form");
 const questionCounter = document.getElementById("question-counter");
+const questionMeter = document.getElementById("question-meter");
 const statusText = document.getElementById("status-text");
-const statusMark = document.getElementById("status-mark");
-const todayDate = document.getElementById("today-date");
-const gameSubtitle = document.getElementById("game-subtitle");
-const hintPanel = document.getElementById("hint-panel");
-const hintList = document.getElementById("hint-list");
+const hintBtn = document.getElementById("hint-btn");
 const concedeBtn = document.getElementById("concede-btn");
+const gameTopic = document.getElementById("game-topic");
+const gameDifficulty = document.getElementById("game-difficulty");
+const gameIntro = document.getElementById("game-intro");
+const gameIntroTopic = document.getElementById("game-intro-topic");
+const suggestionChips = document.getElementById("suggestion-chips");
+
+// The brand mark, animated as a thinking indicator.
+const THINKING_MARK_SVG = `
+  <svg viewBox="0 0 270 180" aria-hidden="true">
+    <g fill="none" stroke-linecap="round" stroke-width="9" class="mark-flow">
+      <path d="M20 24C117 24 131 90 249 90" stroke="#e0e0e0"/>
+      <path d="M20 68C120 68 143 90 249 90" stroke="#b0b0b0"/>
+      <path d="M20 112C120 112 143 90 249 90" stroke="#7e7e7e"/>
+      <path d="M20 156C117 156 131 90 249 90" stroke="#555568"/>
+    </g>
+    <circle cx="249" cy="90" r="16" fill="#e2b714" class="mark-answer"/>
+  </svg>`;
+
+const ANSWER_LABELS = {
+  yes: "Yes",
+  no: "No",
+  partially: "Partially",
+  depends: "Depends",
+  win: "Correct!",
+};
 
 // Parse topic and difficulty from URL query params.
 const urlParams = new URLSearchParams(window.location.search);
-const topicSlug = urlParams.get("topic") || "notable-people";
+const topicSlug = urlParams.get("topic");
 const difficulty = urlParams.get("difficulty") || "normal";
 
-// Redirect to home if no topic specified in URL.
-if (!urlParams.has("topic")) {
+if (!topicSlug) {
   window.location.href = "/";
 }
-
-const HINTS_TOTAL = 5;
-const QUESTIONS_PER_HINT = 4;
 
 let questionsAsked = 0;
 let gameFinished = false;
 let gameId = null;
 let shareCode = null;
-let hintsUnlocked = 0;
 let hintsRevealed = 0;
-const revealedHintIndices = new Set();
-const hintRevealAfterQuestion = new Map(); // hint_index -> after_question
-const revealedHintTexts = new Map(); // hint_index -> hint text (for restoring on resume)
+let hintRequestInFlight = false;
+const answers = []; // answer per asked question, for the meter
 
-// Display topic and difficulty in the subtitle.
-const difficultyLabel = difficulty.charAt(0).toUpperCase() + difficulty.slice(1);
-const topicLabel = topicSlug
-  .split("-")
-  .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-  .join(" ");
-gameSubtitle.textContent = `${topicLabel} — ${difficultyLabel}`;
+function capitalize(text) {
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
 
-todayDate.textContent = new Date().toLocaleDateString("en-US", {
-  weekday: "long",
-  year: "numeric",
-  month: "long",
-  day: "numeric",
-});
+function setTopicName(name) {
+  gameTopic.textContent = name;
+  gameIntroTopic.textContent = name;
+  document.title = `${name} — H21`;
+}
+
+// A readable fallback until the real topic name loads.
+setTopicName(topicSlug.split("-").map(capitalize).join(" "));
+gameDifficulty.textContent = capitalize(difficulty);
+gameDifficulty.classList.add(difficulty);
+
+async function loadTopicName() {
+  try {
+    const response = await fetch("/api/topics");
+    if (!response.ok) return;
+    const topics = await response.json();
+    const topic = topics.find((candidate) => candidate.slug === topicSlug);
+    if (topic) setTopicName(topic.name);
+  } catch {
+    // Keep the fallback name.
+  }
+}
+
+// -- Progress --
+
+function renderMeter() {
+  questionMeter.innerHTML = "";
+  for (let index = 0; index < MAX_QUESTIONS; index++) {
+    const segment = document.createElement("span");
+    segment.className = "meter-segment";
+    if (index < answers.length) {
+      segment.classList.add(answers[index]);
+    } else if (index === answers.length && !gameFinished) {
+      segment.classList.add("current");
+    }
+    questionMeter.appendChild(segment);
+  }
+  questionMeter.setAttribute("aria-label", `${answers.length} of ${MAX_QUESTIONS} questions used`);
+}
+
+function updateProgress() {
+  const remaining = MAX_QUESTIONS - questionsAsked;
+  questionCounter.textContent = remaining === 1 ? "Last question" : `${remaining} questions left`;
+  renderMeter();
+  updateHintButton();
+  gameIntro.hidden = questionsAsked > 0 || gameId === null;
+}
+
+// -- Log --
+
+function scrollToLatest() {
+  window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
+}
+
+function addQuestionEntry(question) {
+  const entry = document.createElement("div");
+  entry.className = "log-entry";
+
+  const questionEl = document.createElement("div");
+  questionEl.className = "log-question";
+  const number = document.createElement("span");
+  number.className = "log-number";
+  number.textContent = String(questionsAsked + 1);
+  questionEl.appendChild(number);
+  const text = document.createElement("span");
+  text.textContent = question;
+  questionEl.appendChild(text);
+  entry.appendChild(questionEl);
+
+  const answerRow = document.createElement("div");
+  answerRow.className = "log-answer-row";
+  const pending = document.createElement("span");
+  pending.className = "thinking-mark";
+  pending.innerHTML = THINKING_MARK_SVG;
+  answerRow.appendChild(pending);
+  entry.appendChild(answerRow);
+
+  questionLog.appendChild(entry);
+  scrollToLatest();
+  return entry;
+}
+
+function fillAnswer(entry, answer, explanation) {
+  const answerRow = entry.querySelector(".log-answer-row");
+  answerRow.innerHTML = "";
+
+  const answerChip = document.createElement("span");
+  answerChip.className = `answer-chip ${answer}`;
+  answerChip.textContent = ANSWER_LABELS[answer] || answer;
+  answerRow.appendChild(answerChip);
+
+  if (explanation) {
+    const explanationEl = document.createElement("p");
+    explanationEl.className = "log-explanation";
+    explanationEl.textContent = explanation;
+    explanationEl.hidden = true;
+
+    const whyBtn = document.createElement("button");
+    whyBtn.type = "button";
+    whyBtn.className = "why-btn";
+    whyBtn.textContent = "Why?";
+    whyBtn.addEventListener("click", () => {
+      explanationEl.hidden = !explanationEl.hidden;
+      whyBtn.textContent = explanationEl.hidden ? "Why?" : "Hide";
+    });
+    answerRow.appendChild(whyBtn);
+    entry.appendChild(explanationEl);
+  }
+}
+
+function addHintEntry(hintIndex, hintText) {
+  const entry = document.createElement("div");
+  entry.className = "log-entry hint-entry";
+  const label = document.createElement("span");
+  label.className = "hint-entry-label";
+  label.textContent = `Hint ${hintIndex + 1}`;
+  entry.appendChild(label);
+  const text = document.createElement("p");
+  text.textContent = hintText || "";
+  entry.appendChild(text);
+  questionLog.appendChild(entry);
+  scrollToLatest();
+}
+
+// -- Hints --
+
+function hintsUnlocked() {
+  return Math.min(Math.floor(questionsAsked / QUESTIONS_PER_HINT), HINTS_TOTAL);
+}
+
+function updateHintButton() {
+  if (gameFinished || gameId === null || hintsRevealed >= HINTS_TOTAL) {
+    hintBtn.hidden = true;
+    return;
+  }
+  hintBtn.hidden = false;
+  const available = hintsUnlocked() - hintsRevealed;
+  if (hintRequestInFlight) {
+    hintBtn.textContent = "Getting hint…";
+    hintBtn.disabled = true;
+  } else if (available > 0) {
+    hintBtn.textContent = `Use hint ${hintsRevealed + 1}`;
+    hintBtn.disabled = false;
+    hintBtn.classList.add("is-available");
+  } else {
+    const unlockAt = (hintsRevealed + 1) * QUESTIONS_PER_HINT;
+    hintBtn.textContent = `Hint after question ${unlockAt}`;
+    hintBtn.disabled = true;
+    hintBtn.classList.remove("is-available");
+  }
+}
+
+async function revealNextHint() {
+  if (gameId === null || hintRequestInFlight) return;
+  const hintIndex = hintsRevealed;
+  hintRequestInFlight = true;
+  updateHintButton();
+  try {
+    const response = await fetch("/api/hint", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ game_id: gameId, hint_index: hintIndex }),
+    });
+    if (response.status === 410) {
+      window.location.href = "/";
+      return;
+    }
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      showError(error.detail || "Couldn't get a hint. Try again.");
+      return;
+    }
+    const data = await response.json();
+    hintsRevealed++;
+    addHintEntry(hintIndex, data.hint);
+  } catch {
+    showError("Couldn't get a hint. Try again.");
+  } finally {
+    hintRequestInFlight = false;
+    updateHintButton();
+  }
+}
+
+hintBtn.addEventListener("click", revealNextHint);
+
+// -- Status --
+
+function showError(message) {
+  statusText.textContent = message;
+  statusText.classList.add("error");
+}
+
+function clearError() {
+  statusText.textContent = "";
+  statusText.classList.remove("error");
+}
+
+function setInputEnabled(enabled) {
+  submitBtn.disabled = !enabled;
+  questionInput.disabled = !enabled;
+  concedeBtn.disabled = !enabled;
+}
+
+// -- Game session --
 
 async function startGameSession() {
   try {
@@ -64,219 +277,37 @@ async function startGameSession() {
       shareCode = data.share_code;
     } else {
       const error = await response.json().catch(() => ({}));
-      statusText.textContent = error.detail || "Failed to start game session.";
-      statusText.classList.add("error");
-    }
-  } catch (error) {
-    statusText.textContent = "Network error — could not start game.";
-    statusText.classList.add("error");
-  }
-}
-
-async function endGameSession(result) {
-  if (gameId === null) return;
-  try {
-    const response = await fetch("/api/game/end", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ game_id: gameId, result }),
-    });
-    if (response.status === 410) {
-      window.location.href = "/";
-    }
-  } catch (error) {
-    console.error("Failed to end game session:", error);
-  }
-}
-
-function updateCounter() {
-  questionCounter.textContent = `Question ${Math.min(questionsAsked + 1, MAX_QUESTIONS)} / ${MAX_QUESTIONS}`;
-}
-
-function addLogEntry(question, answer, explanation) {
-  const entry = document.createElement("div");
-  entry.className = "log-entry";
-
-  const questionEl = document.createElement("div");
-  questionEl.className = "log-question";
-
-  const numberSpan = document.createElement("span");
-  numberSpan.className = "number";
-  numberSpan.textContent = `${questionsAsked}.`;
-  questionEl.appendChild(numberSpan);
-  questionEl.appendChild(document.createTextNode(question));
-
-  const answerRow = document.createElement("div");
-  answerRow.className = "log-answer-row";
-
-  const answerEl = document.createElement("span");
-  answerEl.className = `log-answer ${answer}`;
-  answerEl.textContent = answer === "win" ? "Correct!" : answer;
-  answerRow.appendChild(answerEl);
-
-  entry.appendChild(questionEl);
-  entry.appendChild(answerRow);
-
-  if (explanation) {
-    const explanationEl = document.createElement("div");
-    explanationEl.className = "log-explanation";
-    explanationEl.textContent = explanation;
-    explanationEl.hidden = true;
-    entry.appendChild(explanationEl);
-  }
-
-  questionLog.appendChild(entry);
-  questionLog.scrollTop = questionLog.scrollHeight;
-}
-
-function addHintLogEntry(hintIndex, afterQuestion) {
-  const entry = document.createElement("div");
-  entry.className = "log-entry hint-log-entry";
-  const label = document.createElement("div");
-  label.className = "hint-log-label";
-  const afterQ = afterQuestion ?? hintRevealAfterQuestion.get(hintIndex);
-  const suffix = afterQ != null ? ` after question ${afterQ}` : "";
-  label.textContent = `Opened hint ${hintIndex + 1}${suffix}`;
-  entry.appendChild(label);
-  questionLog.appendChild(entry);
-  questionLog.scrollTop = questionLog.scrollHeight;
-}
-
-function updateHintPanel() {
-  const newUnlocked = Math.min(
-    Math.floor(questionsAsked / QUESTIONS_PER_HINT),
-    HINTS_TOTAL,
-  );
-
-  // Show panel and ensure all hint slots exist.
-  if (newUnlocked > 0 || hintList.children.length > 0) {
-    hintPanel.hidden = false;
-  }
-
-  // Create all hint slots up front (unlocked + pending).
-  while (hintList.children.length < HINTS_TOTAL) {
-    const index = hintList.children.length;
-    const li = document.createElement("li");
-    li.dataset.hintIndex = index;
-
-    const revealBtn = document.createElement("button");
-    revealBtn.className = "hint-reveal-btn";
-    li.appendChild(revealBtn);
-
-    const textSpan = document.createElement("span");
-    textSpan.className = "hint-text";
-    li.appendChild(textSpan);
-
-    hintList.appendChild(li);
-  }
-
-  // Update each slot's state.
-  for (let index = 0; index < HINTS_TOTAL; index++) {
-    const li = hintList.children[index];
-    const btn = li.querySelector(".hint-reveal-btn");
-    const textSpan = li.querySelector(".hint-text");
-    const unlocked = index < newUnlocked;
-
-    if (revealedHintTexts.has(index) || revealedHintIndices.has(index)) {
-      // Already revealed.
-      if (revealedHintTexts.has(index)) {
-        textSpan.textContent = revealedHintTexts.get(index);
-      }
-      textSpan.hidden = false;
-      btn.hidden = true;
-      li.className = "hint-item revealed";
-    } else if (unlocked) {
-      // Unlocked but not yet revealed.
-      btn.textContent = `Reveal hint ${index + 1}`;
-      btn.hidden = false;
-      btn.disabled = index > hintsRevealed;
-      textSpan.hidden = true;
-      li.className = "hint-item locked";
-      if (!li.dataset.listenerAdded) {
-        btn.addEventListener("click", () => fetchAndRevealHint(index));
-        li.dataset.listenerAdded = "1";
-      }
-    } else {
-      // Pending — show when it unlocks.
-      const requiredQuestions = (index + 1) * QUESTIONS_PER_HINT;
-      btn.textContent = `Hint ${index + 1} after question ${requiredQuestions}`;
-      btn.hidden = false;
-      btn.disabled = true;
-      textSpan.hidden = true;
-      li.className = "hint-item pending";
-    }
-  }
-
-  hintsUnlocked = newUnlocked;
-}
-
-async function fetchAndRevealHint(hintIndex) {
-  if (gameId === null) return;
-  const li = hintList.children[hintIndex];
-  const btn = li.querySelector(".hint-reveal-btn");
-  const textSpan = li.querySelector(".hint-text");
-
-  btn.disabled = true;
-  btn.textContent = "Loading...";
-
-  try {
-    const response = await fetch("/api/hint", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ game_id: gameId, hint_index: hintIndex }),
-    });
-    if (!response.ok) {
-      if (response.status === 410) {
-        window.location.href = "/";
-        return;
-      }
-      const error = await response.json().catch(() => ({}));
-      btn.textContent = error.detail || "Failed";
-      btn.disabled = false;
-      return;
-    }
-    const data = await response.json();
-    textSpan.textContent = data.hint;
-    textSpan.hidden = false;
-    btn.hidden = true;
-    li.classList.remove("locked");
-    li.classList.add("revealed");
-    hintsRevealed++;
-    revealedHintIndices.add(hintIndex);
-    hintRevealAfterQuestion.set(hintIndex, data.after_question);
-    addHintLogEntry(hintIndex);
-
-    if (hintsRevealed < hintsUnlocked) {
-      const nextBtn = hintList.children[hintsRevealed].querySelector(".hint-reveal-btn");
-      if (nextBtn) nextBtn.disabled = false;
+      showError(error.detail || "Couldn't start the game.");
     }
   } catch {
-    btn.textContent = "Failed — try again";
-    btn.disabled = false;
+    showError("Network error. Couldn't start the game.");
   }
-}
-
-function setBusyStatus(message) {
-  statusMark.hidden = false;
-  statusText.textContent = message;
-}
-
-function stopBusyStatus() {
-  statusMark.hidden = true;
 }
 
 async function endGame(won) {
   gameFinished = true;
-  submitBtn.disabled = true;
-  concedeBtn.disabled = true;
-  setBusyStatus("Finishing...");
-  await endGameSession(won ? "win" : "loss");
-  window.location.href = `/replay?code=${encodeURIComponent(shareCode)}`;
+  setInputEnabled(false);
+  updateProgress();
+  try {
+    const response = await fetch("/api/game/end", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ game_id: gameId, result: won ? "win" : "loss" }),
+    });
+    if (response.status === 410) {
+      window.location.href = "/";
+      return;
+    }
+  } catch (error) {
+    console.error("Failed to end game session:", error);
+  }
+  // Let the final answer register before moving to the results.
+  setTimeout(() => {
+    window.location.href = `/replay?code=${encodeURIComponent(shareCode)}`;
+  }, won ? 1200 : 600);
 }
 
 async function submitQuestion(question) {
-  setBusyStatus("Thinking...");
-
   const response = await fetch("/api/ask", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -290,12 +321,11 @@ async function submitQuestion(question) {
   if (!response.ok) {
     if (response.status === 410) {
       window.location.href = "/";
-      throw new Error("This puzzle has expired. Redirecting...");
+      throw new Error("This puzzle has expired.");
     }
     const error = await response.json().catch(() => ({}));
-    throw new Error(error.detail || "Request failed");
+    throw new Error(error.detail || "Something went wrong. Try again.");
   }
-
   return await response.json();
 }
 
@@ -303,13 +333,6 @@ function autoResizeInput() {
   questionInput.style.height = "auto";
   questionInput.style.height = questionInput.scrollHeight + "px";
 }
-
-// Measure the placeholder text to set an accurate min-height on mobile
-// where the placeholder wraps to multiple lines.
-questionInput.value = questionInput.placeholder;
-autoResizeInput();
-questionInput.style.minHeight = questionInput.style.height;
-questionInput.value = "";
 
 questionInput.addEventListener("input", autoResizeInput);
 
@@ -322,97 +345,104 @@ questionInput.addEventListener("keydown", (event) => {
 
 askForm.addEventListener("submit", async (event) => {
   event.preventDefault();
-
   if (gameFinished || submitBtn.disabled) return;
 
   const question = questionInput.value.trim();
   if (!question) return;
 
+  clearError();
   questionInput.value = "";
-  questionInput.style.height = "auto";
-  submitBtn.disabled = true;
-  statusText.classList.remove("error");
+  autoResizeInput();
+  setInputEnabled(false);
+  gameIntro.hidden = true;
+  const entry = addQuestionEntry(question);
 
   try {
     const { answer, explanation } = await submitQuestion(question);
     questionsAsked++;
-    updateCounter();
-    addLogEntry(question, answer, explanation);
+    answers.push(answer);
+    fillAnswer(entry, answer, explanation);
+    updateProgress();
 
     if (answer === "win") {
       endGame(true);
-    } else if (questionsAsked >= MAX_QUESTIONS) {
+      return;
+    }
+    if (questionsAsked >= MAX_QUESTIONS) {
       endGame(false);
-    } else {
-      updateHintPanel();
+      return;
     }
   } catch (error) {
-    statusText.textContent = error.message;
-    statusText.classList.add("error");
-  } finally {
-    stopBusyStatus();
-    if (!statusText.classList.contains("error")) {
-      statusText.textContent = "";
-    }
-    if (!gameFinished) {
-      submitBtn.disabled = false;
-      questionInput.focus();
-    }
+    // Put the question back so it can be retried.
+    entry.remove();
+    questionInput.value = question;
+    autoResizeInput();
+    showError(error.message);
+    updateProgress();
   }
+  setInputEnabled(true);
+  questionInput.focus();
 });
 
 concedeBtn.addEventListener("click", () => {
-  if (gameFinished || concedeBtn.disabled) return;
-  if (!confirm("Are you sure you want to give up? This counts as a loss.")) return;
+  if (gameFinished || concedeBtn.disabled || gameId === null) return;
+  if (!confirm("Give up and see the answer? This counts as a loss.")) return;
   endGame(false);
 });
+
+function renderSuggestionChips() {
+  for (const suggestion of STARTER_QUESTIONS) {
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "suggestion-chip";
+    chip.textContent = suggestion;
+    chip.addEventListener("click", () => {
+      questionInput.value = suggestion;
+      autoResizeInput();
+      questionInput.focus();
+    });
+    suggestionChips.appendChild(chip);
+  }
+}
 
 async function tryResumeGame() {
   try {
     const params = new URLSearchParams({ topic_slug: topicSlug, difficulty });
     const response = await fetch(`/api/game/existing?${params}`);
-    if (response.status === 204) return false;
-    if (!response.ok) return false;
+    if (response.status === 204 || !response.ok) return false;
     const data = await response.json();
     gameId = data.game_id;
     shareCode = data.share_code;
 
-    // Finished games redirect to the unified replay page.
+    // Finished games go to the results page.
     if (data.result) {
       window.location.href = `/replay?code=${encodeURIComponent(shareCode)}`;
       return true;
     }
 
-    // Resume an in-progress game: replay questions and hint state.
-    const hintRevealsAtQuestion = new Map();
-    if (data.hint_reveals) {
-      for (const reveal of data.hint_reveals) {
-        revealedHintIndices.add(reveal.hint_index);
-        hintRevealAfterQuestion.set(reveal.hint_index, reveal.after_question);
-        hintsRevealed++;
-        if (!hintRevealsAtQuestion.has(reveal.after_question)) {
-          hintRevealsAtQuestion.set(reveal.after_question, []);
-        }
-        hintRevealsAtQuestion.get(reveal.after_question).push(reveal.hint_index);
+    // Rebuild the log, placing each revealed hint after the question it followed.
+    const revealedHints = data.revealed_hints || {};
+    const hintsAfterQuestion = new Map();
+    for (const reveal of data.hint_reveals || []) {
+      if (!hintsAfterQuestion.has(reveal.after_question)) {
+        hintsAfterQuestion.set(reveal.after_question, []);
       }
+      hintsAfterQuestion.get(reveal.after_question).push(reveal.hint_index);
+      hintsRevealed++;
     }
-    if (data.revealed_hints) {
-      for (const [index, text] of Object.entries(data.revealed_hints)) {
-        revealedHintTexts.set(Number(index), text);
+    const addHintsAfter = (questionNumber) => {
+      for (const hintIndex of hintsAfterQuestion.get(questionNumber) || []) {
+        addHintEntry(hintIndex, revealedHints[hintIndex]);
       }
-    }
+    };
+    addHintsAfter(0);
     for (const question of data.questions) {
+      const entry = addQuestionEntry(question.question);
+      fillAnswer(entry, question.answer, question.explanation);
       questionsAsked++;
-      addLogEntry(question.question, question.answer, question.explanation);
-      const hintsHere = hintRevealsAtQuestion.get(questionsAsked);
-      if (hintsHere) {
-        for (const hintIndex of hintsHere) {
-          addHintLogEntry(hintIndex, questionsAsked);
-        }
-      }
+      answers.push(question.answer);
+      addHintsAfter(questionsAsked);
     }
-    updateCounter();
-    updateHintPanel();
     return true;
   } catch {
     return false;
@@ -420,25 +450,25 @@ async function tryResumeGame() {
 }
 
 async function init() {
-  updateCounter();
-  setBusyStatus("Loading...");
-  submitBtn.disabled = true;
-  concedeBtn.disabled = true;
+  renderSuggestionChips();
+  loadTopicName();
+  setInputEnabled(false);
+  updateProgress();
+  statusText.textContent = "Loading…";
 
   const resumed = await tryResumeGame();
   if (!resumed) {
-    setBusyStatus("Generating today's game...");
+    statusText.textContent = "Setting up today's puzzle…";
     await startGameSession();
   }
 
-  stopBusyStatus();
   if (gameId !== null) {
-    statusText.textContent = "";
-    submitBtn.disabled = false;
-    concedeBtn.disabled = false;
+    clearError();
+    setInputEnabled(true);
     questionInput.focus();
-    updateHintPanel();
   }
+  updateProgress();
+  window.scrollTo({ top: document.body.scrollHeight });
 }
 
 init();

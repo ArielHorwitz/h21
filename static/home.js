@@ -1,12 +1,15 @@
 const topicsList = document.getElementById("topics-list");
+const todayDate = document.getElementById("today-date");
+const suggestTopicToggle = document.getElementById("suggest-topic-toggle");
 const requestForm = document.getElementById("request-topic-form");
 const topicNameInput = document.getElementById("topic-name-input");
 const requestTopicBtn = document.getElementById("request-topic-btn");
 const requestStatus = document.getElementById("request-topic-status");
-const recentResultsSection = document.getElementById("recent-results-section");
+const topicQuota = document.getElementById("topic-quota");
 
 const DIFFICULTIES = ["normal", "expert"];
 const TOPIC_STATUS_POLL_MS = 4000;
+const MAX_FRIEND_AVATARS = 3;
 
 // The brand mark, animated as a thinking indicator (same as the game page).
 const THINKING_MARK_SVG = `
@@ -20,94 +23,87 @@ const THINKING_MARK_SVG = `
     <circle cx="249" cy="90" r="16" fill="#e2b714" class="mark-answer"/>
   </svg>`;
 
+let gameStatuses = {};
 let topicStatusPollTimer = null;
 
-let gameStatuses = {};
+todayDate.textContent = new Date().toLocaleDateString("en-US", {
+  weekday: "long",
+  month: "long",
+  day: "numeric",
+});
 
-function renderTopics(topics) {
-  topicsList.innerHTML = "";
+function capitalize(text) {
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
 
-  for (const topic of topics) {
-    const card = document.createElement("div");
-    card.className = "topic-card";
+function pluralize(count, word) {
+  return `${count} ${word}${count === 1 ? "" : "s"}`;
+}
 
-    const header = document.createElement("div");
-    header.className = "topic-card-header";
-
-    const name = document.createElement("span");
-    name.className = "topic-name";
-    name.textContent = topic.name;
-    header.appendChild(name);
-
-    if (topic.status && topic.status !== "ready") {
-      header.appendChild(renderPendingTopicStatus(topic));
-      card.appendChild(header);
-      topicsList.appendChild(card);
-      continue;
-    }
-
-    const buttons = document.createElement("div");
-    buttons.className = "difficulty-buttons";
-
-    for (const difficulty of DIFFICULTIES) {
-      const link = document.createElement("a");
-      const statusKey = `${topic.slug}:${difficulty}`;
-      const status = gameStatuses[statusKey];
-      let className = `difficulty-btn ${difficulty}`;
-      if (status === "in_progress") {
-        className += " game-in-progress";
-      } else if (status === "win" || status === "loss") {
-        className += " game-played";
-      }
-      link.className = className;
-      link.textContent = difficulty.charAt(0).toUpperCase() + difficulty.slice(1);
-      link.href = `/game?topic=${encodeURIComponent(topic.slug)}&difficulty=${difficulty}`;
-      buttons.appendChild(link);
-    }
-
-    header.appendChild(buttons);
-    card.appendChild(header);
-
-    // Friend avatars per difficulty (expanded rows).
-    const friends = topic.friends || {};
-    for (const difficulty of DIFFICULTIES) {
-      const friendList = friends[difficulty];
-      if (!friendList || friendList.length === 0) continue;
-
-      const row = document.createElement("div");
-      row.className = "topic-friends-row";
-
-      const label = document.createElement("span");
-      label.className = "topic-friends-label";
-      label.textContent = difficulty.charAt(0).toUpperCase() + difficulty.slice(1) + ":";
-      row.appendChild(label);
-
-      const avatars = document.createElement("div");
-      avatars.className = "topic-friends-avatars";
-
-      for (const friend of friendList) {
-        if (friend.player_code && friend.avatar_version > 0) {
-          const img = document.createElement("img");
-          img.className = "avatar-xs";
-          img.src = "/avatars/" + encodeURIComponent(friend.player_code) + ".webp?v=" + friend.avatar_version;
-          img.alt = friend.display_name;
-          img.title = friend.display_name;
-          avatars.appendChild(img);
-        } else {
-          const placeholder = document.createElement("span");
-          placeholder.className = "avatar-xs avatar-placeholder";
-          placeholder.textContent = friend.display_name.charAt(0).toUpperCase();
-          placeholder.title = friend.display_name;
-          avatars.appendChild(placeholder);
-        }
-      }
-
-      row.appendChild(avatars);
-      card.appendChild(row);
-    }
-
-    topicsList.appendChild(card);
+// What a difficulty tile says about the user's game today.
+function describeGame(game) {
+  if (!game) return { className: "", label: "Play" };
+  if (game.result === "win") {
+    return { className: "is-won", label: `Solved in ${game.questions_asked}` };
   }
+  if (game.result === "loss") {
+    return { className: "is-lost", label: "Not solved" };
+  }
+  return { className: "is-in-progress", label: `Continue · ${pluralize(game.questions_asked, "question")}` };
+}
+
+function renderFriendAvatars(friendList) {
+  const avatars = document.createElement("span");
+  avatars.className = "avatar-stack";
+  for (const friend of friendList.slice(0, MAX_FRIEND_AVATARS)) {
+    let avatar;
+    if (friend.player_code && friend.avatar_version > 0) {
+      avatar = document.createElement("img");
+      avatar.src = "/avatars/" + encodeURIComponent(friend.player_code) + ".webp?v=" + friend.avatar_version;
+      avatar.alt = "";
+    } else {
+      avatar = document.createElement("span");
+      avatar.className = "avatar-placeholder";
+      avatar.textContent = friend.display_name.charAt(0).toUpperCase();
+    }
+    avatar.classList.add("avatar-xs");
+    avatar.title = friend.display_name;
+    avatars.appendChild(avatar);
+  }
+  if (friendList.length > MAX_FRIEND_AVATARS) {
+    const more = document.createElement("span");
+    more.className = "avatar-stack-more";
+    more.textContent = `+${friendList.length - MAX_FRIEND_AVATARS}`;
+    avatars.appendChild(more);
+  }
+  const names = friendList.map((friend) => friend.display_name).join(", ");
+  avatars.title = `Played by ${names}`;
+  return avatars;
+}
+
+function renderDifficultyTile(topic, difficulty) {
+  const game = gameStatuses[`${topic.slug}:${difficulty}`];
+  const { className, label } = describeGame(game);
+
+  const tile = document.createElement("a");
+  tile.className = `difficulty-tile ${difficulty} ${className}`.trim();
+  tile.href = `/game?topic=${encodeURIComponent(topic.slug)}&difficulty=${difficulty}`;
+
+  const name = document.createElement("span");
+  name.className = "difficulty-tile-name";
+  name.textContent = capitalize(difficulty);
+  tile.appendChild(name);
+
+  const state = document.createElement("span");
+  state.className = "difficulty-tile-state";
+  state.textContent = label;
+  tile.appendChild(state);
+
+  const friendList = (topic.friends || {})[difficulty];
+  if (friendList && friendList.length > 0) {
+    tile.appendChild(renderFriendAvatars(friendList));
+  }
+  return tile;
 }
 
 // Status shown to a topic's creator while it is being built, or after it failed.
@@ -121,7 +117,7 @@ function renderPendingTopicStatus(topic) {
     mark.innerHTML = THINKING_MARK_SVG;
     status.appendChild(mark);
     const text = document.createElement("span");
-    text.textContent = "Creating puzzles…";
+    text.textContent = "Creating puzzles… this takes a minute or two.";
     status.appendChild(text);
     return status;
   }
@@ -132,7 +128,7 @@ function renderPendingTopicStatus(topic) {
   status.appendChild(text);
 
   const dismissBtn = document.createElement("button");
-  dismissBtn.className = "topic-dismiss-btn";
+  dismissBtn.className = "secondary-btn small-btn";
   dismissBtn.textContent = "Dismiss";
   dismissBtn.addEventListener("click", async () => {
     dismissBtn.disabled = true;
@@ -147,6 +143,34 @@ function renderPendingTopicStatus(topic) {
   return status;
 }
 
+function renderTopics(topics) {
+  topicsList.innerHTML = "";
+
+  for (const topic of topics) {
+    const card = document.createElement("article");
+    card.className = "topic-card";
+
+    const name = document.createElement("h2");
+    name.className = "topic-name";
+    name.textContent = topic.name;
+    card.appendChild(name);
+
+    if (topic.status && topic.status !== "ready") {
+      card.classList.add("is-pending");
+      card.appendChild(renderPendingTopicStatus(topic));
+    } else {
+      const tiles = document.createElement("div");
+      tiles.className = "difficulty-tiles";
+      for (const difficulty of DIFFICULTIES) {
+        tiles.appendChild(renderDifficultyTile(topic, difficulty));
+      }
+      card.appendChild(tiles);
+    }
+
+    topicsList.appendChild(card);
+  }
+}
+
 async function loadGameStatuses() {
   try {
     const response = await fetch("/api/game/statuses");
@@ -156,7 +180,7 @@ async function loadGameStatuses() {
       for (const game of statuses) {
         const key = `${game.topic_slug}:${game.difficulty}`;
         if (!(key in gameStatuses)) {
-          gameStatuses[key] = game.result || "in_progress";
+          gameStatuses[key] = game;
         }
       }
     }
@@ -183,6 +207,30 @@ async function loadTopics() {
   }
 }
 
+async function loadTopicQuota() {
+  try {
+    const response = await fetch("/api/me");
+    if (!response.ok) return;
+    const data = await response.json();
+    const remaining = Math.max(data.daily_topic_limit - data.topic_suggestions_used_today, 0);
+    topicQuota.textContent = remaining > 0
+      ? `You can suggest ${pluralize(remaining, "more topic")} today.`
+      : "You've used today's topic suggestions. Come back tomorrow.";
+    requestTopicBtn.disabled = remaining === 0;
+    topicNameInput.disabled = remaining === 0;
+  } catch {
+    // Non-critical.
+  }
+}
+
+suggestTopicToggle.addEventListener("click", () => {
+  suggestTopicToggle.hidden = true;
+  requestForm.hidden = false;
+  topicQuota.hidden = false;
+  topicNameInput.focus();
+  loadTopicQuota();
+});
+
 requestForm.addEventListener("submit", async (event) => {
   event.preventDefault();
 
@@ -203,7 +251,7 @@ requestForm.addEventListener("submit", async (event) => {
     const data = await response.json();
 
     if (response.ok) {
-      requestStatus.textContent = `Creating "${data.name}". This takes a minute or two.`;
+      requestStatus.textContent = `Creating "${data.name}". It will appear above once its puzzles are ready.`;
       requestStatus.className = "status-success";
       topicNameInput.value = "";
       await loadTopics();
@@ -218,252 +266,8 @@ requestForm.addEventListener("submit", async (event) => {
     requestStatus.hidden = false;
     requestTopicBtn.disabled = false;
     topicNameInput.disabled = false;
+    loadTopicQuota();
   }
 });
 
-let currentUserPlayerCode = null;
-let currentUserAvatarVersion = 0;
-
-async function loadCurrentUser() {
-  try {
-    const response = await fetch("/api/me");
-    if (response.ok) {
-      const data = await response.json();
-      currentUserPlayerCode = data.player_code;
-      currentUserAvatarVersion = data.avatar_version;
-    }
-  } catch {
-    // Non-critical.
-  }
-}
-
-const replayForm = document.getElementById("replay-form");
-const replayCodeInput = document.getElementById("replay-code-input");
-
-replayForm.addEventListener("submit", (event) => {
-  event.preventDefault();
-  const code = replayCodeInput.value.trim();
-  if (!code) return;
-  window.location.href = `/replay?code=${encodeURIComponent(code)}`;
-});
-
-function formatResult(questionsAsked, hintsUsed) {
-  let text = `${questionsAsked} question${questionsAsked !== 1 ? "s" : ""}`;
-  if (hintsUsed > 0) {
-    text += ` + ${hintsUsed} hint${hintsUsed !== 1 ? "s" : ""}`;
-  }
-  return text;
-}
-
-function computeScore(questionsAsked, hintsUsed) {
-  return questionsAsked + hintsUsed * 50;
-}
-
-function renderRecentResults(games) {
-  if (!games || games.length === 0) {
-    recentResultsSection.hidden = true;
-    return;
-  }
-
-  recentResultsSection.hidden = false;
-  recentResultsSection.innerHTML = "";
-
-  const heading = document.createElement("h2");
-  heading.className = "recent-results-heading";
-  heading.textContent = "Recent Results";
-  recentResultsSection.appendChild(heading);
-
-  for (const game of games) {
-    const card = document.createElement("div");
-    card.className = "recent-results-card";
-
-    const title = document.createElement("div");
-    title.className = "recent-results-card-title";
-    const difficulty = game.difficulty.charAt(0).toUpperCase() + game.difficulty.slice(1);
-    title.textContent = `${game.topic_name} (${difficulty})`;
-    card.appendChild(title);
-
-    const dateLabel = document.createElement("div");
-    dateLabel.className = "recent-results-card-date";
-    const parsed = new Date(game.date + "T00:00:00");
-    dateLabel.textContent = parsed.toLocaleDateString("en-US", {
-      weekday: "short",
-      month: "short",
-      day: "numeric",
-    });
-    card.appendChild(dateLabel);
-
-    // Build ranking: player + friends, sorted by score.
-    const playerScore = computeScore(game.my_result.questions_asked, game.my_result.hints_used);
-    const entries = [];
-    entries.push({
-      name: "You",
-      questionsAsked: game.my_result.questions_asked,
-      hintsUsed: game.my_result.hints_used,
-      score: playerScore,
-      isPlayer: true,
-      playerCode: currentUserPlayerCode,
-      avatarVersion: currentUserAvatarVersion,
-    });
-    for (const friend of game.friends) {
-      entries.push({
-        name: friend.display_name,
-        questionsAsked: friend.questions_asked,
-        hintsUsed: friend.hints_used,
-        score: computeScore(friend.questions_asked, friend.hints_used),
-        isPlayer: false,
-        playerCode: friend.player_code,
-        avatarVersion: friend.avatar_version || 0,
-      });
-    }
-    entries.sort((a, b) => a.score - b.score);
-
-    const rankingList = document.createElement("ol");
-    rankingList.className = "recent-results-ranking";
-
-    for (const entry of entries) {
-      const li = document.createElement("li");
-      li.className = "recent-results-rank-entry";
-      if (entry.isPlayer) {
-        li.classList.add("recent-results-rank-self");
-      }
-
-      if (entry.playerCode && entry.avatarVersion > 0) {
-        const avatarImg = document.createElement("img");
-        avatarImg.className = "avatar-sm";
-        avatarImg.src = "/avatars/" + encodeURIComponent(entry.playerCode) + ".webp?v=" + entry.avatarVersion;
-        avatarImg.alt = "";
-        li.appendChild(avatarImg);
-      }
-
-      const nameSpan = document.createElement("span");
-      nameSpan.className = "recent-results-rank-name";
-      nameSpan.textContent = entry.name;
-      li.appendChild(nameSpan);
-
-      const resultSpan = document.createElement("span");
-      resultSpan.className = "recent-results-rank-result";
-      resultSpan.textContent = formatResult(entry.questionsAsked, entry.hintsUsed);
-      li.appendChild(resultSpan);
-
-      rankingList.appendChild(li);
-    }
-
-
-    card.appendChild(rankingList);
-
-    const leaderboardLink = document.createElement("a");
-    leaderboardLink.className = "recent-results-leaderboard-link";
-    leaderboardLink.href = `/leaderboard?topic=${encodeURIComponent(game.topic_slug)}&difficulty=${encodeURIComponent(game.difficulty)}&date=${encodeURIComponent(game.date)}`;
-    leaderboardLink.textContent = "View full leaderboard";
-    card.appendChild(leaderboardLink);
-
-    recentResultsSection.appendChild(card);
-  }
-}
-
-async function loadRecentResults() {
-  try {
-    const response = await fetch("/api/recent-results");
-    if (response.ok) {
-      const data = await response.json();
-      renderRecentResults(data);
-    }
-  } catch (error) {
-    console.error("Failed to load recent results:", error);
-  }
-}
-
-const friendSuggestionsSection = document.getElementById("friend-suggestions-section");
-
-function renderFriendSuggestions(suggestions) {
-  if (!suggestions || suggestions.length === 0) {
-    friendSuggestionsSection.hidden = true;
-    return;
-  }
-
-  friendSuggestionsSection.hidden = false;
-  friendSuggestionsSection.innerHTML = "";
-
-  const heading = document.createElement("h2");
-  heading.className = "friend-suggestions-heading";
-  heading.textContent = "People You May Know";
-  friendSuggestionsSection.appendChild(heading);
-
-  for (const suggestion of suggestions) {
-    const card = document.createElement("div");
-    card.className = "friend-suggestion-card";
-
-    if (suggestion.player_code && suggestion.avatar_version > 0) {
-      const avatar = document.createElement("img");
-      avatar.className = "avatar-sm";
-      avatar.src = "/avatars/" + encodeURIComponent(suggestion.player_code) + ".webp?v=" + suggestion.avatar_version;
-      avatar.alt = "";
-      card.appendChild(avatar);
-    }
-
-    const info = document.createElement("div");
-    info.className = "friend-suggestion-info";
-
-    const name = document.createElement("span");
-    name.className = "friend-suggestion-name";
-    name.textContent = suggestion.display_name || suggestion.username;
-    info.appendChild(name);
-
-    const reason = document.createElement("span");
-    reason.className = "friend-suggestion-reason";
-    reason.textContent = suggestion.reason;
-    info.appendChild(reason);
-
-    card.appendChild(info);
-
-    const followBtn = document.createElement("button");
-    followBtn.className = "friend-suggestion-follow-btn";
-    followBtn.textContent = "Follow";
-    followBtn.addEventListener("click", async () => {
-      followBtn.disabled = true;
-      try {
-        const response = await fetch("/api/friends/" + encodeURIComponent(suggestion.player_code), {
-          method: "POST",
-        });
-        if (response.ok || response.status === 409) {
-          card.classList.add("friend-suggestion-fade-out");
-          card.addEventListener("animationend", () => {
-            card.remove();
-            // Re-fetch to fill the slot.
-            loadFriendSuggestions();
-          });
-        }
-      } catch {
-        followBtn.disabled = false;
-      }
-    });
-    card.appendChild(followBtn);
-
-    friendSuggestionsSection.appendChild(card);
-  }
-
-  const moreLink = document.createElement("a");
-  moreLink.className = "friend-suggestions-more-link";
-  moreLink.href = "/account#friends";
-  moreLink.textContent = "Find more friends";
-  friendSuggestionsSection.appendChild(moreLink);
-}
-
-async function loadFriendSuggestions() {
-  try {
-    const response = await fetch("/api/friend-suggestions");
-    if (response.ok) {
-      const data = await response.json();
-      renderFriendSuggestions(data);
-    }
-  } catch (error) {
-    console.error("Failed to load friend suggestions:", error);
-  }
-}
-
-loadCurrentUser().then(() => {
-  loadRecentResults();
-  loadFriendSuggestions();
-});
 loadTopics();

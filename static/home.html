@@ -17,56 +17,34 @@
   <meta name="twitter:card" content="summary_large_image">
   <link rel="stylesheet" href="/static/style.css">
 </head>
-<body>
-  <nav class="nav-bar">
-    <a href="/" title="Home"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12L12 3l9 9"/><path d="M5 10v9a1 1 0 001 1h4v-5h4v5h4a1 1 0 001-1v-9"/></svg></a>
-    <a href="/help" title="Help"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9 9a3 3 0 115.12 2.12C13.24 12 12 12.5 12 14"/><circle cx="12" cy="18" r="0.5" fill="currentColor"/></svg></a>
-    <a href="/account" title="Account" id="nav-account"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.418 3.582-7 8-7s8 2.582 8 7"/></svg></a>
-  </nav>
-  <main>
-    <h1 class="brand-heading"><img class="brand-logo" src="/static/brand/h21-logo.svg" alt="H21" width="590" height="180"></h1>
-    <p class="subtitle">21 Questions</p>
+<body data-tab="today">
+  <!--TOP_BAR-->
+  <main class="page">
+    <header class="page-header">
+      <h1 class="page-title">Today's puzzles</h1>
+      <p class="page-subtitle" id="today-date"></p>
+    </header>
 
-    <div id="recent-results-section" hidden></div>
+    <div id="topics-list" class="topic-list"></div>
 
-    <div id="friend-suggestions-section" hidden></div>
-
-    <div id="play-section">
-      <h2 class="play-section-heading">Today's Puzzles</h2>
-      <p class="home-intro">Pick a topic and difficulty to start today's puzzle.</p>
-      <div id="topics-list"></div>
-
-      <div id="request-topic-section">
-        <form id="request-topic-form">
-          <input
-            type="text"
-            id="topic-name-input"
-            placeholder="Request a topic, e.g. Ancient Rome, Jazz Music..."
-            autocomplete="off"
-            maxlength="100"
-            required
-          >
-          <button type="submit" id="request-topic-btn">Request</button>
-        </form>
-        <p id="request-topic-status" hidden></p>
-      </div>
-    </div>
-
-    <div id="replay-section">
-      <h2>Replay a Game</h2>
-      <form id="replay-form">
+    <section class="suggest-topic">
+      <button type="button" id="suggest-topic-toggle" class="secondary-btn">Suggest a topic</button>
+      <form id="request-topic-form" class="inline-form" hidden>
         <input
           type="text"
-          id="replay-code-input"
-          placeholder="Enter game ID..."
+          id="topic-name-input"
+          placeholder="e.g. Ancient Rome, Jazz, The Beatles"
           autocomplete="off"
-          maxlength="6"
+          maxlength="100"
           required
         >
-        <button type="submit" id="replay-btn">View</button>
+        <button type="submit" id="request-topic-btn" class="primary-btn">Create</button>
       </form>
-    </div>
+      <p class="field-hint" id="topic-quota" hidden></p>
+      <p id="request-topic-status" hidden></p>
+    </section>
   </main>
+  <!--TAB_BAR-->
   <script src="/static/nav.js"></script>
   <script src="/static/home.js"></script>
 </body>

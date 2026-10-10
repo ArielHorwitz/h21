@@ -428,8 +428,15 @@ async def ensure_hints_exist(
 
 # -- Page routes --
 
+# Shared page chrome, included where a page has the placeholder comment.
+PAGE_PARTIALS = {
+    "<!--TOP_BAR-->": "top-bar.html",
+    "<!--TAB_BAR-->": "tab-bar.html",
+}
+
+
 def render_page(request: Request, filename: str) -> HTMLResponse:
-    """Serve a static HTML page, resolving the __BASE_URL__ placeholder.
+    """Serve a static HTML page, including shared partials and resolving __BASE_URL__.
 
     Open Graph tags need absolute URLs; the base is derived per-request so
     the same files work on localhost and behind a reverse proxy.
@@ -437,6 +444,8 @@ def render_page(request: Request, filename: str) -> HTMLResponse:
     scheme = request.headers.get("x-forwarded-proto", request.url.scheme)
     host = request.headers.get("host", request.url.netloc)
     html = STATIC_DIR.joinpath(filename).read_text()
+    for placeholder, partial in PAGE_PARTIALS.items():
+        html = html.replace(placeholder, STATIC_DIR.joinpath("partials", partial).read_text())
     return HTMLResponse(html.replace("__BASE_URL__", f"{scheme}://{host}"))
 
 
@@ -468,6 +477,11 @@ async def control_page(request: Request) -> HTMLResponse:
 @app.get("/replay")
 async def replay_page(request: Request) -> HTMLResponse:
     return render_page(request, "replay.html")
+
+
+@app.get("/friends")
+async def friends_page(request: Request) -> HTMLResponse:
+    return render_page(request, "friends.html")
 
 
 @app.get("/leaderboard")
