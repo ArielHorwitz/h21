@@ -397,6 +397,9 @@ def seed_database(
 
     database = GameDatabase(db_path)
     database.ensure_schema()
+    # Seeded topics skip the build: their pools fill lazily on first draw.
+    for topic in database.get_topics_with_status("generating"):
+        database.set_topic_status(topic["slug"], "ready")
 
     invite_code = database.create_invite(alias="sandbox", uses=64)
 
@@ -444,7 +447,9 @@ def seed_database(
 
     for topic_index, topic_name in enumerate(EXTRA_TOPICS):
         suggester = friend_ids[topic_index % len(friend_ids)]
-        database.add_topic(slugify(topic_name), topic_name, user_id=suggester)
+        database.add_topic(
+            slugify(topic_name), topic_name, user_id=suggester, status="ready",
+        )
 
     topic_slugs = list(SOLUTION_POOLS)
     difficulties = ("normal", "expert")

@@ -37,7 +37,6 @@ from h21.llm import (
     OpenAIClient,
     ask_question,
     generate_hints,
-    generate_solution,
     generate_solution_batch,
     normalize_topic,
     validate_solution_batch,
@@ -183,6 +182,10 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     log_path = config.log_path
     database.ensure_schema()
 
+    # Resume builds that were interrupted, and build the seeded default topics.
+    for topic in database.get_topics_with_status("generating"):
+        _start_topic_build(topic["slug"], topic["name"])
+
     if config.auto_generate_missing_avatars:
         accounts_without_avatars = database.get_accounts_without_avatars()
         if accounts_without_avatars:
@@ -238,146 +241,171 @@ async def require_auth(request: Request, call_next):
     return await call_next(request)
 
 
-# -- Puzzle pool regeneration --
-
-# Track in-flight pool regeneration tasks to avoid duplicate concurrent
-# regenerations for the same (topic_slug, difficulty) pair.
-_pool_regeneration_tasks: set[tuple[str, str]] = set()
+# -- Puzzle pool --
 
 POOL_BATCH_SIZE = 100
+# Refill a pool in the background once it drops below this many subjects.
 POOL_LOW_THRESHOLD = 50
+# A new topic is rejected unless its first batch keeps at least this many
+# subjects at every difficulty.
+TOPIC_MIN_SUBJECTS = 50
+# Interim guard against topics running dry: once a refill keeps fewer than
+# this many subjects, the pool is not refilled again.
+POOL_EXHAUSTED_KEPT = 10
+
+TOPIC_TOO_NARROW_DETAIL = "Not enough puzzles could be made for this topic. Try something broader."
+TOPIC_BUILD_FAILED_DETAIL = "Something went wrong while creating puzzles. Try again later."
+
+# Strong references to fire-and-forget tasks, so they are not garbage collected.
+_background_tasks: set[asyncio.Task[None]] = set()
+_pool_refills_in_flight: set[tuple[str, str]] = set()
+_topic_builds_in_flight: set[str] = set()
+# Serializes drawing today's puzzle, so concurrent first players share one draw.
+_puzzle_draw_locks: collections.defaultdict[tuple[str, str], asyncio.Lock] = (
+    collections.defaultdict(asyncio.Lock)
+)
+
+
+def _spawn(coroutine: Any) -> asyncio.Task[None]:
+    task = asyncio.create_task(coroutine)
+    _background_tasks.add(task)
+    task.add_done_callback(_background_tasks.discard)
+    return task
 
 
 async def get_today_solution(topic_slug: str, difficulty: str) -> str:
     """Return today's solution for a given topic+difficulty, drawing from the pool."""
     today = date_type.today()
-    existing = database.get_puzzle_solution(today, topic_slug, difficulty)
-    if existing is not None:
-        await ensure_hints_exist(today, topic_slug, difficulty, existing)
-        return existing
+    async with _puzzle_draw_locks[(topic_slug, difficulty)]:
+        existing = database.get_puzzle_solution(today, topic_slug, difficulty)
+        if existing is not None:
+            await ensure_hints_exist(today, topic_slug, difficulty, existing)
+            return existing
 
-    topic_name = database.get_topic_name(topic_slug)
-    if topic_name is None:
-        raise HTTPException(status_code=404, detail="Topic not found")
+        topic = database.get_topic(topic_slug)
+        if topic is None or topic["status"] != "ready":
+            raise HTTPException(status_code=404, detail="Topic not found")
 
-    # Try drawing from the pre-generated pool.
-    solution = database.draw_random_from_pool(topic_slug, difficulty)
-
-    if solution is None:
-        # Pool is empty — generate a batch synchronously (first-time cost).
-        logger.info(
-            "Pool empty for topic=%r difficulty=%r, generating batch synchronously",
-            topic_slug, difficulty,
-        )
-        await _regenerate_pool(topic_slug, difficulty, topic_name)
         solution = database.draw_random_from_pool(topic_slug, difficulty)
-
-    if solution is None:
-        # Fallback: generate a single solution the old way.
-        logger.warning(
-            "Pool still empty after batch generation for topic=%r difficulty=%r, "
-            "falling back to single generation",
-            topic_slug, difficulty,
-        )
-        previous_solutions = database.get_all_known_solutions(topic_slug)
-        try:
-            solution = await generate_solution(
-                llm_client, previous_solutions, topic_name, difficulty,
+        if solution is None and database.get_last_pool_refill(topic_slug, difficulty) is None:
+            # A ready topic whose pool was never filled, e.g. one seeded by
+            # the sandbox. Fill it now, once.
+            try:
+                await _refill_pool(topic_slug, difficulty, topic["name"])
+            except LLMError as exc:
+                raise HTTPException(status_code=502, detail=exc.detail)
+            solution = database.draw_random_from_pool(topic_slug, difficulty)
+        if solution is None:
+            raise HTTPException(
+                status_code=503, detail="This topic has run out of puzzles.",
             )
+
+        try:
+            hints = await generate_hints(llm_client, topic["name"], solution)
         except LLMError as exc:
-            logger.error("Failed to generate solution: %s", exc)
-            raise HTTPException(status_code=502, detail=exc.detail)
+            logger.error("Failed to generate hints: %s", exc)
+            hints = []
+        database.record_puzzle(today, topic_slug, difficulty, solution, hints=hints)
 
-    # Generate hints for the drawn solution.
-    try:
-        hints = await generate_hints(llm_client, topic_name, solution)
-    except LLMError as exc:
-        logger.error("Failed to generate hints: %s", exc)
-        hints = []
-
-    database.record_puzzle(today, topic_slug, difficulty, solution, hints=hints)
-
-    # Check if the pool needs background refill.
-    _maybe_regenerate_pool(topic_slug, difficulty, topic_name)
-
+    _maybe_refill_pool(topic_slug, difficulty, topic["name"])
     return solution
 
 
-def _maybe_regenerate_pool(
-    topic_slug: str, difficulty: str, topic_name: str,
-) -> None:
-    """Kick off background pool regeneration if the pool is running low."""
-    remaining = database.pool_count(topic_slug, difficulty)
-    if remaining < POOL_LOW_THRESHOLD:
-        key = (topic_slug, difficulty)
-        if key not in _pool_regeneration_tasks:
-            logger.info(
-                "Pool low (%d remaining) for topic=%r difficulty=%r, "
-                "starting background regeneration",
-                remaining, topic_slug, difficulty,
-            )
-            _pool_regeneration_tasks.add(key)
-            task = asyncio.create_task(
-                _regenerate_pool(topic_slug, difficulty, topic_name)
-            )
-            task.add_done_callback(lambda _task: _pool_regeneration_tasks.discard(key))
+async def _refill_pool(topic_slug: str, difficulty: str, topic_name: str) -> int:
+    """Generate and validate a batch of subjects, and add the keepers to the pool.
 
-
-async def _regenerate_pool(
-    topic_slug: str, difficulty: str, topic_name: str,
-) -> None:
-    """Generate a batch of subjects, validate them, and insert into the pool."""
+    Returns the number of subjects added. Raises LLMError if either call fails,
+    in which case nothing is added: unvalidated subjects never enter the pool.
+    """
     exclusion_list = database.get_all_known_solutions(topic_slug)
-    try:
-        batch = await generate_solution_batch(
-            llm_client,
-            exclusion_list,
-            topic_name,
-            difficulty,
-            batch_size=POOL_BATCH_SIZE,
-        )
-    except LLMError as exc:
-        logger.error(
-            "Pool regeneration failed for topic=%r difficulty=%r: %s",
-            topic_slug, difficulty, exc,
-        )
-        return
-
-    subjects = batch.subjects
-    if not subjects:
-        logger.warning(
-            "Batch generation returned no subjects for topic=%r difficulty=%r",
-            topic_slug, difficulty,
-        )
-        return
-
-    # Validate the batch: check topic relevance, difficulty, duplication.
-    try:
-        validation = await validate_solution_batch(
-            llm_client, subjects, exclusion_list, topic_name, difficulty,
-        )
-        validated_subjects = [r.subject for r in validation.results if r.kept]
-    except LLMError as exc:
-        logger.error(
-            "Pool validation failed for topic=%r difficulty=%r: %s — "
-            "inserting unvalidated batch",
-            topic_slug, difficulty, exc,
-        )
-        validated_subjects = subjects
-
-    if not validated_subjects:
-        logger.warning(
-            "All %d subjects rejected by validator for topic=%r difficulty=%r",
-            len(subjects), topic_slug, difficulty,
-        )
-        return
-
-    inserted = database.insert_pool_subjects(topic_slug, difficulty, validated_subjects)
-    logger.info(
-        "Pool regeneration for topic=%r difficulty=%r: "
-        "generated %d, validated %d, inserted %d (duplicates skipped)",
-        topic_slug, difficulty, len(subjects), len(validated_subjects), inserted,
+    batch = await generate_solution_batch(
+        llm_client, exclusion_list, topic_name, difficulty, batch_size=POOL_BATCH_SIZE,
     )
+    validation = await validate_solution_batch(
+        llm_client, batch.subjects, exclusion_list, topic_name, difficulty,
+    )
+    kept_subjects = [result.subject for result in validation.results if result.kept]
+    inserted = database.insert_pool_subjects(topic_slug, difficulty, kept_subjects)
+    database.record_pool_refill(topic_slug, difficulty, len(batch.subjects), inserted)
+    logger.info(
+        "Pool refill for topic=%r difficulty=%r: generated %d, kept %d, inserted %d",
+        topic_slug, difficulty, len(batch.subjects), len(kept_subjects), inserted,
+    )
+    return inserted
+
+
+def _pool_exhausted(topic_slug: str, difficulty: str) -> bool:
+    last_refill = database.get_last_pool_refill(topic_slug, difficulty)
+    return last_refill is not None and last_refill["kept"] < POOL_EXHAUSTED_KEPT
+
+
+def _maybe_refill_pool(topic_slug: str, difficulty: str, topic_name: str) -> None:
+    """Start a background refill if the pool is running low and not exhausted."""
+    key = (topic_slug, difficulty)
+    if key in _pool_refills_in_flight:
+        return
+    remaining = database.pool_count(topic_slug, difficulty)
+    if remaining >= POOL_LOW_THRESHOLD:
+        return
+    if _pool_exhausted(topic_slug, difficulty):
+        logger.warning(
+            "Pool for topic=%r difficulty=%r is exhausted (%d remaining), not refilling",
+            topic_slug, difficulty, remaining,
+        )
+        return
+
+    async def refill() -> None:
+        try:
+            await _refill_pool(topic_slug, difficulty, topic_name)
+        except Exception:
+            logger.exception(
+                "Background pool refill failed for topic=%r difficulty=%r",
+                topic_slug, difficulty,
+            )
+        finally:
+            _pool_refills_in_flight.discard(key)
+
+    logger.info(
+        "Pool low (%d remaining) for topic=%r difficulty=%r, refilling in background",
+        remaining, topic_slug, difficulty,
+    )
+    _pool_refills_in_flight.add(key)
+    _spawn(refill())
+
+
+def _start_topic_build(topic_slug: str, topic_name: str) -> None:
+    """Fill a new topic's pools in the background, then mark it ready or failed."""
+    if topic_slug in _topic_builds_in_flight:
+        return
+
+    async def build() -> None:
+        try:
+            # Difficulties are generated concurrently to halve the creator's
+            # wait, so they cannot exclude each other's subjects. Overlaps
+            # are removed afterwards instead.
+            await asyncio.gather(*(
+                _refill_pool(topic_slug, difficulty, topic_name)
+                for difficulty in sorted(VALID_DIFFICULTIES)
+            ))
+            database.remove_cross_difficulty_pool_duplicates(topic_slug)
+            pool_sizes = {
+                difficulty: database.pool_count(topic_slug, difficulty)
+                for difficulty in sorted(VALID_DIFFICULTIES)
+            }
+            if min(pool_sizes.values()) < TOPIC_MIN_SUBJECTS:
+                logger.info("Topic %r rejected as too narrow: %s", topic_slug, pool_sizes)
+                database.set_topic_status(topic_slug, "failed", TOPIC_TOO_NARROW_DETAIL)
+            else:
+                logger.info("Topic %r ready: %s", topic_slug, pool_sizes)
+                database.set_topic_status(topic_slug, "ready")
+        except Exception:
+            logger.exception("Building topic %r failed", topic_slug)
+            database.set_topic_status(topic_slug, "failed", TOPIC_BUILD_FAILED_DETAIL)
+        finally:
+            _topic_builds_in_flight.discard(topic_slug)
+
+    _topic_builds_in_flight.add(topic_slug)
+    _spawn(build())
 
 
 async def ensure_hints_exist(
@@ -1267,13 +1295,30 @@ async def create_topic(request_body: NewTopicRequest, request: Request) -> dict[
     if not slug:
         raise HTTPException(status_code=400, detail="Invalid topic name")
 
-    if database.topic_exists(slug):
-        raise HTTPException(status_code=409, detail="Topic already exists")
+    existing = database.get_topic(slug)
+    if existing is not None:
+        if existing["status"] != "failed":
+            raise HTTPException(status_code=409, detail="Topic already exists")
+        # A failed topic was never playable, so anyone may try it again.
+        database.delete_topic(slug)
 
     database.add_topic(slug, name, user_id=user_id)
     database.increment_daily_topic_suggestions(user_id, date_type.today())
     database.log_activity(user_id, "suggest_topic", {"topic_name": name, "topic_slug": slug})
-    return {"slug": slug, "name": name}
+    _start_topic_build(slug, name)
+    return {"slug": slug, "name": name, "status": "generating"}
+
+
+@app.delete("/api/topics/{slug}")
+async def dismiss_failed_topic(slug: str, request: Request) -> dict[str, str]:
+    """Let a topic's creator dismiss it after it failed to build."""
+    topic = database.get_topic(slug)
+    if topic is None or topic["user_id"] != request.state.user_id:
+        raise HTTPException(status_code=404, detail="Topic not found")
+    if topic["status"] != "failed":
+        raise HTTPException(status_code=409, detail="Only failed topics can be dismissed")
+    database.delete_topic(slug)
+    return {"status": "ok"}
 
 
 # -- Game endpoints --
@@ -1302,7 +1347,8 @@ async def new_game(request_body: NewGameRequest, request: Request) -> dict[str, 
             status_code=400,
             detail=f"Difficulty must be one of: {', '.join(sorted(VALID_DIFFICULTIES))}",
         )
-    if not database.topic_exists(request_body.topic_slug):
+    topic = database.get_topic(request_body.topic_slug)
+    if topic is None or topic["status"] != "ready":
         raise HTTPException(status_code=404, detail="Topic not found")
 
     today = date_type.today()

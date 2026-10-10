@@ -32,8 +32,12 @@ class GameDatabase:
     def ensure_schema(self) -> None:
         self._connection.executescript("""
             CREATE TABLE IF NOT EXISTS topics (
-                slug  TEXT PRIMARY KEY,
-                name  TEXT NOT NULL
+                slug    TEXT PRIMARY KEY,
+                name    TEXT NOT NULL,
+                user_id INTEGER,
+                status  TEXT NOT NULL DEFAULT 'generating',
+                status_detail TEXT,
+                created_at    TEXT NOT NULL
             );
 
             CREATE TABLE IF NOT EXISTS daily_puzzles (
@@ -41,15 +45,36 @@ class GameDatabase:
                 topic_slug  TEXT NOT NULL,
                 difficulty  TEXT NOT NULL,
                 solution    TEXT NOT NULL,
+                hints       TEXT NOT NULL DEFAULT '[]',
                 PRIMARY KEY (date, topic_slug, difficulty),
                 FOREIGN KEY (topic_slug) REFERENCES topics(slug)
+            );
+
+            CREATE TABLE IF NOT EXISTS puzzle_pool (
+                pool_id      INTEGER PRIMARY KEY AUTOINCREMENT,
+                topic_slug   TEXT NOT NULL REFERENCES topics(slug),
+                difficulty   TEXT NOT NULL,
+                solution     TEXT NOT NULL,
+                generated_at TEXT NOT NULL,
+                UNIQUE(topic_slug, difficulty, solution)
+            );
+
+            CREATE TABLE IF NOT EXISTS pool_refills (
+                refill_id   INTEGER PRIMARY KEY AUTOINCREMENT,
+                topic_slug  TEXT NOT NULL REFERENCES topics(slug),
+                difficulty  TEXT NOT NULL,
+                generated   INTEGER NOT NULL,
+                kept        INTEGER NOT NULL,
+                finished_at TEXT NOT NULL
             );
 
             CREATE TABLE IF NOT EXISTS games (
                 game_id         INTEGER PRIMARY KEY AUTOINCREMENT,
                 date            TEXT NOT NULL,
-                topic_slug      TEXT NOT NULL DEFAULT 'notable-people',
-                difficulty      TEXT NOT NULL DEFAULT 'medium',
+                topic_slug      TEXT NOT NULL,
+                difficulty      TEXT NOT NULL,
+                user_id         INTEGER,
+                share_code      TEXT,
                 started_at      TEXT NOT NULL,
                 ended_at        TEXT,
                 result          TEXT,
@@ -65,6 +90,16 @@ class GameDatabase:
                 answer          TEXT NOT NULL,
                 explanation     TEXT NOT NULL DEFAULT '',
                 asked_at        TEXT NOT NULL,
+                user_id         INTEGER,
+                FOREIGN KEY (game_id) REFERENCES games(game_id)
+            );
+
+            CREATE TABLE IF NOT EXISTS hint_reveals (
+                game_id         INTEGER NOT NULL,
+                hint_index      INTEGER NOT NULL,
+                after_question  INTEGER NOT NULL,
+                revealed_at     TEXT NOT NULL,
+                PRIMARY KEY (game_id, hint_index),
                 FOREIGN KEY (game_id) REFERENCES games(game_id)
             );
 
@@ -130,42 +165,8 @@ class GameDatabase:
                 FOREIGN KEY (user_id) REFERENCES accounts(user_id)
             );
         """)
-        self._migrate_add_explanation_column()
-        self._migrate_daily_puzzles_composite_key()
-        self._migrate_games_topic_difficulty()
-        self._migrate_add_hints_column()
-        self._migrate_add_user_id_to_games()
-        self._migrate_invites_multi_use()
-        self._migrate_add_invite_code_to_accounts()
-        self._migrate_add_role_columns()
-        self._migrate_add_blocked_column()
-        self._migrate_add_daily_limits()
-        self._migrate_add_user_id_to_topics()
-        self._migrate_add_user_id_to_questions()
-        self._migrate_add_limits_to_invites()
-        self._migrate_add_share_code_to_games()
-        self._migrate_add_hint_reveals_table()
-        self._migrate_add_profile_columns()
-        self._migrate_add_friends_table()
-        self._migrate_add_avatar_columns()
-        self._migrate_add_avatar_limit_to_invites()
-        self._migrate_add_activity_log_table()
-        self._migrate_add_puzzle_pool_table()
         self._seed_default_topics()
 
-
-    def _migrate_add_puzzle_pool_table(self) -> None:
-        self._connection.execute("""
-            CREATE TABLE IF NOT EXISTS puzzle_pool (
-                pool_id      INTEGER PRIMARY KEY AUTOINCREMENT,
-                topic_slug   TEXT NOT NULL REFERENCES topics(slug),
-                difficulty   TEXT NOT NULL,
-                solution     TEXT NOT NULL,
-                generated_at TEXT NOT NULL,
-                UNIQUE(topic_slug, difficulty, solution)
-            )
-        """)
-        self._connection.commit()
 
     def _seed_default_topics(self) -> None:
         default_topics = [
@@ -173,142 +174,11 @@ class GameDatabase:
             ("world-geography", "World Geography"),
         ]
         self._connection.executemany(
-            "INSERT OR IGNORE INTO topics (slug, name) VALUES (?, ?)",
-            default_topics,
+            "INSERT OR IGNORE INTO topics (slug, name, created_at) VALUES (?, ?, ?)",
+            [(slug, name, _utcnow_iso()) for slug, name in default_topics],
         )
         self._connection.commit()
 
-    def _migrate_add_explanation_column(self) -> None:
-        columns = [
-            row["name"]
-            for row in self._connection.execute("PRAGMA table_info(questions)")
-        ]
-        if "explanation" not in columns:
-            self._connection.execute(
-                "ALTER TABLE questions ADD COLUMN explanation TEXT NOT NULL DEFAULT ''"
-            )
-            self._connection.commit()
-
-    def _migrate_daily_puzzles_composite_key(self) -> None:
-        """Migrate old single-key daily_puzzles to composite key if needed."""
-        columns = [
-            row["name"]
-            for row in self._connection.execute("PRAGMA table_info(daily_puzzles)")
-        ]
-        if "topic_slug" in columns:
-            return  # Already migrated
-
-        # Old schema has only (date, solution). Migrate to new schema.
-        self._connection.executescript("""
-            ALTER TABLE daily_puzzles RENAME TO daily_puzzles_old;
-
-            CREATE TABLE daily_puzzles (
-                date        TEXT NOT NULL,
-                topic_slug  TEXT NOT NULL,
-                difficulty  TEXT NOT NULL,
-                solution    TEXT NOT NULL,
-                PRIMARY KEY (date, topic_slug, difficulty),
-                FOREIGN KEY (topic_slug) REFERENCES topics(slug)
-            );
-
-            INSERT INTO daily_puzzles (date, topic_slug, difficulty, solution)
-                SELECT date, 'notable-people', 'medium', solution
-                FROM daily_puzzles_old;
-
-            DROP TABLE daily_puzzles_old;
-        """)
-        self._connection.commit()
-
-    def _migrate_games_topic_difficulty(self) -> None:
-        """Add topic_slug and difficulty columns to games if missing."""
-        columns = [
-            row["name"]
-            for row in self._connection.execute("PRAGMA table_info(games)")
-        ]
-        if "topic_slug" not in columns:
-            self._connection.execute(
-                "ALTER TABLE games ADD COLUMN topic_slug TEXT NOT NULL DEFAULT 'notable-people'"
-            )
-        if "difficulty" not in columns:
-            self._connection.execute(
-                "ALTER TABLE games ADD COLUMN difficulty TEXT NOT NULL DEFAULT 'medium'"
-            )
-        self._connection.commit()
-
-    def _migrate_add_hints_column(self) -> None:
-        """Add hints column to daily_puzzles if missing."""
-        columns = [
-            row["name"]
-            for row in self._connection.execute("PRAGMA table_info(daily_puzzles)")
-        ]
-        if "hints" not in columns:
-            self._connection.execute(
-                "ALTER TABLE daily_puzzles ADD COLUMN hints TEXT NOT NULL DEFAULT '[]'"
-            )
-            self._connection.commit()
-
-    def _migrate_add_share_code_to_games(self) -> None:
-        columns = [
-            row["name"]
-            for row in self._connection.execute("PRAGMA table_info(games)")
-        ]
-        if "share_code" not in columns:
-            self._connection.execute(
-                "ALTER TABLE games ADD COLUMN share_code TEXT"
-            )
-            # Backfill existing games with random share codes.
-            rows = self._connection.execute(
-                "SELECT game_id FROM games WHERE share_code IS NULL"
-            ).fetchall()
-            for row in rows:
-                code = secrets.token_hex(3).upper()
-                self._connection.execute(
-                    "UPDATE games SET share_code = ? WHERE game_id = ?",
-                    (code, row["game_id"]),
-                )
-            self._connection.commit()
-
-    def _migrate_add_hint_reveals_table(self) -> None:
-        self._connection.execute("""
-            CREATE TABLE IF NOT EXISTS hint_reveals (
-                game_id         INTEGER NOT NULL,
-                hint_index      INTEGER NOT NULL,
-                after_question  INTEGER NOT NULL,
-                revealed_at     TEXT NOT NULL,
-                PRIMARY KEY (game_id, hint_index),
-                FOREIGN KEY (game_id) REFERENCES games(game_id)
-            )
-        """)
-        self._connection.commit()
-
-    def _migrate_add_profile_columns(self) -> None:
-        columns = [
-            row["name"]
-            for row in self._connection.execute("PRAGMA table_info(accounts)")
-        ]
-        if "display_name" not in columns:
-            self._connection.execute(
-                "ALTER TABLE accounts ADD COLUMN display_name TEXT"
-            )
-        if "player_code" not in columns:
-            self._connection.execute(
-                "ALTER TABLE accounts ADD COLUMN player_code TEXT"
-            )
-            self._connection.execute(
-                "CREATE UNIQUE INDEX IF NOT EXISTS idx_accounts_player_code "
-                "ON accounts(player_code)"
-            )
-        if "anonymous" not in columns:
-            self._connection.execute(
-                "ALTER TABLE accounts ADD COLUMN anonymous INTEGER NOT NULL DEFAULT 0"
-            )
-        self._connection.commit()
-        # Backfill player codes for existing accounts that don't have one.
-        rows = self._connection.execute(
-            "SELECT user_id FROM accounts WHERE player_code IS NULL"
-        ).fetchall()
-        for row in rows:
-            self._generate_and_set_player_code(row["user_id"])
 
     def _generate_player_code(self, hex_bytes: int = 2) -> str:
         """Generate a unique player code. Starts at 4 hex chars, grows on exhaustion."""
@@ -332,52 +202,6 @@ class GameDatabase:
         self._connection.commit()
         return code
 
-    def _migrate_add_friends_table(self) -> None:
-        self._connection.execute("""
-            CREATE TABLE IF NOT EXISTS friends (
-                user_id    INTEGER NOT NULL,
-                friend_id  INTEGER NOT NULL,
-                created_at TEXT NOT NULL,
-                PRIMARY KEY (user_id, friend_id),
-                FOREIGN KEY (user_id) REFERENCES accounts(user_id),
-                FOREIGN KEY (friend_id) REFERENCES accounts(user_id)
-            )
-        """)
-        self._connection.commit()
-
-    def _migrate_add_avatar_columns(self) -> None:
-        columns = [
-            row["name"]
-            for row in self._connection.execute("PRAGMA table_info(accounts)")
-        ]
-        if "avatar_version" not in columns:
-            self._connection.execute(
-                "ALTER TABLE accounts ADD COLUMN avatar_version INTEGER NOT NULL DEFAULT 0"
-            )
-        if "avatar_generations_used" not in columns:
-            self._connection.execute(
-                "ALTER TABLE accounts ADD COLUMN avatar_generations_used INTEGER NOT NULL DEFAULT 0"
-            )
-        if "avatar_generation_reset" not in columns:
-            self._connection.execute(
-                "ALTER TABLE accounts ADD COLUMN avatar_generation_reset TEXT"
-            )
-        if "monthly_avatar_limit" not in columns:
-            self._connection.execute(
-                "ALTER TABLE accounts ADD COLUMN monthly_avatar_limit INTEGER NOT NULL DEFAULT 3"
-            )
-        self._connection.commit()
-
-    def _migrate_add_avatar_limit_to_invites(self) -> None:
-        columns = [
-            row["name"]
-            for row in self._connection.execute("PRAGMA table_info(invites)")
-        ]
-        if "monthly_avatar_limit" not in columns:
-            self._connection.execute(
-                "ALTER TABLE invites ADD COLUMN monthly_avatar_limit INTEGER"
-            )
-            self._connection.commit()
 
     # -- Topics --
 
@@ -388,7 +212,10 @@ class GameDatabase:
         return [dict(row) for row in rows]
 
     def get_topics_ranked(self, user_id: int, today: date) -> list[dict[str, Any]]:
-        """Return all topics sorted to surface unplayed puzzles first.
+        """Return playable topics sorted to surface unplayed puzzles first.
+
+        Topics that are not ready yet (still generating, or failed) are only
+        included for the user who suggested them, so they can follow progress.
 
         Each topic includes a ``friends`` dict mapping difficulty to a list of
         friend avatar entries for today's puzzles.  Topics are grouped into
@@ -400,10 +227,13 @@ class GameDatabase:
 
         # All topics with their total play count.
         topic_rows = self._connection.execute(
-            "SELECT t.slug, t.name, COUNT(g.game_id) AS play_count "
+            "SELECT t.slug, t.name, t.status, t.status_detail, "
+            "COUNT(g.game_id) AS play_count "
             "FROM topics t "
             "LEFT JOIN games g ON g.topic_slug = t.slug "
+            "WHERE t.status = 'ready' OR t.user_id = ? "
             "GROUP BY t.slug, t.name",
+            (user_id,),
         ).fetchall()
 
         topics: dict[str, dict[str, Any]] = {}
@@ -411,6 +241,8 @@ class GameDatabase:
             topics[row["slug"]] = {
                 "slug": row["slug"],
                 "name": row["name"],
+                "status": row["status"],
+                "status_detail": row["status_detail"],
                 "play_count": row["play_count"],
                 "friends": {},
             }
@@ -477,18 +309,46 @@ class GameDatabase:
 
         return sorted(topics.values(), key=sort_key)
 
-    def add_topic(self, slug: str, name: str, user_id: Optional[int] = None) -> None:
+    def add_topic(
+        self, slug: str, name: str, user_id: Optional[int] = None,
+        status: str = "generating",
+    ) -> None:
         self._connection.execute(
-            "INSERT OR IGNORE INTO topics (slug, name, user_id) VALUES (?, ?, ?)",
-            (slug, name, user_id),
+            "INSERT OR IGNORE INTO topics (slug, name, user_id, status, created_at) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (slug, name, user_id, status, _utcnow_iso()),
         )
         self._connection.commit()
 
-    def topic_exists(self, slug: str) -> bool:
+    def get_topic(self, slug: str) -> Optional[dict[str, Any]]:
         row = self._connection.execute(
-            "SELECT 1 FROM topics WHERE slug = ?", (slug,)
+            "SELECT slug, name, user_id, status, status_detail FROM topics WHERE slug = ?",
+            (slug,),
         ).fetchone()
-        return row is not None
+        return dict(row) if row is not None else None
+
+    def get_topics_with_status(self, status: str) -> list[dict[str, Any]]:
+        rows = self._connection.execute(
+            "SELECT slug, name, user_id, status, status_detail FROM topics WHERE status = ?",
+            (status,),
+        ).fetchall()
+        return [dict(row) for row in rows]
+
+    def set_topic_status(
+        self, slug: str, status: str, status_detail: Optional[str] = None,
+    ) -> None:
+        self._connection.execute(
+            "UPDATE topics SET status = ?, status_detail = ? WHERE slug = ?",
+            (status, status_detail, slug),
+        )
+        self._connection.commit()
+
+    def delete_topic(self, slug: str) -> None:
+        """Delete a topic that was never played, along with its pool."""
+        self._connection.execute("DELETE FROM puzzle_pool WHERE topic_slug = ?", (slug,))
+        self._connection.execute("DELETE FROM pool_refills WHERE topic_slug = ?", (slug,))
+        self._connection.execute("DELETE FROM topics WHERE slug = ?", (slug,))
+        self._connection.commit()
 
     # -- Puzzles --
 
@@ -535,18 +395,6 @@ class GameDatabase:
         if row is None:
             return []
         return json.loads(row["hints"])
-
-    def get_all_solutions(
-        self, topic_slug: str, difficulty: str
-    ) -> list[str]:
-        """Return all previously used solutions for a topic+difficulty, for dedup."""
-        rows = self._connection.execute(
-            "SELECT solution FROM daily_puzzles "
-            "WHERE topic_slug = ? AND difficulty = ? ORDER BY date",
-            (topic_slug, difficulty),
-        ).fetchall()
-        return [row["solution"] for row in rows]
-
 
     # -- Puzzle Pool --
 
@@ -606,30 +454,42 @@ class GameDatabase:
         self._connection.commit()
         return self._connection.total_changes - before
 
-    def clear_pool(
-        self,
-        topic_slug: Optional[str] = None,
-        difficulty: Optional[str] = None,
-    ) -> int:
-        """Delete subjects from the pool. Returns count deleted.
+    def remove_cross_difficulty_pool_duplicates(self, topic_slug: str) -> int:
+        """Drop non-normal pool subjects that also appear in the normal pool.
 
-        If topic_slug is None, clears all topics. If difficulty is None,
-        clears both difficulties for the given topic(s).
+        Returns count deleted.
         """
-        conditions = []
-        params: list[str] = []
-        if topic_slug is not None:
-            conditions.append("topic_slug = ?")
-            params.append(topic_slug)
-        if difficulty is not None:
-            conditions.append("difficulty = ?")
-            params.append(difficulty)
-
-        where = (" WHERE " + " AND ".join(conditions)) if conditions else ""
         before = self._connection.total_changes
-        self._connection.execute("DELETE FROM puzzle_pool" + where, params)
+        self._connection.execute(
+            "DELETE FROM puzzle_pool "
+            "WHERE topic_slug = ? AND difficulty != 'normal' AND solution IN ("
+            "  SELECT solution FROM puzzle_pool "
+            "  WHERE topic_slug = ? AND difficulty = 'normal')",
+            (topic_slug, topic_slug),
+        )
         self._connection.commit()
         return self._connection.total_changes - before
+
+    def record_pool_refill(
+        self, topic_slug: str, difficulty: str, generated: int, kept: int,
+    ) -> None:
+        self._connection.execute(
+            "INSERT INTO pool_refills (topic_slug, difficulty, generated, kept, finished_at) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (topic_slug, difficulty, generated, kept, _utcnow_iso()),
+        )
+        self._connection.commit()
+
+    def get_last_pool_refill(
+        self, topic_slug: str, difficulty: str,
+    ) -> Optional[dict[str, Any]]:
+        row = self._connection.execute(
+            "SELECT generated, kept, finished_at FROM pool_refills "
+            "WHERE topic_slug = ? AND difficulty = ? "
+            "ORDER BY refill_id DESC LIMIT 1",
+            (topic_slug, difficulty),
+        ).fetchone()
+        return dict(row) if row is not None else None
 
     # -- Games --
 
@@ -893,137 +753,6 @@ class GameDatabase:
             return None
         return row["name"]
 
-    # -- Migrations (accounts) --
-
-    def _migrate_add_user_id_to_games(self) -> None:
-        columns = [
-            row["name"]
-            for row in self._connection.execute("PRAGMA table_info(games)")
-        ]
-        if "user_id" not in columns:
-            self._connection.execute(
-                "ALTER TABLE games ADD COLUMN user_id INTEGER"
-            )
-            self._connection.commit()
-
-    def _migrate_invites_multi_use(self) -> None:
-        columns = [
-            row["name"]
-            for row in self._connection.execute("PRAGMA table_info(invites)")
-        ]
-        if "remaining_uses" in columns:
-            return
-        # Old schema had used_at/used_by; new schema has alias/remaining_uses.
-        self._connection.executescript("""
-            ALTER TABLE invites RENAME TO invites_old;
-
-            CREATE TABLE invites (
-                code            TEXT PRIMARY KEY,
-                alias           TEXT,
-                remaining_uses  INTEGER NOT NULL DEFAULT 1,
-                created_at      TEXT NOT NULL
-            );
-
-            INSERT INTO invites (code, remaining_uses, created_at)
-                SELECT code, CASE WHEN used_at IS NOT NULL THEN 0 ELSE 1 END, created_at
-                FROM invites_old;
-
-            DROP TABLE invites_old;
-        """)
-        self._connection.commit()
-
-    def _migrate_add_invite_code_to_accounts(self) -> None:
-        columns = [
-            row["name"]
-            for row in self._connection.execute("PRAGMA table_info(accounts)")
-        ]
-        if "invite_code" not in columns:
-            self._connection.execute(
-                "ALTER TABLE accounts ADD COLUMN invite_code TEXT"
-            )
-            self._connection.commit()
-
-    def _migrate_add_role_columns(self) -> None:
-        account_columns = [
-            row["name"]
-            for row in self._connection.execute("PRAGMA table_info(accounts)")
-        ]
-        if "role" not in account_columns:
-            self._connection.execute(
-                "ALTER TABLE accounts ADD COLUMN role TEXT NOT NULL DEFAULT 'user'"
-            )
-        invite_columns = [
-            row["name"]
-            for row in self._connection.execute("PRAGMA table_info(invites)")
-        ]
-        if "role" not in invite_columns:
-            self._connection.execute(
-                "ALTER TABLE invites ADD COLUMN role TEXT NOT NULL DEFAULT 'user'"
-            )
-        self._connection.commit()
-
-    def _migrate_add_blocked_column(self) -> None:
-        columns = [
-            row["name"]
-            for row in self._connection.execute("PRAGMA table_info(accounts)")
-        ]
-        if "blocked" not in columns:
-            self._connection.execute(
-                "ALTER TABLE accounts ADD COLUMN blocked INTEGER NOT NULL DEFAULT 0"
-            )
-            self._connection.commit()
-
-    def _migrate_add_daily_limits(self) -> None:
-        columns = [
-            row["name"]
-            for row in self._connection.execute("PRAGMA table_info(accounts)")
-        ]
-        if "daily_question_limit" not in columns:
-            self._connection.execute(
-                "ALTER TABLE accounts ADD COLUMN daily_question_limit INTEGER NOT NULL DEFAULT 105"
-            )
-        if "daily_topic_limit" not in columns:
-            self._connection.execute(
-                "ALTER TABLE accounts ADD COLUMN daily_topic_limit INTEGER NOT NULL DEFAULT 1"
-            )
-        self._connection.commit()
-
-    def _migrate_add_user_id_to_topics(self) -> None:
-        columns = [
-            row["name"]
-            for row in self._connection.execute("PRAGMA table_info(topics)")
-        ]
-        if "user_id" not in columns:
-            self._connection.execute(
-                "ALTER TABLE topics ADD COLUMN user_id INTEGER"
-            )
-            self._connection.commit()
-
-    def _migrate_add_user_id_to_questions(self) -> None:
-        columns = [
-            row["name"]
-            for row in self._connection.execute("PRAGMA table_info(questions)")
-        ]
-        if "user_id" not in columns:
-            self._connection.execute(
-                "ALTER TABLE questions ADD COLUMN user_id INTEGER"
-            )
-            self._connection.commit()
-
-    def _migrate_add_limits_to_invites(self) -> None:
-        columns = [
-            row["name"]
-            for row in self._connection.execute("PRAGMA table_info(invites)")
-        ]
-        if "daily_question_limit" not in columns:
-            self._connection.execute(
-                "ALTER TABLE invites ADD COLUMN daily_question_limit INTEGER"
-            )
-        if "daily_topic_limit" not in columns:
-            self._connection.execute(
-                "ALTER TABLE invites ADD COLUMN daily_topic_limit INTEGER"
-            )
-        self._connection.commit()
 
     # -- Accounts --
 
@@ -1482,18 +1211,6 @@ class GameDatabase:
 
         return pool
 
-    def _migrate_add_activity_log_table(self) -> None:
-        self._connection.execute("""
-            CREATE TABLE IF NOT EXISTS activity_log (
-                log_id     INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id    INTEGER NOT NULL,
-                action     TEXT NOT NULL,
-                detail     TEXT,
-                created_at TEXT NOT NULL,
-                FOREIGN KEY (user_id) REFERENCES accounts(user_id)
-            )
-        """)
-        self._connection.commit()
 
     # -- Activity log --
 

@@ -65,20 +65,6 @@ question is in, your final answer on the last line MUST always be one of the \
 five English words above.\
 """
 
-GENERATE_SOLUTION_PROMPT_TEMPLATE = """\
-You are helping create daily puzzles for a 21-questions trivia game.
-
-The topic is: {topic}.
-
-Generate a single subject related to this topic that would work well as a \
-21-questions answer. For most topics, this would be a notable figure, event, \
-place, or concept.
-
-{difficulty_guidance}
-
-Reply with ONLY the name of the subject. No quotes, no explanation, no \
-punctuation beyond what the name itself requires.\
-"""
 
 GENERATE_HINTS_PROMPT_TEMPLATE = """\
 You are helping create hints for a 21-questions trivia game.
@@ -124,7 +110,6 @@ Reply with exactly {batch_size} lines, one subject per line. No numbering, \
 no bullet points, no extra text — just the name of each subject on its own \
 line.\
 """
-
 
 
 VALIDATE_SOLUTION_BATCH_PROMPT_TEMPLATE = """\
@@ -261,38 +246,6 @@ class OpenAIClient:
             )
 
         return content
-
-
-async def generate_solution(
-    client: LLMClient,
-    previous_solutions: list[str],
-    topic_name: str,
-    difficulty: str,
-) -> str:
-    """Ask the LLM to generate a new daily solution, avoiding repeats."""
-    guidance = DIFFICULTY_GUIDANCE.get(difficulty, DIFFICULTY_GUIDANCE["normal"])
-    prompt = GENERATE_SOLUTION_PROMPT_TEMPLATE.format(
-        topic=topic_name,
-        difficulty_guidance=guidance,
-    )
-    if previous_solutions:
-        formatted = "\n".join(f"- {solution}" for solution in previous_solutions)
-        prompt += (
-            "\n\nThe following subjects have already been used. "
-            "Do NOT repeat any of them:\n" + formatted
-        )
-
-    response = await client.ask(prompt, "Generate a new subject.")
-    solution = response.strip().strip('"').strip("'")
-    if not solution:
-        logger.error("LLM generated empty solution after stripping for topic=%r", topic_name)
-        raise LLMError(
-            "LLM generated empty solution",
-            "AI failed to generate a valid puzzle. Please try again.",
-        )
-    logger.info("Generated solution for topic=%r difficulty=%r: %r", topic_name, difficulty, solution)
-    return solution
-
 
 
 @dataclass
