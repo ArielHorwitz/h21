@@ -2216,3 +2216,7 @@ a.history-row:hover {
   font-style: normal;
   flex-shrink: 0;
 }
+
+#avatar-gen-counter {
+  margin-top: 0.5rem;
+}

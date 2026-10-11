@@ -140,9 +140,14 @@ function updateAvatarDisplay() {
 }
 
 function updateAvatarCounter() {
-  const remaining = monthlyAvatarLimit - avatarGenerationsUsed;
-  avatarGenCounter.textContent = remaining + " of " + monthlyAvatarLimit + " generations remaining this month";
-  avatarGenerateBtn.disabled = remaining <= 0;
+  const remaining = Math.max(monthlyAvatarLimit - avatarGenerationsUsed, 0);
+  if (remaining === 0) {
+    avatarGenCounter.textContent = "You've used this month's picture generations. Come back next month.";
+  } else {
+    const pictures = remaining === 1 ? "1 more picture" : `${remaining} more pictures`;
+    avatarGenCounter.textContent = `You can generate ${pictures} this month.`;
+  }
+  avatarGenerateBtn.disabled = remaining === 0;
 }
 
 function showAvatarGenerator() {
