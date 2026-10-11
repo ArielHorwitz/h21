@@ -227,7 +227,7 @@ class GameDatabase:
 
         # All topics with their total play count.
         topic_rows = self._connection.execute(
-            "SELECT t.slug, t.name, t.status, t.status_detail, "
+            "SELECT t.slug, t.name, t.status, t.status_detail, t.user_id, "
             "COUNT(g.game_id) AS play_count "
             "FROM topics t "
             "LEFT JOIN games g ON g.topic_slug = t.slug "
@@ -243,6 +243,7 @@ class GameDatabase:
                 "name": row["name"],
                 "status": row["status"],
                 "status_detail": row["status_detail"],
+                "suggested_by_me": row["user_id"] == user_id,
                 "play_count": row["play_count"],
                 "friends": {},
             }

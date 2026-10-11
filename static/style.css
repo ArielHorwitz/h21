@@ -1163,8 +1163,53 @@ body[data-tab="profile"] .tab-bar a[data-tab="profile"] .tab-avatar img {
   margin-top: 0.5rem;
 }
 
-.suggest-topic #suggest-topic-toggle {
+.suggest-topic .secondary-btn {
   align-self: center;
+}
+
+/* -- Suggest a topic -- */
+
+.suggest-examples {
+  padding-left: 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.example-broad {
+  color: #ff6b6b;
+  font-weight: 600;
+}
+
+.example-better {
+  color: var(--yes);
+  font-weight: 600;
+}
+
+.example-arrow {
+  color: var(--text-faint);
+}
+
+.suggest-form-section {
+  display: flex;
+  flex-direction: column;
+}
+
+#my-topics-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.my-topic-status {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-shrink: 0;
+}
+
+.my-topic-status .secondary-btn {
+  text-decoration: none;
 }
 
 /* ===================================================================
@@ -2223,5 +2268,9 @@ a.history-row:hover {
 .quota-note.is-exhausted {
   border-color: rgba(244, 67, 54, 0.5);
   background: rgba(244, 67, 54, 0.12);
+  color: #ff6b6b;
+}
+
+.person-detail.topic-failed-text {
   color: #ff6b6b;
 }

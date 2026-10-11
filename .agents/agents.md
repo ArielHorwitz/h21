@@ -21,7 +21,8 @@ An AI-powered 21 questions trivia game. Players pick a topic (user-submitted or 
 
 | File | Purpose |
 |------|---------|
-| `static/home.html/js` | Today: topic list with per-difficulty play buttons, topic suggestion |
+| `static/home.html/js` | Today: topic list with per-difficulty play buttons |
+| `static/suggest.html/js` | Suggest a topic: guide, form with quota, your topics |
 | `static/index.html`, `static/game.js` | Main gameplay: Q&A loop, hints, game state |
 | `static/replay.html/js` | Game results and replays |
 | `static/friends.html/js` | Recent games with friends, search, suggestions, following |

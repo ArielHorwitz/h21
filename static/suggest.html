@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <link rel="icon" type="image/png" sizes="32x32" href="/static/brand/h21-favicon-32.png">
+  <link rel="icon" type="image/svg+xml" href="/static/brand/h21-favicon.svg">
+  <link rel="apple-touch-icon" href="/static/brand/h21-touch-icon.png">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#1a1a2e">
+  <title>Suggest a topic — H21</title>
+  <meta property="og:title" content="H21 — 21 Questions">
+  <meta property="og:description" content="A daily 21 Questions trivia game powered by AI.">
+  <meta property="og:type" content="website">
+  <meta property="og:image" content="__BASE_URL__/static/brand/h21-og-card.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body data-tab="today">
+  <!--TOP_BAR-->
+  <main class="page">
+    <header class="page-header">
+      <h1 class="page-title">Suggest a topic</h1>
+    </header>
+
+    <section class="help-card suggest-guide">
+      <p>
+        Each topic gets two new puzzles a day, picked from everything the topic
+        covers. So say what you mean:
+      </p>
+      <ul class="suggest-examples">
+        <li><span class="example-broad">Disney</span> could mean theme parks, executives or company history. <span class="example-better">Disney animated films</span> is clearer.</li>
+        <li><span class="example-broad">Space</span> <span class="example-arrow">→</span> <span class="example-better">Space exploration missions</span> or <span class="example-better">Planets and moons</span></li>
+        <li><span class="example-broad">Music</span> <span class="example-arrow">→</span> <span class="example-better">Jazz musicians</span> or <span class="example-better">Classical composers</span></li>
+      </ul>
+      <p class="field-hint">
+        Very narrow topics get turned down: there need to be dozens of well-known
+        subjects to draw from.
+      </p>
+    </section>
+
+    <section class="suggest-form-section">
+      <form id="request-topic-form" class="inline-form">
+        <input
+          type="text"
+          id="topic-name-input"
+          placeholder="e.g. Ancient Rome, Jazz musicians"
+          autocomplete="off"
+          maxlength="100"
+          required
+        >
+        <button type="submit" id="request-topic-btn" class="primary-btn">Create</button>
+      </form>
+      <p class="quota-note" id="topic-quota" hidden></p>
+      <p id="request-topic-status" hidden></p>
+    </section>
+
+    <section id="my-topics-section" hidden>
+      <h2 class="section-title">Your topics</h2>
+      <div id="my-topics-list" class="person-list"></div>
+    </section>
+  </main>
+  <!--TAB_BAR-->
+  <script src="/static/nav.js"></script>
+  <script src="/static/suggest.js"></script>
+</body>
+</html>

@@ -48,6 +48,10 @@ Screenshots of every page at phone (390px) and desktop widths, on a seeded sandb
   - Costs per image as measured: mini high (the old default) $0.033, mini low $0.002, Flare low $0.006, Flare high $0.053.
   - Considered and set aside: assigning curated palettes (dropping color words was simpler), and a style picker on the profile page (a possible follow-up).
 
+- **Suggesting a topic has its own page** (`/suggest`; Today links to it). It opens with a short guide, because players suggest broad topics like "Disney" expecting films and get theme parks and executives too: broad-vs-specific examples, and a note that very narrow topics get turned down. Below are the form with the quota pill and "Your topics" (ready ones link to play, creating ones show progress, turned-down ones show the reason and Dismiss). Considered for later: a preview step showing how a topic will be read (scope, sample subjects, sharper alternatives) before it uses up a suggestion.
+- **Quotas are accented pills** ("3 pictures left this month", "3 topic suggestions left today"), red when used up; remaining picture generations also show on the avatar preview.
+- **Two button styles:** filled gold for the main action, gold outline for the rest (the muted grey outline is gone). Danger buttons, text links and segmented switches keep their own looks.
+
 ## Status
 
 - All pages redesigned.

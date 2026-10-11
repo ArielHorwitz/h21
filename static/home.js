@@ -1,11 +1,5 @@
 const topicsList = document.getElementById("topics-list");
 const todayDate = document.getElementById("today-date");
-const suggestTopicToggle = document.getElementById("suggest-topic-toggle");
-const requestForm = document.getElementById("request-topic-form");
-const topicNameInput = document.getElementById("topic-name-input");
-const requestTopicBtn = document.getElementById("request-topic-btn");
-const requestStatus = document.getElementById("request-topic-status");
-const topicQuota = document.getElementById("topic-quota");
 
 const DIFFICULTIES = ["normal", "expert"];
 const TOPIC_STATUS_POLL_MS = 4000;
@@ -227,69 +221,5 @@ async function loadTopics() {
     console.error("Failed to load topics:", error);
   }
 }
-
-async function loadTopicQuota() {
-  try {
-    const response = await fetch("/api/me");
-    if (!response.ok) return;
-    const data = await response.json();
-    const remaining = Math.max(data.daily_topic_limit - data.topic_suggestions_used_today, 0);
-    topicQuota.textContent = remaining > 0
-      ? `${pluralize(remaining, "topic suggestion")} left today`
-      : "No topic suggestions left today";
-    topicQuota.classList.toggle("is-exhausted", remaining === 0);
-    requestTopicBtn.disabled = remaining === 0;
-    topicNameInput.disabled = remaining === 0;
-  } catch {
-    // Non-critical.
-  }
-}
-
-suggestTopicToggle.addEventListener("click", () => {
-  suggestTopicToggle.hidden = true;
-  requestForm.hidden = false;
-  topicQuota.hidden = false;
-  topicNameInput.focus();
-  loadTopicQuota();
-});
-
-requestForm.addEventListener("submit", async (event) => {
-  event.preventDefault();
-
-  const name = topicNameInput.value.trim();
-  if (!name) return;
-
-  requestTopicBtn.disabled = true;
-  topicNameInput.disabled = true;
-  requestStatus.hidden = true;
-
-  try {
-    const response = await fetch("/api/topics", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name }),
-    });
-
-    const data = await response.json();
-
-    if (response.ok) {
-      requestStatus.textContent = `Creating "${data.name}". It will appear above once its puzzles are ready.`;
-      requestStatus.className = "status-success";
-      topicNameInput.value = "";
-      await loadTopics();
-    } else {
-      requestStatus.textContent = data.detail || "Request failed.";
-      requestStatus.className = "status-error";
-    }
-  } catch (error) {
-    requestStatus.textContent = "Network error. Please try again.";
-    requestStatus.className = "status-error";
-  } finally {
-    requestStatus.hidden = false;
-    requestTopicBtn.disabled = false;
-    topicNameInput.disabled = false;
-    loadTopicQuota();
-  }
-});
 
 loadTopics();

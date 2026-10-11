@@ -479,6 +479,11 @@ async def replay_page(request: Request) -> HTMLResponse:
     return render_page(request, "replay.html")
 
 
+@app.get("/suggest")
+async def suggest_page(request: Request) -> HTMLResponse:
+    return render_page(request, "suggest.html")
+
+
 @app.get("/friends")
 async def friends_page(request: Request) -> HTMLResponse:
     return render_page(request, "friends.html")
