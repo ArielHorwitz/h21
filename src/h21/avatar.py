@@ -14,25 +14,30 @@ logger = logging.getLogger("h21.avatar")
 
 THUMBNAIL_SIZE = 128
 
-AVATAR_ADJECTIVES = (
-    "amber", "antique", "aquamarine", "azure", "bejeweled", "blackened",
-    "blazing", "blooming", "bronze", "burnished", "cerulean", "charred",
-    "checkered", "chrome", "cobalt", "copper", "coral", "cracked", "crimson",
-    "crystalline", "curved", "cyan", "dappled", "diamond", "dotted",
-    "emerald", "etched", "faceted", "feathered", "fiery", "floating",
-    "floral", "flowing", "fluorescent", "folded", "forged", "frosted",
-    "frozen", "gilded", "glacial", "glittering", "glossy", "glowing",
-    "golden", "granite", "hammered", "hazy", "hexagonal", "holographic",
-    "icy", "illuminated", "indigo", "iridescent", "ivory", "jade", "jagged",
-    "lacquered", "layered", "lavender", "leafy", "luminous", "magenta",
-    "marbled", "matte", "metallic", "miniature", "molten", "mossy",
-    "multicolored", "obsidian", "opaline", "ornate", "oxidized", "patterned",
-    "pearl", "polished", "prismatic", "radiant", "reflective", "ribbed",
-    "rough", "ruby", "rusted", "sapphire", "scarlet", "scorched",
-    "shattered", "shimmering", "silken", "silver", "speckled", "spiked",
-    "spiraled", "striped", "textured", "translucent", "turquoise", "velvet",
-    "violet", "woven",
+# Art styles for generated avatars, each with a few defining words so the
+# image model doesn't drift toward its default look. Chosen to stay distinct
+# from each other and readable at small sizes.
+AVATAR_STYLES = {
+    "linocut": "linocut print (bold carved lines, two or three inks)",
+    "stained glass": "stained glass (thick dark outlines)",
+    "pixel art": "pixel art (chunky 32x32 sprite)",
+    "embroidered": "embroidered patch (stitched thread texture)",
+    "origami": "origami (folded paper)",
+    "mosaic": "mosaic tiles",
+    "rubber-hose": "1930s rubber-hose cartoon",
+}
+
+# Background colors. Each avatar is offered two and the model picks the one
+# that contrasts better with the subject, so backgrounds vary without
+# landing a subject on its own color.
+AVATAR_BACKGROUNDS = (
+    "deep teal", "mustard yellow", "coral pink", "navy blue", "sage green", "terracotta",
+    "lavender", "charcoal grey", "sky blue", "forest green", "plum purple", "tomato red",
 )
+
+# Low quality is indistinguishable from high at avatar sizes, at a fraction
+# of the cost.
+AVATAR_QUALITY = "low"
 
 AVATAR_NOUNS = (
     "octopus", "beetle", "chameleon", "peacock", "fox", "owl", "raven",
@@ -54,26 +59,45 @@ AVATAR_NOUNS = (
 )
 
 
-def build_avatar_prompt(adjective: str, noun: str) -> str:
-    """Build the standard generation prompt for an adjective + noun subject."""
+def _avatar_prompt_ending(backgrounds: tuple[str, str]) -> str:
+    first, second = backgrounds
     return (
-        f"Generate a visually striking profile picture of a {adjective} "
-        f"{noun}. Colorful, bold, memorable at small sizes. Square "
-        f"composition, no text or letters."
+        "Distinctive and simple: a single centered subject that reads clearly at small "
+        f"sizes, on a plain background in either {first} or {second}, whichever contrasts "
+        "better with the subject. Square composition, no border or frame, no text or letters."
     )
+
+
+def build_avatar_prompt(noun: str, style: str, backgrounds: tuple[str, str]) -> str:
+    """Build the generation prompt for a subject, an AVATAR_STYLES key and two backgrounds."""
+    return (
+        f"A profile picture of a {noun}, in the style of {AVATAR_STYLES[style]}. "
+        + _avatar_prompt_ending(backgrounds)
+    )
+
+
+def build_reference_prompt(style: str, backgrounds: tuple[str, str]) -> str:
+    """Build the prompt for a picture based on a reference image."""
+    return (
+        f"A profile picture inspired by this image, in the style of {AVATAR_STYLES[style]}. "
+        + _avatar_prompt_ending(backgrounds)
+    )
+
+
+def _random_backgrounds() -> tuple[str, str]:
+    first, second = random.sample(AVATAR_BACKGROUNDS, 2)
+    return first, second
 
 
 def _random_avatar_prompt() -> str:
-    """Build a prompt with a randomly chosen adjective + noun subject."""
+    """Build a prompt with a random subject, style and pair of backgrounds."""
     return build_avatar_prompt(
-        random.choice(AVATAR_ADJECTIVES), random.choice(AVATAR_NOUNS),
+        random.choice(AVATAR_NOUNS), random.choice(list(AVATAR_STYLES)), _random_backgrounds(),
     )
 
-REFERENCE_DEFAULT_PROMPT = (
-    "Create a stylized profile picture inspired by this image. "
-    "Creative interpretation, suitable as a small avatar. "
-    "Square composition, no text or letters."
-)
+
+def _random_reference_prompt() -> str:
+    return build_reference_prompt(random.choice(list(AVATAR_STYLES)), _random_backgrounds())
 
 
 def _avatars_dir(data_dir: Path) -> Path:
@@ -123,7 +147,7 @@ async def generate_avatar(
     image input), and images.generate() otherwise.
     """
     effective_prompt = prompt or (
-        REFERENCE_DEFAULT_PROMPT if reference_image else _random_avatar_prompt()
+        _random_reference_prompt() if reference_image else _random_avatar_prompt()
     )
 
     if reference_image:
@@ -146,6 +170,7 @@ async def generate_avatar(
             prompt=effective_prompt,
             n=1,
             size="1024x1024",
+            quality=AVATAR_QUALITY,
         )
     else:
         logger.info(
@@ -157,6 +182,7 @@ async def generate_avatar(
             prompt=effective_prompt,
             n=1,
             size="1024x1024",
+            quality=AVATAR_QUALITY,
         )
 
     image_b64 = result.data[0].b64_json

@@ -69,21 +69,21 @@ SAMPLE_AVATARS_DIR = Path(__file__).resolve().parents[2].joinpath(
 )
 SAMPLE_SIZE = 512
 
-# Each persona's avatar subject, using adjectives/nouns from avatar.py's own
-# lists so samples match what live in-game generation produces.
+# Each persona's avatar subject as (style, noun), using avatar.py's own styles
+# and nouns so samples match what live in-game generation produces.
 SAMPLE_AVATAR_SUBJECTS: dict[str, tuple[str, str]] = {
-    "dev": ("holographic", "octopus"),
-    "alice": ("gilded", "fox"),
-    "bob": ("cobalt", "owl"),
-    "carol": ("blooming", "lotus"),
-    "dana": ("crimson", "dragonfly"),
-    "eli": ("frosted", "lighthouse"),
-    "fern": ("leafy", "fern"),
-    "gil": ("copper", "gramophone"),
-    "hana": ("coral", "seahorse"),
-    "zoe": ("obsidian", "raven"),
-    "felix": ("amber", "hedgehog"),
-    "gwen": ("iridescent", "butterfly"),
+    "dev": ("stained glass", "octopus"),
+    "alice": ("linocut", "fox"),
+    "bob": ("mosaic", "owl"),
+    "carol": ("embroidered", "lotus"),
+    "dana": ("origami", "dragonfly"),
+    "eli": ("pixel art", "lighthouse"),
+    "fern": ("embroidered", "fern"),
+    "gil": ("rubber-hose", "gramophone"),
+    "hana": ("stained glass", "seahorse"),
+    "zoe": ("linocut", "raven"),
+    "felix": ("pixel art", "hedgehog"),
+    "gwen": ("mosaic", "butterfly"),
 }
 
 EXTRA_TOPICS = ["Movie Classics", "Great Inventions"]
@@ -306,26 +306,27 @@ def _generate_samples() -> None:
 
     from openai import AsyncOpenAI
 
-    from h21.avatar import build_avatar_prompt, generate_avatar
+    from h21.avatar import AVATAR_BACKGROUNDS, build_avatar_prompt, generate_avatar
     from h21.config import load_config
 
     config = load_config()
     client = AsyncOpenAI(api_key=config.openai_api_key)
     SAMPLE_AVATARS_DIR.mkdir(parents=True, exist_ok=True)
 
-    async def generate_one(username: str, adjective: str, noun: str) -> None:
-        prompt = build_avatar_prompt(adjective, noun)
+    async def generate_one(username: str, style: str, noun: str) -> None:
+        first, second = random.sample(AVATAR_BACKGROUNDS, 2)
+        prompt = build_avatar_prompt(noun, style, (first, second))
         image_bytes = await generate_avatar(
             client, config.avatar_image_model, prompt=prompt,
         )
         sample_path = SAMPLE_AVATARS_DIR.joinpath(f"{username}.webp")
         sample_path.write_bytes(_shrink_sample(image_bytes))
-        print(f"  {username}: {adjective} {noun} -> {sample_path.name}")
+        print(f"  {username}: {style} {noun} -> {sample_path.name}")
 
     async def generate_all() -> None:
         await asyncio.gather(*(
-            generate_one(username, adjective, noun)
-            for username, (adjective, noun) in SAMPLE_AVATAR_SUBJECTS.items()
+            generate_one(username, style, noun)
+            for username, (style, noun) in SAMPLE_AVATAR_SUBJECTS.items()
         ))
 
     print(f"Generating {len(SAMPLE_AVATAR_SUBJECTS)} sample avatars "

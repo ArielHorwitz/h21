@@ -34,7 +34,7 @@ Config is loaded from `~/.config/h21/config.toml` with env var overrides. The da
 | `invite_request_hint` | -- | `Email` | Contact method shown on the login page for requesting an invite |
 | `default_daily_question_limit` | -- | `200` | Default questions per account per day |
 | `default_daily_topic_limit` | -- | `3` | Default topic suggestions per account per day |
-| `avatar_image_model` | -- | `gpt-image-1-mini` | OpenAI model for avatar generation |
+| `avatar_image_model` | -- | `gpt-image-2.5-flare` | OpenAI model for avatar generation (always at low quality) |
 | `default_monthly_avatar_limit` | -- | `3` | Default avatar generations per month |
 | `auto_generate_missing_avatars` | -- | `false` | Generate avatars automatically for accounts without one |
 

@@ -64,7 +64,7 @@ def load_config() -> Config:
     secure_cookies = raw.get("secure_cookies", False)
     default_daily_question_limit = raw.get("default_daily_question_limit", 200)
     default_daily_topic_limit = raw.get("default_daily_topic_limit", 3)
-    avatar_image_model = raw.get("avatar_image_model", "gpt-image-1-mini")
+    avatar_image_model = raw.get("avatar_image_model", "gpt-image-2.5-flare")
     default_monthly_avatar_limit = raw.get("default_monthly_avatar_limit", 3)
     auto_generate_missing_avatars = raw.get("auto_generate_missing_avatars", False)
 
