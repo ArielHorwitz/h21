@@ -318,22 +318,6 @@ h1 {
   font-weight: bold;
 }
 
-.secondary-btn {
-  padding: 0.6rem 1.2rem;
-  border: 1px solid #444;
-  border-radius: 4px;
-  background: transparent;
-  color: #ccc;
-  font-size: 1rem;
-  cursor: pointer;
-  transition: border-color 0.15s, color 0.15s;
-}
-
-.secondary-btn:hover {
-  border-color: #888;
-  color: #e0e0e0;
-}
-
 /* -- Avatar -- */
 
 .avatar-large {
@@ -1000,29 +984,18 @@ body[data-tab="profile"] .tab-bar a[data-tab="profile"] .tab-avatar img {
   font-weight: 700;
 }
 
+/* The two button styles: primary is filled gold, secondary is a gold
+   outline (matching the unplayed puzzle buttons on Today). */
 .secondary-btn {
   background: transparent;
-  color: var(--text);
-  border: 1px solid var(--border);
+  color: var(--accent);
+  border: 1px solid rgba(226, 183, 20, 0.6);
   padding: 0.6rem 1.1rem;
+  font-weight: 600;
+  text-decoration: none;
 }
 
 .secondary-btn:hover {
-  border-color: var(--text-faint);
-}
-
-/* Gold outline, matching the unplayed puzzle buttons on Today. */
-.outline-btn {
-  font: inherit;
-  cursor: pointer;
-  border-radius: 8px;
-  background: transparent;
-  border: 1px solid rgba(226, 183, 20, 0.6);
-  color: var(--accent);
-  font-weight: 600;
-}
-
-.outline-btn:hover {
   background: rgba(226, 183, 20, 0.1);
 }
 
