@@ -76,11 +76,15 @@ def build_avatar_prompt(noun: str, style: str, backgrounds: tuple[str, str]) -> 
     )
 
 
-def build_reference_prompt(style: str, backgrounds: tuple[str, str]) -> str:
-    """Build the prompt for a picture based on a reference image."""
+def build_reference_prompt(style: str) -> str:
+    """Build the prompt for a picture based on a reference image.
+
+    The background is left to the image, so only the style is imposed.
+    """
     return (
         f"A profile picture inspired by this image, in the style of {AVATAR_STYLES[style]}. "
-        + _avatar_prompt_ending(backgrounds)
+        "Distinctive and simple, reading clearly at small sizes. Square composition, "
+        "no border or frame, no text or letters."
     )
 
 
@@ -97,7 +101,7 @@ def _random_avatar_prompt() -> str:
 
 
 def _random_reference_prompt() -> str:
-    return build_reference_prompt(random.choice(list(AVATAR_STYLES)), _random_backgrounds())
+    return build_reference_prompt(random.choice(list(AVATAR_STYLES)))
 
 
 def _avatars_dir(data_dir: Path) -> Path:
