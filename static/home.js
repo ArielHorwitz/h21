@@ -235,8 +235,9 @@ async function loadTopicQuota() {
     const data = await response.json();
     const remaining = Math.max(data.daily_topic_limit - data.topic_suggestions_used_today, 0);
     topicQuota.textContent = remaining > 0
-      ? `You can suggest ${pluralize(remaining, "more topic")} today.`
-      : "You've used today's topic suggestions. Come back tomorrow.";
+      ? `${pluralize(remaining, "topic suggestion")} left today`
+      : "No topic suggestions left today";
+    topicQuota.classList.toggle("is-exhausted", remaining === 0);
     requestTopicBtn.disabled = remaining === 0;
     topicNameInput.disabled = remaining === 0;
   } catch {

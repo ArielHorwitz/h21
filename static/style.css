@@ -2217,6 +2217,23 @@ a.history-row:hover {
   flex-shrink: 0;
 }
 
-.avatar-quota {
-  margin-top: 0.5rem;
+/* A remaining-quota note: accented so it isn't missed. */
+.quota-note {
+  align-self: center;
+  width: fit-content;
+  margin: 0.6rem auto 0;
+  padding: 0.35rem 0.8rem;
+  border-radius: 999px;
+  border: 1px solid rgba(226, 183, 20, 0.45);
+  background: rgba(226, 183, 20, 0.12);
+  color: var(--accent);
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.quota-note.is-exhausted {
+  border-color: rgba(244, 67, 54, 0.5);
+  background: rgba(244, 67, 54, 0.12);
+  color: #ff6b6b;
 }

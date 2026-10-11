@@ -144,12 +144,14 @@ function updateAvatarCounter() {
   const remaining = Math.max(monthlyAvatarLimit - avatarGenerationsUsed, 0);
   let message;
   if (remaining === 0) {
-    message = "You've used this month's picture generations. Come back next month.";
+    message = "No pictures left this month";
   } else {
-    const pictures = remaining === 1 ? "1 more picture" : `${remaining} more pictures`;
-    message = `You can generate ${pictures} this month.`;
+    message = `${remaining} ${remaining === 1 ? "picture" : "pictures"} left this month`;
   }
-  for (const line of avatarQuotaLines) line.textContent = message;
+  for (const line of avatarQuotaLines) {
+    line.textContent = message;
+    line.classList.toggle("is-exhausted", remaining === 0);
+  }
   avatarGenerateBtn.disabled = remaining === 0;
   avatarRetryBtn.disabled = remaining === 0;
 }
