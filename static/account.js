@@ -16,7 +16,8 @@ const avatarReferenceInput = document.getElementById("avatar-reference-input");
 const avatarPromptInput = document.getElementById("avatar-prompt-input");
 const avatarGenerateBtn = document.getElementById("avatar-generate-btn");
 const avatarCancelBtn = document.getElementById("avatar-cancel-btn");
-const avatarGenCounter = document.getElementById("avatar-gen-counter");
+// The remaining-generations line, shown both before generating and on the preview.
+const avatarQuotaLines = document.querySelectorAll(".avatar-quota");
 const avatarGenStatus = document.getElementById("avatar-gen-status");
 const avatarPreview = document.getElementById("avatar-preview");
 const avatarPreviewOriginal = document.getElementById("avatar-preview-original");
@@ -141,13 +142,16 @@ function updateAvatarDisplay() {
 
 function updateAvatarCounter() {
   const remaining = Math.max(monthlyAvatarLimit - avatarGenerationsUsed, 0);
+  let message;
   if (remaining === 0) {
-    avatarGenCounter.textContent = "You've used this month's picture generations. Come back next month.";
+    message = "You've used this month's picture generations. Come back next month.";
   } else {
     const pictures = remaining === 1 ? "1 more picture" : `${remaining} more pictures`;
-    avatarGenCounter.textContent = `You can generate ${pictures} this month.`;
+    message = `You can generate ${pictures} this month.`;
   }
+  for (const line of avatarQuotaLines) line.textContent = message;
   avatarGenerateBtn.disabled = remaining === 0;
+  avatarRetryBtn.disabled = remaining === 0;
 }
 
 function showAvatarGenerator() {

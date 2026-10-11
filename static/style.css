@@ -2217,6 +2217,6 @@ a.history-row:hover {
   flex-shrink: 0;
 }
 
-#avatar-gen-counter {
+.avatar-quota {
   margin-top: 0.5rem;
 }
