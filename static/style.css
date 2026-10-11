@@ -1011,6 +1011,21 @@ body[data-tab="profile"] .tab-bar a[data-tab="profile"] .tab-avatar img {
   border-color: var(--text-faint);
 }
 
+/* Gold outline, matching the unplayed puzzle buttons on Today. */
+.outline-btn {
+  font: inherit;
+  cursor: pointer;
+  border-radius: 8px;
+  background: transparent;
+  border: 1px solid rgba(226, 183, 20, 0.6);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.outline-btn:hover {
+  background: rgba(226, 183, 20, 0.1);
+}
+
 .small-btn {
   padding: 0.3rem 0.7rem;
   font-size: 0.85rem;

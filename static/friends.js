@@ -125,6 +125,7 @@ async function loadFollowing() {
         playerCode: friend.anonymous ? null : friend.player_code,
         avatarVersion: friend.avatar_version,
         actionLabel: "Unfollow",
+        actionClass: "outline-btn",
         onAction: async () => {
           if (!confirm(`Unfollow ${name}?`)) return true;
           if (await unfollow(friend.player_code)) {
