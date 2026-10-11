@@ -1169,27 +1169,6 @@ body[data-tab="profile"] .tab-bar a[data-tab="profile"] .tab-avatar img {
 
 /* -- Suggest a topic -- */
 
-.suggest-examples {
-  padding-left: 1.2rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.example-broad {
-  color: #ff6b6b;
-  font-weight: 600;
-}
-
-.example-better {
-  color: var(--yes);
-  font-weight: 600;
-}
-
-.example-arrow {
-  color: var(--text-faint);
-}
-
 .suggest-form-section {
   display: flex;
   flex-direction: column;
