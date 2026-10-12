@@ -155,6 +155,27 @@ function renderSummary(game) {
   replaySummary.hidden = false;
 }
 
+// Today's date in local time, as the server's puzzle dates are.
+function todayIso() {
+  const now = new Date();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${now.getFullYear()}-${month}-${day}`;
+}
+
+// How the game ended, for games that didn't end with a correct guess.
+function describeEnding(game) {
+  if (game.result === "loss") {
+    return game.questions_asked >= MAX_QUESTIONS
+      ? "Out of questions"
+      : `Gave up after question ${game.questions_asked}`;
+  }
+  if (!game.result) {
+    return game.date === todayIso() ? "Still in progress" : "Left unfinished";
+  }
+  return null;
+}
+
 function renderLog(game) {
   const hints = game.hints || [];
   const hintsAfterQuestion = groupHintReveals(game.hint_reveals);
@@ -168,6 +189,14 @@ function renderLog(game) {
       questionLog.appendChild(createHintEntry(hintIndex, hints[hintIndex]));
       revealedIndices.add(hintIndex);
     }
+  }
+
+  const ending = describeEnding(game);
+  if (ending) {
+    const endEntry = document.createElement("div");
+    endEntry.className = "log-entry ending-entry";
+    endEntry.textContent = ending;
+    questionLog.appendChild(endEntry);
   }
 
   const entries = Array.from(questionLog.querySelectorAll(".log-entry"))

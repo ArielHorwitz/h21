@@ -2232,3 +2232,13 @@ a.history-row:hover {
 .person-detail.topic-failed-text {
   color: #ff6b6b;
 }
+
+/* The closing line of a results log: how a game ended without a solve. */
+#question-log .ending-entry {
+  align-items: center;
+  border-style: dashed;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  font-style: italic;
+}
