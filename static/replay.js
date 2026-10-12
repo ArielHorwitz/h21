@@ -66,11 +66,11 @@ function buildShareText(game) {
   }
 
   const hintsUsed = (game.hint_reveals || []).length;
+  const hintsPart = hintsUsed > 0 ? pluralize(hintsUsed, "hint") : "no hints";
   const resultLine = game.result === "win"
-    ? `Won in ${game.questions_asked}/21 questions!`
-    : `Lost after ${game.questions_asked} questions.`;
-  const hintsLine = hintsUsed > 0 ? ` (${pluralize(hintsUsed, "hint")} used)` : "";
-  let text = `H21 — ${topicName} (${capitalize(game.difficulty)})\n${dateStr}\n\n${resultLine}${hintsLine}\n${emojis}`;
+    ? `Won in ${pluralize(game.questions_asked, "question")} and ${hintsPart}!`
+    : `Lost after ${pluralize(game.questions_asked, "question")} and ${hintsPart}.`;
+  let text = `H21 — ${topicName} (${capitalize(game.difficulty)})\n${dateStr}\n\n${resultLine}\n${emojis}`;
   if (game.share_code) {
     text += `\n${window.location.origin}/replay?code=${game.share_code}`;
   }
