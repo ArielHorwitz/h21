@@ -766,8 +766,9 @@ def _seed_game(
         fixups.games.append((started_at.isoformat(), None, game_id))
 
 
-# How today's added games turn out: solved, not solved, or still in progress.
-ACTIVITY_OUTCOMES = (("win", 0.5), ("loss", 0.25), ("in_progress", 0.25))
+# For each persona and each of today's puzzles they haven't played: the
+# chance they solve it, fail it, start it without finishing, or skip it.
+ACTIVITY_OUTCOMES = (("win", 0.5), ("loss", 0.2), ("in_progress", 0.1), ("skip", 0.2))
 
 
 def add_activity(
@@ -778,9 +779,10 @@ def add_activity(
 ) -> dict[str, Any]:
     """Add games for today by every persona except dev, to an existing sandbox.
 
-    Nothing is reset: each persona plays a few of today's puzzles they
-    haven't played yet, each one solved, not solved or left in progress at
-    random. Puzzles nobody has drawn yet today are drawn from the pool, as a
+    Nothing is reset: for each persona, every one of today's puzzles they
+    haven't played yet is independently solved, failed, started without
+    finishing or skipped, per ACTIVITY_OUTCOMES. Puzzles nobody has drawn
+    yet today are drawn from the pool, as a
     real first player would; their hints are generated when someone plays
     them for real. Returns a summary dict.
     """
@@ -819,11 +821,13 @@ def add_activity(
             puzzle for puzzle in puzzles
             if database.get_existing_game(account["user_id"], today, *puzzle) is None
         ]
-        for topic_slug, difficulty in rng.sample(unplayed, min(rng.randint(1, 3), len(unplayed))):
+        for topic_slug, difficulty in unplayed:
+            outcome = rng.choices(outcomes, weights)[0]
+            if outcome == "skip":
+                continue
             solution = todays_solution(topic_slug, difficulty)
             if solution is None:
                 continue
-            outcome = rng.choices(outcomes, weights)[0]
             decoys = [
                 known for known in database.get_all_known_solutions(topic_slug) if known != solution
             ]

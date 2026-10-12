@@ -113,9 +113,10 @@ today's activity without resetting anything:
 h21-sandbox --dir .sandbox --add-activity
 ```
 
-Each persona except `dev` plays a few of today's puzzles they haven't played
-yet, each solved, not solved or left in progress at random, so running it
-again later in the day adds more. Puzzles nobody has drawn yet are drawn from
+For each persona except `dev`, every one of today's puzzles they haven't
+played yet is independently solved (50%), failed (20%), started without
+finishing (10%) or skipped (20%), so running it again later in the day fills
+in some of the skipped ones. Puzzles nobody has drawn yet are drawn from
 the pool, as for a real first player.
 
 ## Project Structure
