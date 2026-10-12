@@ -129,12 +129,6 @@ function renderSummary(game) {
   resultStats.textContent = stats.join(" · ");
 
   if (game.result === "win" || game.result === "loss") {
-    const leaderboardLink = document.createElement("a");
-    leaderboardLink.className = "secondary-btn";
-    leaderboardLink.href = `/leaderboard?topic=${encodeURIComponent(game.topic_slug)}&difficulty=${encodeURIComponent(game.difficulty)}&date=${encodeURIComponent(game.date)}`;
-    leaderboardLink.textContent = "Leaderboard";
-    resultActions.appendChild(leaderboardLink);
-
     if (game.is_own_game) {
       const shareText = buildShareText(game);
       const shareBtn = document.createElement("button");
@@ -149,6 +143,12 @@ function renderSummary(game) {
       });
       resultActions.appendChild(shareBtn);
     }
+
+    const leaderboardLink = document.createElement("a");
+    leaderboardLink.className = "secondary-btn";
+    leaderboardLink.href = `/leaderboard?topic=${encodeURIComponent(game.topic_slug)}&difficulty=${encodeURIComponent(game.difficulty)}&date=${encodeURIComponent(game.date)}`;
+    leaderboardLink.textContent = "Leaderboard";
+    resultActions.appendChild(leaderboardLink);
   }
   resultActions.hidden = resultActions.children.length === 0;
 
