@@ -58,8 +58,8 @@ Screenshots of every page at phone (390px) and desktop widths, on a seeded sandb
 
 ## Open items
 
-- Later, with stats: a per-puzzle solve rate was suggested to convey difficulty without exposing individuals, but puzzles aren't comparable even within a difficulty, so it waits for a proper look at stats.
-
-- Starter questions are generic ("Is it a person?" reads oddly for World Geography). Consider topic-aware starters.
-- Not yet checked on a real phone: the pinned composer with the on-screen keyboard, and iPhone safe areas.
-- Leaderboard and results show usernames for other players where display names would read better (the replay API only returns `username`).
+- Real-phone check: done on Android (works well); not yet on an iPhone.
+- Avatar style picker on the profile page (possible, not important).
+- Stats (including per-puzzle solve rates) are out of scope for now.
+- Starter question chips on the game screen were removed: the user didn't find them useful. The intro line naming the topic stays.
+- Topic-related items (preview, thresholds, running dry) live in the topic flow case (60ac).
