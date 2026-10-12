@@ -1,6 +1,8 @@
-# Relaunch UI/UX overhaul
+# Relaunch UX overhaul
 
 ## Goal
+
+Widened on 2026-10-12 from a UI pass to the whole user experience, including playtesting fixes and blind UX reviews.
 
 A major pass over the whole app's UI and UX for the clean relaunch (see the puzzle pool case, c254, for the relaunch context). Keep the brand assets and the palette; everything else (layout, buttons, navigation, in-app hints) is open to reconsideration. Mobile first: most play happens on phones.
 
@@ -57,6 +59,11 @@ Screenshots of every page at phone (390px) and desktop widths, on a seeded sandb
 ## Status
 
 - All pages redesigned.
+
+## Blind reviews (planned)
+
+- **Topic flow:** two independent agents (Opus 5.5 and GPT-6.1 Sol), the same neutral brief (current behavior and observed problems as facts, none of our ideas), code without the casebook. Their reports are synthesized into one recommendation report for the user to review before anything is changed. The topic flow case (60ac) holds the work that follows.
+- **Whole-app UX:** eight blind agents on regular-user features only (no admin), each running its own local sandbox and driving it at phone size: two starting points (a brand-new player, and a returning regular with friends and history), four models each (Opus, Sonnet, Sol, Terra). Synthesized into one report for the user to review before addressing. Fable and Astra are not used.
 
 ## Open items
 
