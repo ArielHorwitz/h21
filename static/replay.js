@@ -129,11 +129,17 @@ function renderSummary(game) {
   resultStats.textContent = stats.join(" · ");
 
   if (game.result === "win" || game.result === "loss") {
+    const leaderboardLink = document.createElement("a");
+    leaderboardLink.className = "secondary-btn";
+    leaderboardLink.href = `/leaderboard?topic=${encodeURIComponent(game.topic_slug)}&difficulty=${encodeURIComponent(game.difficulty)}&date=${encodeURIComponent(game.date)}`;
+    leaderboardLink.textContent = "Leaderboard";
+    resultActions.appendChild(leaderboardLink);
+
     if (game.is_own_game) {
       const shareText = buildShareText(game);
       const shareBtn = document.createElement("button");
       shareBtn.type = "button";
-      shareBtn.className = "primary-btn";
+      shareBtn.className = "secondary-btn";
       shareBtn.textContent = "Share result";
       shareBtn.addEventListener("click", async () => {
         const outcome = await shareResult(shareText);
@@ -143,20 +149,8 @@ function renderSummary(game) {
       });
       resultActions.appendChild(shareBtn);
     }
-
-    const leaderboardLink = document.createElement("a");
-    leaderboardLink.className = "secondary-btn";
-    leaderboardLink.href = `/leaderboard?topic=${encodeURIComponent(game.topic_slug)}&difficulty=${encodeURIComponent(game.difficulty)}&date=${encodeURIComponent(game.date)}`;
-    leaderboardLink.textContent = "Leaderboard";
-    resultActions.appendChild(leaderboardLink);
-
   }
-
-  const homeLink = document.createElement("a");
-  homeLink.className = "secondary-btn";
-  homeLink.href = "/";
-  homeLink.textContent = "More puzzles";
-  resultActions.appendChild(homeLink);
+  resultActions.hidden = resultActions.children.length === 0;
 
   replaySummary.hidden = false;
 }
