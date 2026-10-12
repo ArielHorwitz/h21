@@ -50,6 +50,7 @@ Screenshots of every page at phone (390px) and desktop widths, on a seeded sandb
 
 - **Suggesting a topic has its own page** (`/suggest`; Today links to it): the form with the quota pill, and "Your topics" (ready ones link to play, creating ones show progress, turned-down ones show the reason and Dismiss). A guide with broad-vs-focused example topics was tried and dropped: good examples are hard to pick, since the sweet spot is a topic with hundreds of well-known subjects ("Pop songs", not "Music" or "Classical composers"), and the user wasn't satisfied with any set. The motivating problem remains (players suggest "Disney" expecting films and get theme parks and executives too). Considered for later: a preview step showing how a topic will be read (scope, sample subjects, sharper alternatives) before it uses up a suggestion.
 - **Quotas are accented pills** ("3 pictures left this month", "3 topic suggestions left today"), red when used up; remaining picture generations also show on the avatar preview.
+- **Results actions trimmed to one row:** Leaderboard, then Share result, both gold outlines; More puzzles was dropped as redundant with the tab bar (it pushed the buttons onto a second row). Renaming the Today tab to Puzzles was discussed and left as Today for the daily-ritual feel.
 - **Two button styles:** filled gold for the main action, gold outline for the rest (the muted grey outline is gone). Danger buttons, text links and segmented switches keep their own looks.
 
 ## Status
