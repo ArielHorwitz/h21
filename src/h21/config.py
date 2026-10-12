@@ -59,7 +59,7 @@ def load_config() -> Config:
     db_path = data_dir / "h21.db"
 
     model = raw.get("model", "gpt-6-luna")
-    reasoning_effort = raw.get("reasoning_effort", "medium")
+    reasoning_effort = raw.get("reasoning_effort", "high")
     invite_request_hint = raw.get("invite_request_hint", "Email")
     secure_cookies = raw.get("secure_cookies", False)
     default_daily_question_limit = raw.get("default_daily_question_limit", 200)

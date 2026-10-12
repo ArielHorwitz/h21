@@ -29,7 +29,7 @@ Config is loaded from `~/.config/h21/config.toml` with env var overrides. The da
 |-----|-------------|---------|-------------|
 | `openai_api_key` | `OPENAI_API_KEY` | (required) | OpenAI API key |
 | `model` | -- | `gpt-6-luna` | OpenAI model name |
-| `reasoning_effort` | -- | `medium` | Reasoning effort for the model |
+| `reasoning_effort` | -- | `high` | Reasoning effort for the model |
 | `secure_cookies` | -- | `false` | Mark session cookies HTTPS-only; enable behind TLS in deployment |
 | `invite_request_hint` | -- | `Email` | Contact method shown on the login page for requesting an invite |
 | `default_daily_question_limit` | -- | `200` | Default questions per account per day |

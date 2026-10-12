@@ -63,5 +63,5 @@ Screenshots of every page at phone (390px) and desktop widths, on a seeded sandb
 - Real-phone check done on Android; there won't be an iPhone check.
 - No avatar style picker.
 - Stats (including per-puzzle solve rates) are out of scope.
-- The game model default is now `gpt-6-luna` at medium effort (what all the tuning this session ran on, including the partially/depends evaluation); it was `gpt-5.4-nano` at high.
+- The game model default is now `gpt-6-luna` at high effort; the code default was `gpt-5.4-nano` at high, and production's config sets `gpt-5.4-mini` at high. The concern was date-reasoning mistakes seen in the past (e.g. treating 1400 as before year 1): on 20 date and ordering traps x 3 runs, luna got 60/60 at both medium and high, with no latency difference (median about 2.4s). High costs about 20 more reasoning tokens per answer, roughly $0.00013 vs $0.00012 per question at luna's $0.10/$0.50 per million tokens, so high was chosen for the margin.
 - Topic-related items live in the topic flow case (60ac). Deployment and the relaunch cutover will be overhauled in a separate session, after the topic flow work and a several-day playtest.
