@@ -6,7 +6,7 @@ from datetime import date, timedelta
 from pathlib import Path
 
 from h21.db import GameDatabase
-from h21.sandbox import DEV_USERNAME, seed_database
+from h21.sandbox import DEV_USERNAME, add_activity, seed_database
 
 
 class SandboxSeedTests(unittest.TestCase):
@@ -175,3 +175,39 @@ class SandboxSeedTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SandboxAddActivityTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.temporary_directory = tempfile.TemporaryDirectory()
+        self.db_path = Path(self.temporary_directory.name).joinpath("h21.db")
+        self.today = date(2026, 8, 28)
+        seed_database(self.db_path, password="test-password", rng_seed=21, today=self.today)
+
+    def tearDown(self) -> None:
+        self.temporary_directory.cleanup()
+
+    def _games(self, database: GameDatabase) -> list[list]:
+        return database.execute_readonly_query(
+            "SELECT a.username, g.date, g.topic_slug, g.difficulty, g.result "
+            "FROM games g JOIN accounts a ON a.user_id = g.user_id"
+        )["rows"]
+
+    def test_adds_games_for_personas_without_duplicates(self) -> None:
+        database = GameDatabase(self.db_path)
+        before = self._games(database)
+        database.close()
+
+        tomorrow = self.today + timedelta(days=1)
+        summary = add_activity(self.db_path, rng_seed=5, today=tomorrow)
+        add_activity(self.db_path, rng_seed=6, today=tomorrow)
+
+        database = GameDatabase(self.db_path)
+        after = self._games(database)
+        database.close()
+        self.assertGreater(len(summary["games"]), 0)
+        self.assertTrue(all(game["username"] != DEV_USERNAME for game in summary["games"]))
+        # Existing games are untouched and no one plays a puzzle twice.
+        self.assertEqual(after[:len(before)], before)
+        puzzles_played = [(row[0], row[1], row[2], row[3]) for row in after]
+        self.assertEqual(len(puzzles_played), len(set(puzzles_played)))

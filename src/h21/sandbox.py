@@ -259,6 +259,23 @@ QUESTION_POOLS: dict[str, list[tuple[str, str, str]]] = {
 }
 
 # Wrong guesses used as filler questions; none appear in the solution pools.
+# Questions for topics without hand-written ones. Answers are fabricated,
+# so they only need to read plausibly in a transcript.
+GENERIC_QUESTIONS: list[tuple[str, str, str]] = [
+    ("Is it a person?", "no", "The subject is not a person."),
+    ("Is it well known?", "yes", "Most people would recognize the subject."),
+    ("Is it older than a hundred years?", "partially", "Parts of its story go back that far."),
+    ("Is it associated with Europe?", "depends", "That depends on which aspect you mean."),
+    ("Is it something you can touch?", "yes", "The subject is physical."),
+    ("Is it bigger than a car?", "no", "The subject is smaller than a car."),
+    ("Is it still around today?", "yes", "The subject still exists."),
+    ("Is it connected to entertainment?", "partially", "It has some ties to entertainment."),
+    ("Is it from the 20th century?", "no", "It is not from the 20th century."),
+    ("Is it used every day?", "depends", "That depends on who you ask."),
+    ("Is it famous worldwide?", "yes", "It is known around the world."),
+    ("Is it natural rather than man-made?", "no", "It was made by people."),
+]
+
 DECOY_GUESSES: dict[str, list[str]] = {
     "notable-people": [
         "Albert Einstein", "Napoleon Bonaparte", "William Shakespeare",
@@ -681,14 +698,19 @@ def _seed_game(
     win: bool,
     finished: bool = True,
     question_count: Optional[int] = None,
+    decoys: Optional[list[str]] = None,
+    reveal_hints: bool = True,
 ) -> None:
     """Fabricate one game with a plausible transcript.
 
     Unfinished games stop after `question_count` questions (default: a
-    random handful) with no guess at the solution.
+    random handful) with no guess at the solution. Topics without
+    hand-written questions (e.g. ones suggested on a live sandbox) get
+    generic ones, and `decoys` overrides the wrong guesses.
     """
-    question_pool = QUESTION_POOLS[topic_slug]
-    decoys = DECOY_GUESSES[topic_slug]
+    question_pool = QUESTION_POOLS.get(topic_slug, GENERIC_QUESTIONS)
+    if decoys is None:
+        decoys = DECOY_GUESSES.get(topic_slug, [])
 
     if not finished:
         count = question_count or rng.randint(3, 7)
@@ -697,9 +719,10 @@ def _seed_game(
     else:
         transcript = rng.sample(question_pool, rng.randint(5, min(12, len(question_pool))))
     if finished:
+        guess_count = rng.randint(1, 3) if win else rng.randint(2, 5)
         wrong_guesses = [
             (f"Is it {decoy}?", "no", f"It is not {decoy}.")
-            for decoy in rng.sample(decoys, rng.randint(1, 3) if win else rng.randint(2, 5))
+            for decoy in rng.sample(decoys, min(guess_count, len(decoys)))
         ]
         transcript.extend(wrong_guesses)
         rng.shuffle(transcript)
@@ -727,7 +750,7 @@ def _seed_game(
 
     # A hint unlocks every 4 questions; reveal some of the unlocked ones.
     hints_unlocked = min(len(transcript) // 4, 5)
-    if hints_unlocked > 0 and rng.random() < 0.5:
+    if reveal_hints and hints_unlocked > 0 and rng.random() < 0.5:
         revealed_at = started_at
         for hint_index in range(rng.randint(1, min(3, hints_unlocked))):
             after_question = (hint_index + 1) * 4
@@ -741,6 +764,85 @@ def _seed_game(
         fixups.games.append((started_at.isoformat(), ended_at.isoformat(), game_id))
     else:
         fixups.games.append((started_at.isoformat(), None, game_id))
+
+
+# How today's added games turn out: solved, not solved, or still in progress.
+ACTIVITY_OUTCOMES = (("win", 0.5), ("loss", 0.25), ("in_progress", 0.25))
+
+
+def add_activity(
+    db_path: Path,
+    *,
+    rng_seed: Optional[int] = None,
+    today: Optional[date] = None,
+) -> dict[str, Any]:
+    """Add games for today by every persona except dev, to an existing sandbox.
+
+    Nothing is reset: each persona plays a few of today's puzzles they
+    haven't played yet, each one solved, not solved or left in progress at
+    random. Puzzles nobody has drawn yet today are drawn from the pool, as a
+    real first player would; their hints are generated when someone plays
+    them for real. Returns a summary dict.
+    """
+    if today is None:
+        today = date.today()
+    rng = random.Random(rng_seed)
+    fixups = _TimestampFixups()
+    now = datetime.now(timezone.utc)
+    database = GameDatabase(db_path)
+    database.ensure_schema()
+
+    personas = [
+        account for account in database.get_all_accounts()
+        if account["username"] != DEV_USERNAME
+    ]
+    puzzles = [
+        (topic["slug"], difficulty)
+        for topic in database.get_topics_with_status("ready")
+        for difficulty in ("normal", "expert")
+    ]
+
+    def todays_solution(topic_slug: str, difficulty: str) -> Optional[str]:
+        solution = database.get_puzzle_solution(today, topic_slug, difficulty)
+        if solution is None:
+            solution = database.draw_random_from_pool(topic_slug, difficulty)
+            if solution is None:
+                return None
+            database.record_puzzle(today, topic_slug, difficulty, solution, hints=[])
+        return solution
+
+    outcomes = [outcome for outcome, _ in ACTIVITY_OUTCOMES]
+    weights = [weight for _, weight in ACTIVITY_OUTCOMES]
+    added: list[dict[str, str]] = []
+    for account in personas:
+        unplayed = [
+            puzzle for puzzle in puzzles
+            if database.get_existing_game(account["user_id"], today, *puzzle) is None
+        ]
+        for topic_slug, difficulty in rng.sample(unplayed, min(rng.randint(1, 3), len(unplayed))):
+            solution = todays_solution(topic_slug, difficulty)
+            if solution is None:
+                continue
+            outcome = rng.choices(outcomes, weights)[0]
+            decoys = [
+                known for known in database.get_all_known_solutions(topic_slug) if known != solution
+            ]
+            _seed_game(
+                database, rng, fixups, now,
+                user_id=account["user_id"], day=today, topic_slug=topic_slug,
+                difficulty=difficulty, solution=solution,
+                win=outcome == "win", finished=outcome != "in_progress",
+                decoys=decoys or None,
+                reveal_hints=bool(database.get_puzzle_hints(today, topic_slug, difficulty)),
+            )
+            added.append({
+                "username": account["username"], "topic_slug": topic_slug,
+                "difficulty": difficulty, "outcome": outcome,
+            })
+
+    database.close()
+    _apply_timestamp_fixups(db_path, fixups)
+    return {"date": today.isoformat(), "games": added}
 
 
 def _apply_timestamp_fixups(db_path: Path, fixups: _TimestampFixups) -> None:
@@ -851,6 +953,10 @@ def main() -> None:
         help="Port for --serve (default: 8000)",
     )
     parser.add_argument(
+        "--add-activity", action="store_true",
+        help="Add today's games for every persona except dev to the existing sandbox, then exit",
+    )
+    parser.add_argument(
         "--generate-pools", action="store_true",
         help="Regenerate the committed sandbox puzzle pools via the LLM, then exit",
     )
@@ -869,6 +975,17 @@ def main() -> None:
 
     sandbox_dir = Path(args.dir).resolve()
     db_path = sandbox_dir.joinpath("data", "h21", "h21.db")
+
+    if args.add_activity:
+        if not db_path.is_file():
+            print(f"No sandbox at {sandbox_dir}. Create one first.", file=sys.stderr)
+            sys.exit(1)
+        summary = add_activity(db_path)
+        print(f"Added {len(summary['games'])} games for {summary['date']}:")
+        for game in summary["games"]:
+            outcome = {"win": "solved", "loss": "not solved", "in_progress": "in progress"}[game["outcome"]]
+            print(f"  {game['username']:8} {game['topic_slug']} ({game['difficulty']}): {outcome}")
+        return
 
     if db_path.is_file() and not args.force:
         if not args.serve:

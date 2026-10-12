@@ -106,6 +106,18 @@ committed, so drawing new puzzles makes no API calls either (answering
 questions and hints still do). Regenerate it with `h21-sandbox
 --generate-pools`.
 
+To make an existing sandbox feel lived-in over several days of play, add
+today's activity without resetting anything:
+
+```bash
+h21-sandbox --dir .sandbox --add-activity
+```
+
+Each persona except `dev` plays a few of today's puzzles they haven't played
+yet, each solved, not solved or left in progress at random, so running it
+again later in the day adds more. Puzzles nobody has drawn yet are drawn from
+the pool, as for a real first player.
+
 ## Project Structure
 
 ```
