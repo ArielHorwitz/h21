@@ -60,8 +60,8 @@ Screenshots of every page at phone (390px) and desktop widths, on a seeded sandb
 
 ## Open items
 
-- Real-phone check: done on Android (works well); not yet on an iPhone.
-- Avatar style picker on the profile page (possible, not important).
-- Stats (including per-puzzle solve rates) are out of scope for now.
-- Starter question chips on the game screen were removed: the user didn't find them useful. The intro line naming the topic stays.
-- Topic-related items (preview, thresholds, running dry) live in the topic flow case (60ac).
+- Real-phone check done on Android; there won't be an iPhone check.
+- No avatar style picker.
+- Stats (including per-puzzle solve rates) are out of scope.
+- The game model default is now `gpt-6-luna` at medium effort (what all the tuning this session ran on, including the partially/depends evaluation); it was `gpt-5.4-nano` at high.
+- Topic-related items live in the topic flow case (60ac). Deployment and the relaunch cutover will be overhauled in a separate session, after the topic flow work and a several-day playtest.
