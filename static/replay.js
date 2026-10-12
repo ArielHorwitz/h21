@@ -105,7 +105,7 @@ async function shareResult(text) {
 
 function renderSummary(game) {
   const won = game.result === "win";
-  const owner = game.is_own_game ? null : game.username;
+  const owner = game.is_own_game ? null : (game.display_name || game.username);
   resultMeta.textContent = owner ? `${owner}'s game · ${describePuzzle(game)}` : describePuzzle(game);
 
   if (won) {
@@ -200,7 +200,8 @@ function renderLog(game) {
 }
 
 function renderGated(game) {
-  const owner = game.username ? `${game.username}'s game · ` : "";
+  const ownerName = game.display_name || game.username;
+  const owner = ownerName ? `${ownerName}'s game · ` : "";
   gatedMeta.textContent = owner + describePuzzle(game);
   gatedMessage.textContent = "This game reveals today's answer. Play the puzzle yourself first, then come back to compare.";
   gatedPlayBtn.href =

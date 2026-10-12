@@ -1,7 +1,6 @@
 const MAX_QUESTIONS = 21;
 const HINTS_TOTAL = 5;
 const QUESTIONS_PER_HINT = 4;
-const STARTER_QUESTIONS = ["Is it a person?", "Is it from before 1900?", "Is it in Europe?"];
 
 const questionLog = document.getElementById("question-log");
 const questionInput = document.getElementById("question-input");
@@ -16,7 +15,6 @@ const gameTopic = document.getElementById("game-topic");
 const gameDifficulty = document.getElementById("game-difficulty");
 const gameIntro = document.getElementById("game-intro");
 const gameIntroTopic = document.getElementById("game-intro-topic");
-const suggestionChips = document.getElementById("suggestion-chips");
 
 // Parse topic and difficulty from URL query params.
 const urlParams = new URLSearchParams(window.location.search);
@@ -297,21 +295,6 @@ concedeBtn.addEventListener("click", () => {
   endGame(false);
 });
 
-function renderSuggestionChips() {
-  for (const suggestion of STARTER_QUESTIONS) {
-    const chip = document.createElement("button");
-    chip.type = "button";
-    chip.className = "suggestion-chip";
-    chip.textContent = suggestion;
-    chip.addEventListener("click", () => {
-      questionInput.value = suggestion;
-      autoResizeInput();
-      questionInput.focus();
-    });
-    suggestionChips.appendChild(chip);
-  }
-}
-
 async function tryResumeGame() {
   try {
     const params = new URLSearchParams({ topic_slug: topicSlug, difficulty });
@@ -351,7 +334,6 @@ async function tryResumeGame() {
 }
 
 async function init() {
-  renderSuggestionChips();
   loadTopicName();
   setInputEnabled(false);
   updateProgress();

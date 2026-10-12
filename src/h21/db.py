@@ -653,7 +653,7 @@ class GameDatabase:
         row = self._connection.execute(
             "SELECT g.game_id, g.user_id, g.date, g.topic_slug, g.difficulty, "
             "g.started_at, g.ended_at, g.result, g.questions_asked, "
-            "g.share_code, a.username "
+            "g.share_code, a.username, a.display_name "
             "FROM games g "
             "JOIN accounts a ON a.user_id = g.user_id "
             "WHERE g.share_code = ? "

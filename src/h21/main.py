@@ -1610,6 +1610,7 @@ async def get_replay(share_code: str, request: Request) -> dict[str, Any]:
             "topic_name": game.get("topic_name"),
             "difficulty": game["difficulty"],
             "username": game.get("username"),
+            "display_name": game.get("display_name"),
         }
     game["is_own_game"] = is_own_game
     return game
