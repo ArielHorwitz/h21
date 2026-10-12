@@ -700,8 +700,8 @@ def _seed_game(
     question_count: Optional[int] = None,
     decoys: Optional[list[str]] = None,
     reveal_hints: bool = True,
-) -> None:
-    """Fabricate one game with a plausible transcript.
+) -> str:
+    """Fabricate one game with a plausible transcript. Returns its share code.
 
     Unfinished games stop after `question_count` questions (default: a
     random handful) with no guess at the solution. Topics without
@@ -764,6 +764,7 @@ def _seed_game(
         fixups.games.append((started_at.isoformat(), ended_at.isoformat(), game_id))
     else:
         fixups.games.append((started_at.isoformat(), None, game_id))
+    return game["share_code"]
 
 
 # For each persona and each of today's puzzles they haven't played: the
@@ -831,7 +832,7 @@ def add_activity(
             decoys = [
                 known for known in database.get_all_known_solutions(topic_slug) if known != solution
             ]
-            _seed_game(
+            share_code = _seed_game(
                 database, rng, fixups, now,
                 user_id=account["user_id"], day=today, topic_slug=topic_slug,
                 difficulty=difficulty, solution=solution,
@@ -841,7 +842,7 @@ def add_activity(
             )
             added.append({
                 "username": account["username"], "topic_slug": topic_slug,
-                "difficulty": difficulty, "outcome": outcome,
+                "difficulty": difficulty, "outcome": outcome, "share_code": share_code,
             })
 
     database.close()
@@ -988,7 +989,8 @@ def main() -> None:
         print(f"Added {len(summary['games'])} games for {summary['date']}:")
         for game in summary["games"]:
             outcome = {"win": "solved", "loss": "not solved", "in_progress": "in progress"}[game["outcome"]]
-            print(f"  {game['username']:8} {game['topic_slug']} ({game['difficulty']}): {outcome}")
+            link = f"  /replay?code={game['share_code']}" if game["outcome"] != "in_progress" else ""
+            print(f"  {game['username']:8} {game['topic_slug']} ({game['difficulty']}): {outcome}{link}")
         return
 
     if db_path.is_file() and not args.force:
