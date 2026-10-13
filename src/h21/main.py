@@ -752,7 +752,9 @@ async def search_players(request: Request, q: str = "") -> list[dict[str, Any]]:
     return [
         {"username": row["username"], "display_name": row["display_name"],
          "player_code": row["player_code"],
-         "avatar_version": row.get("avatar_version", 0)}
+         "avatar_version": row.get("avatar_version", 0),
+         "following": bool(row["following"]),
+         "follows_you": bool(row["follows_you"])}
         for row in results
     ]
 

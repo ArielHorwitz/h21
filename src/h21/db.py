@@ -1114,15 +1114,20 @@ class GameDatabase:
     def search_players(self, query: str, exclude_user_id: int) -> list[dict[str, Any]]:
         """Search non-anonymous accounts by username or display_name (LIKE match),
         or by exact player code. Excludes the searching user and anonymous
-        or blocked players. Returns up to 20 results."""
+        or blocked players. Returns up to 20 results, each with whether the
+        searching user follows them and whether they follow the searcher."""
         pattern = f"%{query}%"
         rows = self._connection.execute(
-            "SELECT user_id, username, display_name, player_code, avatar_version "
+            "SELECT user_id, username, display_name, player_code, avatar_version, "
+            "EXISTS (SELECT 1 FROM friends f WHERE f.user_id = ? AND f.friend_id = accounts.user_id) "
+            "  AS following, "
+            "EXISTS (SELECT 1 FROM friends f WHERE f.user_id = accounts.user_id AND f.friend_id = ?) "
+            "  AS follows_you "
             "FROM accounts "
             "WHERE anonymous = 0 AND blocked = 0 AND user_id != ? "
             "AND (username LIKE ? OR display_name LIKE ? OR player_code = ?) "
             "LIMIT 20",
-            (exclude_user_id, pattern, pattern, query.strip().upper()),
+            (exclude_user_id, exclude_user_id, exclude_user_id, pattern, pattern, query.strip().upper()),
         ).fetchall()
         return [dict(row) for row in rows]
 

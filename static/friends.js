@@ -85,17 +85,20 @@ async function searchPlayers(query) {
       return;
     }
     for (const player of players) {
+      const name = player.display_name || player.username;
       searchResults.appendChild(renderPersonRow({
-        name: player.display_name || player.username,
-        detail: `Code ${player.player_code}`,
+        name,
+        detail: describePerson(player, player.follows_you ? "Follows you" : ""),
         playerCode: player.player_code,
         avatarVersion: player.avatar_version,
-        actionLabel: "Follow",
-        actionClass: "primary-btn",
-        onAction: async (button) => {
-          if (await follow(player.player_code)) {
-            button.textContent = "Following";
+        actionLabel: player.following ? "Unfollow" : "Follow",
+        actionClass: player.following ? "secondary-btn" : "primary-btn",
+        onAction: async () => {
+          if (player.following && !confirm(`Unfollow ${name}?`)) return true;
+          const done = player.following ? await unfollow(player.player_code) : await follow(player.player_code);
+          if (done) {
             refreshSocialLists();
+            searchPlayers(query);
             return false;
           }
           return true;
