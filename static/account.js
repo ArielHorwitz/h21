@@ -64,8 +64,16 @@ function showStatus(element, message, isError) {
 
 // -- Profile actions --
 
+const editDisplayNameBtn = document.getElementById("edit-display-name-btn");
+
 displayNameInput.addEventListener("input", () => {
   saveDisplayNameBtn.hidden = displayNameInput.value.trim() === savedDisplayName;
+  editDisplayNameBtn.hidden = !saveDisplayNameBtn.hidden;
+});
+
+editDisplayNameBtn.addEventListener("click", () => {
+  displayNameInput.focus();
+  displayNameInput.select();
 });
 
 displayNameInput.addEventListener("keydown", (event) => {
@@ -83,6 +91,7 @@ saveDisplayNameBtn.addEventListener("click", async () => {
     if (response.ok) {
       savedDisplayName = value || "";
       saveDisplayNameBtn.hidden = true;
+      editDisplayNameBtn.hidden = false;
       showStatus(displayNameStatus, "Saved", false);
     } else {
       const data = await response.json();

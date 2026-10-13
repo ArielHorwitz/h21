@@ -1920,6 +1920,33 @@ body[data-tab="profile"] .tab-bar a[data-tab="profile"] .tab-avatar img {
   border-color: var(--border);
 }
 
+/* Name and pencil sit centered together; the input sizes to its text where supported. */
+.profile-name-input {
+  field-sizing: content;
+  min-width: 4ch;
+  width: auto;
+  border-bottom: 1px dashed var(--text-faint);
+  border-radius: 8px 8px 0 0;
+}
+
+.edit-name-btn {
+  margin-right: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.edit-name-btn svg {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+.edit-name-btn[hidden] {
+  display: none;
+}
+
 .profile-name-input:focus {
   outline: none;
   border-color: var(--accent);
