@@ -67,6 +67,8 @@ Screenshots of every page at phone (390px) and desktop widths, on a seeded sandb
 
 ## Open items
 
+- **For the relaunch session: open registration.** Today the app is invite-only, to keep strangers from running up the API bill. With spending capped by the API limit, the user wants strangers to be able to register without an invite (sending people a link without a code is an unpleasant start), throttled to about three new registrations a day, with a way to switch it off if it gets abused. Not part of this session.
+
 - Real-phone check done on Android; there won't be an iPhone check.
 - No avatar style picker.
 - Stats (including per-puzzle solve rates) are out of scope.
