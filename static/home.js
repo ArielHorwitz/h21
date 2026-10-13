@@ -3,7 +3,7 @@ const todayDate = document.getElementById("today-date");
 
 const DIFFICULTIES = ["normal", "expert"];
 const TOPIC_STATUS_POLL_MS = 4000;
-// A winding-down series only shows how many puzzles remain below this.
+// A series shows how many puzzles remain once fewer than this are left.
 const FEW_PUZZLES_LEFT = 10;
 const MAX_FRIEND_AVATARS = 3;
 
@@ -112,7 +112,7 @@ function describeSeriesNotes(topic) {
     const label = capitalize(difficulty);
     if (series.state === "finished") {
       notes.push(`${label} finished`);
-    } else if (series.state === "winding_down" && series.remaining < FEW_PUZZLES_LEFT) {
+    } else if (series.remaining < FEW_PUZZLES_LEFT) {
       notes.push(series.remaining === 0 ? `${label}: last puzzle` : `${label}: ${series.remaining} left`);
     }
   }
