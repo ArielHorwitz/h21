@@ -20,21 +20,21 @@ All API endpoints are defined in `src/h21/main.py`. JSON request/response bodies
 | POST | `/api/topics` | User | Submit a new topic. LLM tidies the name, then the topic is built in the background (status `generating`). Counts against the daily topic limit. 409 if a topic with the same tidied name exists or is being built; a turned-down one may be tried again. |
 | GET | `/api/topics/turned-down` | User | Recently turned-down topics with the reason (e.g. how many solutions each difficulty kept). |
 
-## Admin (dev only)
+## Admin (admin only)
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| GET | `/api/settings` | Dev | Admin settings (open sign-ups per day and their quotas) and open sign-ups used today. |
-| POST | `/api/settings` | Dev | Update settings: `{"values": {key: int}}`. 400 for unknown keys or negative values. |
-| GET | `/api/admin/attention` | Dev | What needs the admin, for the Admin tab badge: pending invite requests, flagged series, whether today's open spots are used up, and their `total`. |
+| GET | `/api/settings` | Admin | Admin settings (open sign-ups per day and their quotas) and open sign-ups used today. |
+| POST | `/api/settings` | Admin | Update settings: `{"values": {key: int}}`. 400 for unknown keys or negative values. |
+| GET | `/api/admin/attention` | Admin | What needs the admin, for the Admin tab badge: pending invite requests, flagged series, whether today's open spots are used up, and their `total`. |
 
-## Series (dev only)
+## Series (admin only)
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| GET | `/api/series` | Dev | Every series with status, pool size, puzzles played, last refill and any attention flag. |
-| POST | `/api/series/{topic_slug}/{difficulty}/refill` | Dev | Run a refill now. |
-| POST | `/api/series/{topic_slug}/{difficulty}/reopen` | Dev | Make a winding-down or finished series available again and clear its flag. |
+| GET | `/api/series` | Admin | Every series with status, pool size, puzzles played, last refill and any attention flag. |
+| POST | `/api/series/{topic_slug}/{difficulty}/refill` | Admin | Run a refill now. |
+| POST | `/api/series/{topic_slug}/{difficulty}/reopen` | Admin | Make a winding-down or finished series available again and clear its flag. |
 
 ## Games
 
@@ -58,20 +58,20 @@ All API endpoints are defined in `src/h21/main.py`. JSON request/response bodies
 | GET | `/avatars/{player_code}.webp` | Public | Serve avatar thumbnail (128x128 webp). Cache-busted via `?v=` param. |
 | GET | `/avatars/{player_code}_original.png` | Public | Serve original avatar (full resolution PNG). |
 
-## Admin (dev role only)
+## Admin (admin role only)
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| GET | `/api/invites` | Dev | List all invite codes. |
-| POST | `/api/invites` | Dev | Create an invite code with optional alias, uses count, and role. |
-| DELETE | `/api/invites/{code}` | Dev | Delete an invite code. |
-| GET | `/api/accounts` | Dev | List all accounts with daily usage stats. |
-| POST | `/api/accounts/{user_id}/block` | Dev | Block an account (cannot block self). |
-| POST | `/api/accounts/{user_id}/unblock` | Dev | Unblock an account. |
-| POST | `/api/accounts/{user_id}/limits` | Dev | Update daily question and topic limits. |
-| POST | `/api/accounts/{user_id}/reset-usage` | Dev | Reset daily usage counters. |
-| POST | `/api/query` | Dev | Execute a read-only SQL query against the database. |
-| GET | `/api/logs` | Dev | Read log file lines. Query params: `mode` (`head`\|`tail`, default `tail`), `lines` (1-10000, default 100). |
+| GET | `/api/invites` | Admin | List all invite codes. |
+| POST | `/api/invites` | Admin | Create an invite code with optional alias, uses count, and role. |
+| DELETE | `/api/invites/{code}` | Admin | Delete an invite code. |
+| GET | `/api/accounts` | Admin | List all accounts with daily usage stats. |
+| POST | `/api/accounts/{user_id}/block` | Admin | Block an account (cannot block self). |
+| POST | `/api/accounts/{user_id}/unblock` | Admin | Unblock an account. |
+| POST | `/api/accounts/{user_id}/limits` | Admin | Update daily question and topic limits. |
+| POST | `/api/accounts/{user_id}/reset-usage` | Admin | Reset daily usage counters. |
+| POST | `/api/query` | Admin | Execute a read-only SQL query against the database. |
+| GET | `/api/logs` | Admin | Read log file lines. Query params: `mode` (`head`\|`tail`, default `tail`), `lines` (1-10000, default 100). |
 
 ## Page Routes
 
@@ -81,7 +81,7 @@ All API endpoints are defined in `src/h21/main.py`. JSON request/response bodies
 | `/game` | `index.html` |
 | `/account` | `account.html` |
 | `/help` | `help.html` |
-| `/control` | `control.html` (dev only) |
+| `/control` | `control.html` (admin only) |
 | `/login` | `login.html` |
 | `/static/*` | Static file serving |
 

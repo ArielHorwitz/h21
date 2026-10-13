@@ -15,7 +15,7 @@
 2. `no_cache_static` middleware sets cache headers on static/page routes
 3. `require_auth` middleware checks the session cookie:
    - Public paths (`/login`, `/api/login`, `/api/register`, `/api/open-signups`, `/static/*`) pass through
-   - Dev paths (`/control`, `/api/invites`, `/api/accounts`, `/api/query`, `/api/series`, `/api/settings`, `/api/admin` and a few more) require `role == "dev"`
+   - Admin paths (`/control`, `/api/invites`, `/api/accounts`, `/api/query`, `/api/series`, `/api/settings`, `/api/admin` and a few more) require `role == "admin"`
    - All other paths require a valid, non-blocked account
    - Sets `request.state.user_id` and `request.state.role` for downstream handlers
 4. Route handler executes, typically calling `database.*` and/or `llm_client` via helper functions
@@ -30,8 +30,8 @@
 - **Login** returns a signed session cookie. No server-side session store.
 - **Cookie transport** is configurable: local HTTP development defaults to a
   non-secure cookie, while HTTPS deployments set `secure_cookies = true`.
-- **Roles**: `user` (standard access) and `dev` (admin panel, SQL queries, account/invite management).
-- **Blocking**: Accounts can be blocked by devs. Blocked accounts are rejected at the middleware level.
+- **Roles**: `user` (standard access) and `admin` (admin panel, SQL queries, account/invite management). A new account's default picture is generated for players and is the H21 admin badge for admins; either can replace it from Profile.
+- **Blocking**: Accounts can be blocked by admins. Blocked accounts are rejected at the middleware level.
 
 ## Rate Limiting
 

@@ -6,7 +6,7 @@ from datetime import date, timedelta
 from pathlib import Path
 
 from h21.db import GameDatabase
-from h21.sandbox import BLOCKED_PERSONA, DEV_USERNAME, NO_PICTURE_PERSONA, add_activity, seed_database
+from h21.sandbox import BLOCKED_PERSONA, ADMIN_USERNAME, NO_PICTURE_PERSONA, add_activity, seed_database
 
 
 class SandboxSeedTests(unittest.TestCase):
@@ -32,13 +32,13 @@ class SandboxSeedTests(unittest.TestCase):
         cls.database.close()
         cls.temporary_directory.cleanup()
 
-    def test_dev_account_exists_and_authenticates(self) -> None:
-        account = self.database.get_account_by_username(DEV_USERNAME)
+    def test_admin_account_exists_and_authenticates(self) -> None:
+        account = self.database.get_account_by_username(ADMIN_USERNAME)
         self.assertIsNotNone(account)
-        self.assertEqual(account["role"], "dev")
+        self.assertEqual(account["role"], "admin")
         self.assertEqual(
-            self.database.authenticate(DEV_USERNAME, "test-password"),
-            self.summary["dev_user_id"],
+            self.database.authenticate(ADMIN_USERNAME, "test-password"),
+            self.summary["admin_user_id"],
         )
 
     def test_series_cover_every_state(self) -> None:
@@ -58,8 +58,8 @@ class SandboxSeedTests(unittest.TestCase):
         self.assertEqual(len(flagged), 1)
 
     def test_friend_connections_are_mutual(self) -> None:
-        dev_id = self.summary["dev_user_id"]
-        friends = self.database.get_friends(dev_id)
+        admin_id = self.summary["admin_user_id"]
+        friends = self.database.get_friends(admin_id)
         friend_usernames = {friend["username"] for friend in friends}
         expected = set(self.summary["friend_usernames"])
         expected.add(self.summary["anonymous_username"])
@@ -69,10 +69,10 @@ class SandboxSeedTests(unittest.TestCase):
                 entry["user_id"]
                 for entry in self.database.get_friends(friend["user_id"])
             }
-            self.assertIn(dev_id, followed_back)
+            self.assertIn(admin_id, followed_back)
 
     def test_friend_suggestions_cover_follower_and_friend_of_friend(self) -> None:
-        suggestions = self.database.get_friend_suggestions(self.summary["dev_user_id"])
+        suggestions = self.database.get_friend_suggestions(self.summary["admin_user_id"])
         suggested = {entry["username"]: entry["tier"] for entry in suggestions}
         self.assertEqual(suggested.get(self.summary["follower_username"]), 1)
         self.assertEqual(suggested.get(self.summary["friend_of_friend_username"]), 2)
@@ -100,8 +100,8 @@ class SandboxSeedTests(unittest.TestCase):
         )
         self.assertEqual(mismatched["rows"][0][0], 0)
 
-    def test_dev_has_history_and_every_state_today(self) -> None:
-        history = self.database.get_history(self.summary["dev_user_id"])
+    def test_admin_has_history_and_every_state_today(self) -> None:
+        history = self.database.get_history(self.summary["admin_user_id"])
         played_dates = {date.fromisoformat(game["date"]) for game in history}
         self.assertIn(self.today - timedelta(days=1), played_dates)
 
@@ -117,37 +117,37 @@ class SandboxSeedTests(unittest.TestCase):
     def test_turned_down_topics_for_several_players(self) -> None:
         failed = self.database.get_topics_with_status("failed")
         suggesters = {topic["user_id"] for topic in failed}
-        self.assertIn(self.summary["dev_user_id"], suggesters)
+        self.assertIn(self.summary["admin_user_id"], suggesters)
         self.assertGreater(len(suggesters), 1)
 
     def test_friends_have_completed_games_today(self) -> None:
         completed_today = self.database.execute_readonly_query(
             "SELECT COUNT(*) FROM games g "
             "JOIN friends f ON f.friend_id = g.user_id "
-            f"WHERE f.user_id = {self.summary['dev_user_id']} "
+            f"WHERE f.user_id = {self.summary['admin_user_id']} "
             f"AND g.date = '{self.today.isoformat()}' AND g.result IS NOT NULL"
         )
         self.assertGreater(completed_today["rows"][0][0], 0)
 
-    def test_dev_has_recent_shared_wins(self) -> None:
-        results = self.database.get_recent_results(self.summary["dev_user_id"])
+    def test_admin_has_recent_shared_wins(self) -> None:
+        results = self.database.get_recent_results(self.summary["admin_user_id"])
         self.assertGreater(len(results), 0)
         self.assertTrue(all(result["friends"] for result in results))
 
-    def test_friends_lost_puzzles_dev_solved(self) -> None:
+    def test_friends_lost_puzzles_admin_solved(self) -> None:
         for day in (self.today, self.today - timedelta(days=1)):
             losses = self.database.execute_readonly_query(
                 "SELECT COUNT(*) FROM games g "
                 "JOIN friends f ON f.friend_id = g.user_id "
                 "JOIN games mine ON mine.user_id = f.user_id AND mine.date = g.date "
                 "  AND mine.topic_slug = g.topic_slug AND mine.difficulty = g.difficulty "
-                f"WHERE f.user_id = {self.summary['dev_user_id']} "
+                f"WHERE f.user_id = {self.summary['admin_user_id']} "
                 f"AND g.date = '{day.isoformat()}' AND g.result = 'loss' AND mine.result = 'win'"
             )
             self.assertGreater(losses["rows"][0][0], 0, day)
 
     def test_unsolved_games_stay_out_of_recent_results(self) -> None:
-        results = self.database.get_recent_results(self.summary["dev_user_id"], limit=10)
+        results = self.database.get_recent_results(self.summary["admin_user_id"], limit=10)
         self.assertGreater(len(results), 0)
         for result in results:
             for friend in result["friends"]:
@@ -161,10 +161,10 @@ class SandboxSeedTests(unittest.TestCase):
     def test_blocked_accounts_are_never_suggested_or_found(self) -> None:
         blocked = self.database.get_account_by_username(BLOCKED_PERSONA[0])
         self.assertTrue(blocked["blocked"])
-        dev_id = self.summary["dev_user_id"]
-        suggested = {entry["username"] for entry in self.database.get_friend_suggestions(dev_id)}
+        admin_id = self.summary["admin_user_id"]
+        suggested = {entry["username"] for entry in self.database.get_friend_suggestions(admin_id)}
         self.assertNotIn(BLOCKED_PERSONA[0], suggested)
-        found = {entry["username"] for entry in self.database.search_players(BLOCKED_PERSONA[0], exclude_user_id=dev_id)}
+        found = {entry["username"] for entry in self.database.search_players(BLOCKED_PERSONA[0], exclude_user_id=admin_id)}
         self.assertNotIn(BLOCKED_PERSONA[0], found)
 
     def test_answers_use_llm_vocabulary(self) -> None:
@@ -229,7 +229,7 @@ class SandboxAddActivityTests(unittest.TestCase):
         after = self._games(database)
         database.close()
         self.assertGreater(len(summary["games"]), 0)
-        self.assertTrue(all(game["username"] != DEV_USERNAME for game in summary["games"]))
+        self.assertTrue(all(game["username"] != ADMIN_USERNAME for game in summary["games"]))
         # Existing games are untouched and no one plays a puzzle twice.
         self.assertEqual(after[:len(before)], before)
         puzzles_played = [(row[0], row[1], row[2], row[3]) for row in after]

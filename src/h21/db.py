@@ -1177,7 +1177,7 @@ class GameDatabase:
     def get_accounts_without_avatars(self) -> list[dict[str, Any]]:
         """Return accounts with avatar_version = 0 (no avatar generated yet)."""
         rows = self._connection.execute(
-            "SELECT user_id, username, player_code "
+            "SELECT user_id, username, player_code, role "
             "FROM accounts WHERE avatar_version = 0 AND player_code IS NOT NULL"
         ).fetchall()
         return [dict(row) for row in rows]

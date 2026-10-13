@@ -2,7 +2,7 @@
 
 The sandbox lives in its own directory (default: ./.sandbox) holding isolated
 XDG config and data directories, so it never touches the real database. It is
-seeded with a dev account, friend personas, and fabricated play history so the
+seeded with an admin account, friend personas, and fabricated play history so the
 app can be experienced as a normal user with active friends. Puzzles are drawn
 from committed, pre-generated pools; live play (answering questions, hints)
 works through the OpenAI API using the real config/key.
@@ -30,12 +30,12 @@ from zoneinfo import ZoneInfo
 
 from PIL import Image, ImageDraw
 
-from h21.avatar import process_upload, save_avatar_direct
+from h21.avatar import ADMIN_AVATAR_PATH, process_upload, save_avatar_direct
 from h21.config import _config_dir
 from h21.db import GameDatabase, slugify
 
 
-DEV_USERNAME = "dev"
+ADMIN_USERNAME = "admin"
 DEFAULT_SANDBOX_DIR = ".sandbox"
 DEFAULT_PASSWORD = "sandbox"
 DEFAULT_FRIEND_COUNT = 4
@@ -60,7 +60,7 @@ FRIEND_PERSONAS = [
 
 # Extra personas that exercise specific features regardless of --friends:
 ANONYMOUS_FRIEND = ("zoe", "Zoe")     # mutual friend with the anonymous flag set
-FOLLOWER_ONLY = ("felix", "Felix")    # follows dev without a follow-back (suggestion tier 1)
+FOLLOWER_ONLY = ("felix", "Felix")    # follows admin without a follow-back (suggestion tier 1)
 FRIEND_OF_FRIEND = ("gwen", "Gwen")   # followed by the first friend (suggestion tier 2)
 
 # Pre-generated profile pictures, committed to the repo so seeding needs no
@@ -73,7 +73,6 @@ SAMPLE_SIZE = 512
 # Each persona's avatar solution as (style, noun), using avatar.py's own styles
 # and nouns so samples match what live in-game generation produces.
 SAMPLE_AVATAR_SUBJECTS: dict[str, tuple[str, str]] = {
-    "dev": ("stained glass", "octopus"),
     "alice": ("linocut", "fox"),
     "bob": ("mosaic", "owl"),
     "carol": ("embroidered", "lotus"),
@@ -87,7 +86,7 @@ SAMPLE_AVATAR_SUBJECTS: dict[str, tuple[str, str]] = {
     "gwen": ("mosaic", "butterfly"),
 }
 
-# Players outside dev's circle: they fill global leaderboards beyond friends.
+# Players outside admin's circle: they fill global leaderboards beyond friends.
 # One has a very long display name, one has no picture, one is blocked.
 STRANGER_PERSONAS = [
     ("sam", "Sam"), ("priya", "Priya"), ("lena", "Lena"), ("kofi", "Kofi"),
@@ -97,7 +96,7 @@ NO_PICTURE_PERSONA = ("omar", "Omar")
 BLOCKED_PERSONA = ("troll", "Troll")
 
 # Topics turned down for different players and reasons, as (slug, name,
-# suggester index into the friends, detail); index None means dev.
+# suggester index into the friends, detail); index None means admin.
 TURNED_DOWN_TOPICS = [
     ("left-handed-accordion-makers", "Left-Handed Accordion Makers", None,
      "We could only make 4 expert and 11 normal solutions; each difficulty needs at least 50."),
@@ -108,7 +107,7 @@ TURNED_DOWN_TOPICS = [
     ("ancient-roman-pottery", "Ancient Roman Pottery", 2,
      "Something went wrong while creating puzzles. Try again later."),
 ]
-# A topic of dev's left mid-build: the server builds it for real on startup.
+# A topic of admin's left mid-build: the server builds it for real on startup.
 BUILDING_TOPIC = ("jazz-musicians", "Jazz Musicians")
 
 EXTRA_TOPICS = ["Movie Classics", "Great Inventions"]
@@ -535,7 +534,7 @@ def seed_database(
 ) -> dict[str, Any]:
     """Create and populate a sandbox database. Returns a summary dict.
 
-    "Today" is the date in `time_zone` (dev's, since each player's day
+    "Today" is the date in `time_zone` (admin's, since each player's day
     follows their own clock), or the system's local date.
     """
     if today is None:
@@ -568,7 +567,10 @@ def seed_database(
         )
         database.update_profile(user_id, display_name, anonymous)
         player_code = database.get_account_by_id(user_id)["player_code"]
-        if with_picture:
+        if role == "admin":
+            save_avatar_direct(db_path.parent, player_code, ADMIN_AVATAR_PATH.read_bytes())
+            database.bump_avatar_version(user_id)
+        elif with_picture:
             _install_avatar(db_path.parent, player_code, username)
             database.bump_avatar_version(user_id)
         joined = datetime.combine(
@@ -577,9 +579,9 @@ def seed_database(
         fixups.accounts.append((joined.isoformat(), user_id))
         return user_id
 
-    dev_id = create_player(DEV_USERNAME, "Dev", role="dev")
+    admin_id = create_player(ADMIN_USERNAME, "Admin", role="admin")
     if time_zone:
-        database.set_time_zone(dev_id, time_zone)
+        database.set_time_zone(admin_id, time_zone)
     friend_ids = [
         create_player(username, display_name)
         for username, display_name in FRIEND_PERSONAS[:friend_count]
@@ -588,16 +590,16 @@ def seed_database(
     follower_id = create_player(*FOLLOWER_ONLY)
     friend_of_friend_id = create_player(*FRIEND_OF_FRIEND)
 
-    # Mutual friendships between dev and each friend persona (plus the
+    # Mutual friendships between admin and each friend persona (plus the
     # anonymous one), a one-way follower, and a friend-of-friend edge so the
     # friend-suggestion tiers all have candidates.
     for friend_id in [*friend_ids, anonymous_id]:
-        database.add_friend(dev_id, friend_id)
-        database.add_friend(friend_id, dev_id)
+        database.add_friend(admin_id, friend_id)
+        database.add_friend(friend_id, admin_id)
     for first_id, second_id in zip(friend_ids, friend_ids[1:]):
         database.add_friend(first_id, second_id)
         database.add_friend(second_id, first_id)
-    database.add_friend(follower_id, dev_id)
+    database.add_friend(follower_id, admin_id)
     database.add_friend(friend_ids[0], friend_of_friend_id)
 
     for topic_index, topic_name in enumerate(EXTRA_TOPICS):
@@ -660,19 +662,19 @@ def seed_database(
                 seed_game(extra_id, day, popular_slug, "normal", rng.random() < 0.6)
                 game_count += 1
 
-        # Dev has history on past days; today is covered separately below.
+        # Admin has history on past days; today is covered separately below.
         # Wins on the two most recent past days are forced so recent shared
         # results are guaranteed.
         if day_offset > 0:
             win = day_offset <= 2 or rng.random() < 0.7
-            seed_game(dev_id, day, popular_slug, "normal", win)
+            seed_game(admin_id, day, popular_slug, "normal", win)
             game_count += 1
             if rng.random() < 0.5:
                 other_slug = topic_slugs[(day_offset + 2) % len(topic_slugs)]
-                seed_game(dev_id, day, other_slug, rng.choice(difficulties), rng.random() < 0.6)
+                seed_game(admin_id, day, other_slug, rng.choice(difficulties), rng.random() < 0.6)
                 game_count += 1
 
-    # Today, dev has one puzzle in each state (solved, not solved, in
+    # Today, admin has one puzzle in each state (solved, not solved, in
     # progress) and the rest unplayed for live play. A friend is mid-game
     # too, and a game from earlier in the week shows how abandoned games
     # (a rare state set by the system or an admin) look in history.
@@ -683,16 +685,16 @@ def seed_database(
         seed_game(user_id, day, topic_slug, difficulty, **options)
         return 1
 
-    game_count += seed_unplayed(dev_id, today, topic_slugs[1], "normal", win=True)
-    game_count += seed_unplayed(dev_id, today, topic_slugs[0], "expert", win=False)
+    game_count += seed_unplayed(admin_id, today, topic_slugs[1], "normal", win=True)
+    game_count += seed_unplayed(admin_id, today, topic_slugs[0], "expert", win=False)
     game_count += seed_unplayed(
-        dev_id, today, topic_slugs[0], "normal", win=False, finished=False, question_count=6,
+        admin_id, today, topic_slugs[0], "normal", win=False, finished=False, question_count=6,
         hint_count=1,
     )
     game_count += seed_unplayed(
         friend_ids[0], today, topic_slugs[1], "expert", win=False, finished=False, question_count=4,
     )
-    # Friends who didn't solve a puzzle dev solved, today and yesterday, to
+    # Friends who didn't solve a puzzle admin solved, today and yesterday, to
     # check that unsolved games stay out of every social view.
     def seed_friend_loss(day: date, topic_slug: str, difficulty: str) -> int:
         for friend_id in friend_ids[1:]:
@@ -708,31 +710,31 @@ def seed_database(
     if history_days > 3:
         abandoned_day = today - timedelta(days=3)
         abandoned_slug = topic_slugs[3 % len(topic_slugs)]
-        added = seed_unplayed(dev_id, abandoned_day, abandoned_slug, "expert", win=False, finished=False)
+        added = seed_unplayed(admin_id, abandoned_day, abandoned_slug, "expert", win=False, finished=False)
         if added:
-            abandoned = database.get_existing_game(dev_id, abandoned_day, abandoned_slug, "expert")
+            abandoned = database.get_existing_game(admin_id, abandoned_day, abandoned_slug, "expert")
             database.end_game(abandoned["game_id"], "abandoned")
         game_count += added
 
     # -- Edge cases: everything else the app can show --
 
-    # Dev's history covers every way a game can end.
-    def seed_dev_special(**options: Any) -> int:
-        """Seed a game for dev on the most recent past day with an unplayed puzzle."""
+    # Admin's history covers every way a game can end.
+    def seed_admin_special(**options: Any) -> int:
+        """Seed a game for admin on the most recent past day with an unplayed puzzle."""
         for day_offset in range(1, history_days):
             day = today - timedelta(days=day_offset)
             for topic_slug in topic_slugs:
                 for difficulty in difficulties:
                     if (day, topic_slug, difficulty) in puzzle_solutions and \
-                            database.get_existing_game(dev_id, day, topic_slug, difficulty) is None:
-                        seed_game(dev_id, day, topic_slug, difficulty, **options)
+                            database.get_existing_game(admin_id, day, topic_slug, difficulty) is None:
+                        seed_game(admin_id, day, topic_slug, difficulty, **options)
                         return 1
         return 0
 
-    game_count += seed_dev_special(win=True, question_count=1, hint_count=0)
-    game_count += seed_dev_special(win=True, question_count=20, hint_count=5)
-    game_count += seed_dev_special(win=False, question_count=21, hint_count=2)
-    game_count += seed_dev_special(win=False, question_count=3, hint_count=0)
+    game_count += seed_admin_special(win=True, question_count=1, hint_count=0)
+    game_count += seed_admin_special(win=True, question_count=20, hint_count=5)
+    game_count += seed_admin_special(win=False, question_count=21, hint_count=2)
+    game_count += seed_admin_special(win=False, question_count=3, hint_count=0)
 
     # A game from yesterday still in progress carries over: its series
     # offers it until it ends, with today's puzzle waiting behind it.
@@ -741,9 +743,9 @@ def seed_database(
         for topic_slug in topic_slugs:
             for difficulty in difficulties:
                 if (yesterday, topic_slug, difficulty) in puzzle_solutions \
-                        and database.get_existing_game(dev_id, yesterday, topic_slug, difficulty) is None \
-                        and database.get_existing_game(dev_id, today, topic_slug, difficulty) is None:
-                    seed_game(dev_id, yesterday, topic_slug, difficulty, win=False, finished=False, question_count=5)
+                        and database.get_existing_game(admin_id, yesterday, topic_slug, difficulty) is None \
+                        and database.get_existing_game(admin_id, today, topic_slug, difficulty) is None:
+                    seed_game(admin_id, yesterday, topic_slug, difficulty, win=False, finished=False, question_count=5)
                     return 1
         return 0
 
@@ -763,18 +765,18 @@ def seed_database(
                         stranger_id, today, topic_slug, difficulty, win=rng.random() < 0.75,
                     )
 
-    # Topics turned down for several players, and one of dev's still building.
+    # Topics turned down for several players, and one of admin's still building.
     for slug, name, suggester_index, detail in TURNED_DOWN_TOPICS:
-        suggester = dev_id if suggester_index is None else friend_ids[suggester_index % len(friend_ids)]
+        suggester = admin_id if suggester_index is None else friend_ids[suggester_index % len(friend_ids)]
         database.add_topic(slug, name, user_id=suggester, status="failed")
         database.set_topic_status(slug, "failed", detail)
-    database.add_topic(*BUILDING_TOPIC, user_id=dev_id, status="generating")
-    # The newest extra topic is dev's own, so "Your topics" has a ready one.
-    database.set_topic_owner(slugify(EXTRA_TOPICS[-1]), dev_id)
+    database.add_topic(*BUILDING_TOPIC, user_id=admin_id, status="generating")
+    # The newest extra topic is admin's own, so "Your topics" has a ready one.
+    database.set_topic_owner(slugify(EXTRA_TOPICS[-1]), admin_id)
 
-    # Usage: dev has used a suggestion today; one friend has used up both
+    # Usage: admin has used a suggestion today; one friend has used up both
     # topic suggestions and picture generations, so their limits show.
-    database.increment_daily_topic_suggestions(dev_id, today)
+    database.increment_daily_topic_suggestions(admin_id, today)
     exhausted_id = friend_ids[1 % len(friend_ids)]
     for _ in range(DAILY_TOPIC_LIMIT):
         database.increment_daily_topic_suggestions(exhausted_id, today)
@@ -851,8 +853,8 @@ def seed_database(
     _apply_timestamp_fixups(db_path, fixups)
 
     return {
-        "dev_username": DEV_USERNAME,
-        "dev_user_id": dev_id,
+        "admin_username": ADMIN_USERNAME,
+        "admin_user_id": admin_id,
         "friend_usernames": [username for username, _ in FRIEND_PERSONAS[:friend_count]],
         "anonymous_username": ANONYMOUS_FRIEND[0],
         "follower_username": FOLLOWER_ONLY[0],
@@ -984,7 +986,7 @@ def add_activity(
     rng_seed: Optional[int] = None,
     today: Optional[date] = None,
 ) -> dict[str, Any]:
-    """Add games for today by every persona except dev, to an existing sandbox.
+    """Add games for today by every persona except admin, to an existing sandbox.
 
     Nothing is reset: for each persona, every one of today's puzzles they
     haven't played yet is independently solved, failed, started without
@@ -999,13 +1001,13 @@ def add_activity(
     database = GameDatabase(db_path)
     database.ensure_schema()
     if today is None:
-        # Today in dev's time zone, so the activity lands on their day.
-        dev = database.get_account_by_username(DEV_USERNAME)
-        today = _today_in(dev["time_zone"] if dev else None)
+        # Today in admin's time zone, so the activity lands on their day.
+        admin = database.get_account_by_username(ADMIN_USERNAME)
+        today = _today_in(admin["time_zone"] if admin else None)
 
     personas = [
         account for account in database.get_all_accounts()
-        if account["username"] != DEV_USERNAME
+        if account["username"] != ADMIN_USERNAME
     ]
     series = [
         (topic["slug"], difficulty)
@@ -1169,12 +1171,12 @@ def main() -> None:
     )
     parser.add_argument(
         "--time-zone",
-        help="dev's time zone (e.g. America/New_York), which sets the sandbox's today "
+        help="admin's time zone (e.g. America/New_York), which sets the sandbox's today "
              "(default: the system's)",
     )
     parser.add_argument(
         "--add-activity", action="store_true",
-        help="Add today's games for every persona except dev to the existing sandbox, then exit",
+        help="Add today's games for every persona except admin to the existing sandbox, then exit",
     )
     parser.add_argument(
         "--generate-pools", action="store_true",
@@ -1247,7 +1249,7 @@ def _print_summary(
           f"pre-generated solutions in the puzzle pools.")
     print()
     print(f"Accounts (password for all: {password!r}):")
-    print(f"  {summary['dev_username']:12s} your account (role: dev)")
+    print(f"  {summary['admin_username']:12s} your account (role: admin)")
     print(f"  {friends:12s} mutual friends with play history")
     print(f"  {summary['anonymous_username']:12s} mutual friend who plays anonymously")
     print(f"  {summary['follower_username']:12s} follows you (friend suggestion, tier 1)")

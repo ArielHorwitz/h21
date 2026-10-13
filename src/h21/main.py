@@ -105,9 +105,7 @@ async def _backfill_avatars(accounts: list[dict[str, Any]]) -> None:
     logger.info("Backfilling avatars for %d accounts", len(accounts))
     for account in accounts:
         try:
-            image_bytes = await avatar_mod.generate_auto_avatar(
-                openai_image_client, avatar_image_model,
-            )
+            image_bytes = await _default_avatar_bytes(account["role"])
             avatar_mod.save_avatar_direct(
                 data_dir, account["player_code"], image_bytes,
             )
@@ -124,14 +122,22 @@ async def _backfill_avatars(accounts: list[dict[str, Any]]) -> None:
     logger.info("Avatar backfill complete")
 
 
+async def _default_avatar_bytes(role: str) -> bytes:
+    """A new account's picture: the admin badge for admins, a generated one for players.
+
+    Either can later be replaced from the profile page.
+    """
+    if role == "admin":
+        return avatar_mod.ADMIN_AVATAR_PATH.read_bytes()
+    return await avatar_mod.generate_auto_avatar(openai_image_client, avatar_image_model)
+
+
 async def _generate_registration_avatar(
-    user_id: int, username: str, player_code: str,
+    user_id: int, username: str, player_code: str, role: str,
 ) -> None:
-    """Generate an avatar for a newly registered account. Runs as a background task."""
+    """Give a newly registered account its default picture. Runs as a background task."""
     try:
-        image_bytes = await avatar_mod.generate_auto_avatar(
-            openai_image_client, avatar_image_model,
-        )
+        image_bytes = await _default_avatar_bytes(role)
         avatar_mod.save_avatar_direct(
             data_dir, player_code, image_bytes,
         )
@@ -212,7 +218,7 @@ async def no_cache_static(request: Request, call_next):
     return response
 
 
-DEV_PATHS = ("/control", "/api/invites", "/api/accounts", "/api/query", "/api/invite-requests", "/api/logs", "/api/series", "/api/settings", "/api/admin")
+ADMIN_PATHS = ("/control", "/api/invites", "/api/accounts", "/api/query", "/api/invite-requests", "/api/logs", "/api/series", "/api/settings", "/api/admin")
 
 
 # -- Player dates --
@@ -272,8 +278,8 @@ async def require_auth(request: Request, call_next):
     if time_zone and time_zone != account["time_zone"] and _time_zone(time_zone) is not None:
         database.set_time_zone(user_id, time_zone)
 
-    if any(path.startswith(prefix) for prefix in DEV_PATHS):
-        if account["role"] != "dev":
+    if any(path.startswith(prefix) for prefix in ADMIN_PATHS):
+        if account["role"] != "admin":
             if path.startswith("/api/"):
                 return JSONResponse({"detail": "Forbidden"}, status_code=403)
             return RedirectResponse("/", status_code=302)
@@ -703,7 +709,7 @@ async def register(request_body: RegisterRequest) -> JSONResponse:
     account = database.get_account_by_id(user_id)
     if account and account["player_code"]:
         asyncio.create_task(_generate_registration_avatar(
-            user_id, username, account["player_code"],
+            user_id, username, account["player_code"], role,
         ))
 
     response = JSONResponse({"user_id": user_id, "username": username})
@@ -1249,7 +1255,7 @@ async def get_leaderboard(
     }
 
 
-# -- Invite management (dev only, protected by middleware) --
+# -- Invite management (admin only, protected by middleware) --
 
 class CreateInviteRequest(BaseModel):
     alias: Optional[str] = None
@@ -1267,8 +1273,8 @@ async def list_invites() -> list[dict[str, Any]]:
 
 @app.post("/api/invites")
 async def create_invite_api(request_body: CreateInviteRequest) -> dict[str, Any]:
-    if request_body.role not in ("user", "dev"):
-        raise HTTPException(status_code=400, detail="Role must be 'user' or 'dev'")
+    if request_body.role not in ("user", "admin"):
+        raise HTTPException(status_code=400, detail="Role must be 'user' or 'admin'")
     if request_body.uses < 1:
         raise HTTPException(status_code=400, detail="Uses must be at least 1")
     alias = request_body.alias.strip() if request_body.alias else None
@@ -1289,7 +1295,7 @@ async def delete_invite_api(code: str) -> dict[str, str]:
     return {"status": "ok"}
 
 
-# -- Account management (dev only, protected by middleware) --
+# -- Account management (admin only, protected by middleware) --
 
 @app.get("/api/accounts")
 async def list_accounts() -> list[dict[str, Any]]:
@@ -1373,7 +1379,7 @@ async def upload_avatar(user_id: int, image: UploadFile = File()) -> dict[str, A
     return {"status": "ok", "avatar_version": new_version}
 
 
-# -- Query (dev only) --
+# -- Query (admin only) --
 
 class QueryRequest(BaseModel):
     sql: str
@@ -1391,7 +1397,7 @@ async def run_query(request_body: QueryRequest) -> dict[str, Any]:
     return result
 
 
-# -- Logs (dev only) --
+# -- Logs (admin only) --
 
 @app.get("/api/logs")
 async def get_logs(mode: str = "tail", lines: int = 100) -> dict[str, Any]:
@@ -1534,7 +1540,7 @@ async def get_turned_down_topics() -> list[dict[str, Any]]:
     ]
 
 
-# -- Admin settings and attention (dev only, protected by middleware) --
+# -- Admin settings and attention (admin only, protected by middleware) --
 
 class SettingsUpdate(BaseModel):
     values: dict[str, int]
@@ -1576,7 +1582,7 @@ async def admin_attention() -> dict[str, Any]:
     }
 
 
-# -- Series management (dev only, protected by middleware) --
+# -- Series management (admin only, protected by middleware) --
 
 @app.get("/api/series")
 async def list_series() -> list[dict[str, Any]]:

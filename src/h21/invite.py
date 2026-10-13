@@ -12,7 +12,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Generate an invite code")
     parser.add_argument("--alias", default=None, help="Optional label for this invite")
     parser.add_argument("--uses", type=int, default=1, help="Number of allowed uses (default: 1)")
-    parser.add_argument("--role", default="user", choices=["user", "dev"],
+    parser.add_argument("--role", default="user", choices=["user", "admin"],
                         help="Role granted to accounts using this invite (default: user)")
     parser.add_argument("--question-limit", type=int, default=None,
                         help="Daily question limit for accounts using this invite")

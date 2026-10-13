@@ -96,7 +96,7 @@ Composite primary key: `(date, topic_slug, difficulty)`.
 | `user_id` | INTEGER PK | Auto-increment |
 | `username` | TEXT UNIQUE | |
 | `password_hash` | TEXT | `salt:sha256_hex` format |
-| `role` | TEXT | `user` or `dev` |
+| `role` | TEXT | `user` or `admin` |
 | `blocked` | INTEGER | 0 or 1 |
 | `daily_question_limit` | INTEGER | Default 105 |
 | `daily_topic_limit` | INTEGER | Default 1 |

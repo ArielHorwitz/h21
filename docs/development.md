@@ -66,7 +66,7 @@ h21 --host 0.0.0.0 --port 3000
 ## Local Testing Sandbox
 
 `h21-sandbox` creates an isolated instance (default: `./.sandbox`, gitignored)
-with its own XDG config and data directories, seeded with a `dev` account,
+with its own XDG config and data directories, seeded with an `admin` account,
 friend personas, friend connections, and fabricated play history — so the app
 can be experienced as a normal user with active friends. The real database is
 never touched.
@@ -88,29 +88,30 @@ produced once by the in-game generator and committed to the repo, so seeding
 itself makes no API calls (personas without a sample fall back to a locally
 rendered identicon). Regenerate the samples with
 `h21-sandbox --generate-samples` (uses the image API). Log in
-as `dev`
-(role `dev`) to see the app with friends, history, and suggestions populated.
+as `admin`
+(role `admin`) to see the app with friends, history, and suggestions populated.
+Its picture is the admin badge (`static/brand/h21-admin-avatar.png`), the default for every admin account.
 The sandbox is meant to reach every corner of the app:
 
-- **Games:** today, `dev` has a puzzle solved, one not solved and one in
+- **Games:** today, `admin` has a puzzle solved, one not solved and one in
   progress with a hint revealed, with the rest unplayed. Their history has a
   one-question win, a five-hint win, an out-of-questions loss, a give-up and
   an abandoned game, and a game from yesterday still in progress, which
   carries over with today's puzzle waiting. Friends are mid-game today and
-  didn't solve puzzles `dev` solved (which must stay private).
-- **Dates:** the sandbox's "today" is the system's date, or `dev`'s with
-  `--time-zone America/New_York` (stored on `dev`, so `--add-activity`
+  didn't solve puzzles `admin` solved (which must stay private).
+- **Dates:** the sandbox's "today" is the system's date, or `admin`'s with
+  `--time-zone America/New_York` (stored on `admin`, so `--add-activity`
   follows it).
 - **Series:** one winding down with a few puzzles left, one on its last
   puzzle, one finished, a whole topic finished, one unavailable, and one
   flagged for the control panel.
 - **Topics:** turned-down topics from several players with different
-  reasons, a ready topic of `dev`'s marked New, and one of `dev`'s left
+  reasons, a ready topic of `admin`'s marked New, and one of `admin`'s left
   mid-build, which the server builds for real on startup (a few cents).
-- **People:** strangers outside `dev`'s circle on the global leaderboards,
+- **People:** strangers outside `admin`'s circle on the global leaderboards,
   one with a very long display name, one without a picture, and a blocked
   account.
-- **Limits and requests:** `dev` has used a topic suggestion today; a friend
+- **Limits and requests:** `admin` has used a topic suggestion today; a friend
   has used up both topic suggestions and picture generations; two invite
   requests wait in the control panel;
 the friend personas (`alice`, `bob`, ...) can be logged into as well. The
@@ -132,7 +133,7 @@ today's activity without resetting anything:
 h21-sandbox --dir .sandbox --add-activity
 ```
 
-For each persona except `dev`, every one of today's puzzles they haven't
+For each persona except `admin`, every one of today's puzzles they haven't
 played yet is independently solved (50%), failed (20%), started without
 finishing (10%) or skipped (20%), so running it again later in the day fills
 in some of the skipped ones. Puzzles nobody has drawn yet are drawn from

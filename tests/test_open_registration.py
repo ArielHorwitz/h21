@@ -135,5 +135,11 @@ class RecentlyActiveSuggestionTests(unittest.TestCase):
         self.assertEqual(suggestions[0]["tier"], 4)
 
 
+class DefaultPictureTests(unittest.TestCase):
+    def test_admins_start_with_the_admin_badge(self) -> None:
+        badge = main.avatar_mod.ADMIN_AVATAR_PATH.read_bytes()
+        self.assertEqual(asyncio.run(main._default_avatar_bytes("admin")), badge)
+
+
 if __name__ == "__main__":
     unittest.main()

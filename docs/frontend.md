@@ -31,9 +31,9 @@ Colors and sizes are CSS custom properties at the top of `style.css`. The
 | Profile | `account.html`, `account.js` | Picture (AI generation flow), inline display name, stats, history list, settings (log out). |
 | Login | `login.html`, `login.js` | Log in / Join switch, invite request behind a link. The invite code is optional while open spots last; otherwise Join says so and requires one. `?invite=CODE` opens Join prefilled. |
 | Help | `help.html` | Rules, answers, hints, sharing, topics, tips. |
-| Control | `control.html`, `control.js` | Dev-only admin panel, reached from the Admin tab: open sign-up settings, invites and requests, series, users, activity, SQL queries, logs. |
+| Control | `control.html`, `control.js` | Admin-only control panel, reached from the Admin tab: open sign-up settings, invites and requests, series, users, activity, SQL queries, logs. |
 
-The tab bar (`partials/tab-bar.html`) has Today, Friends and Profile, plus an Admin tab that `nav.js` shows to devs with a badge counting what needs attention (`/api/admin/attention`).
+The tab bar (`partials/tab-bar.html`) has Today, Friends and Profile, plus an Admin tab that `nav.js` shows to admins with a badge counting what needs attention (`/api/admin/attention`).
 
 `people-list.js` holds the person rows and follow/unfollow actions shared by Friends and People. `question-log.js` holds the question log rendering (entries, answer chips,
 hints, the meter) shared by the game and results pages.

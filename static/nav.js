@@ -1,5 +1,5 @@
 // Replace the Profile tab's generic icon with the user's avatar, and show
-// devs the Admin tab with a count of what needs their attention.
+// admins the Admin tab with a count of what needs their attention.
 (function () {
   var slot = document.querySelector("#nav-account .tab-avatar");
   if (!slot) return;
@@ -28,7 +28,7 @@
       return response.json();
     })
     .then(function (data) {
-      if (data && data.role === "dev") showAdminTab();
+      if (data && data.role === "admin") showAdminTab();
       if (!data || !data.player_code || data.avatar_version < 1) return;
       var img = document.createElement("img");
       img.src =

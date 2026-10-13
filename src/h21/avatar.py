@@ -236,6 +236,10 @@ def confirm_pending(data_dir: Path, player_code: str) -> bool:
     return True
 
 
+# Admins start with the H21 admin badge instead of a generated picture.
+ADMIN_AVATAR_PATH = Path(__file__).resolve().parents[2].joinpath("static", "brand", "h21-admin-avatar.png")
+
+
 def save_avatar_direct(data_dir: Path, player_code: str, image_bytes: bytes) -> None:
     """Save an avatar directly (for auto-generation on registration)."""
     original = _original_path(data_dir, player_code)
