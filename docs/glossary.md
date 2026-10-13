@@ -1,6 +1,6 @@
 # Glossary
 
-The terms used across code, copy and docs. When they disagree with an older name in the code, these win; older names are renamed as the code is touched.
+The terms used across code, copy and docs.
 
 | Term | Meaning | Example |
 |---|---|---|
