@@ -41,7 +41,7 @@ hints, the meter) shared by the game and results pages.
 ## Game State Flow
 
 1. `game.js` reads `topic` and `difficulty` from URL query params (e.g. `/game?topic=western-history&difficulty=normal`)
-2. On init, calls `GET /api/game/existing` to check for an in-progress or completed game for today's puzzle
+2. On init, calls `GET /api/game/existing` for the game the series offers: an open one from any day (with a note under the meter if today's puzzle is waiting), or today's
 3. If a game exists, replays all recorded questions to restore UI state (counter, log, hints)
 4. If no game exists, calls `POST /api/game/new` to start a fresh game (which triggers solution generation on the backend if needed)
 5. Each question submission calls `POST /api/ask` with the `game_id` and `question_number`
@@ -51,6 +51,7 @@ hints, the meter) shared by the game and results pages.
 ## JS Patterns
 
 - No module system — scripts loaded via `<script>` tags
+- Every page loads `tz.js` in its head, which reports the browser's time zone in a `tz` cookie (see "Dates" in `architecture.md`)
 - DOM elements grabbed by ID at the top of each file
 - State tracked in module-level variables (`questionsAsked`, `gameId`, `gameFinished`, etc.)
 - `localStorage` used to persist `user_id` across sessions

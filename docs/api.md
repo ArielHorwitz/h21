@@ -40,10 +40,11 @@ All API endpoints are defined in `src/h21/main.py`. JSON request/response bodies
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| GET | `/api/game/existing?topic_slug=...&difficulty=...` | User | Get user's existing game for today's puzzle. Returns 204 if none. |
-| POST | `/api/game/new` | User | Start a new game for a ready topic+difficulty. Draws today's solution from the pool if needed. 409 if game already exists, 503 if the topic has run out of puzzles. |
-| POST | `/api/game/end` | User | End a game with result (`win`/`loss`). Returns solution and hints. |
-| POST | `/api/ask` | User | Ask a question. LLM judges against secret solution. Counts against daily question limit. Records Q&A if game_id provided. |
+| GET | `/api/game/existing?topic_slug=...&difficulty=...` | User | The game the series offers the user: their open game from any date, else their game on today's puzzle (the player's today). Open games include `new_puzzle_waiting`. Returns 204 if none. |
+| GET | `/api/game/statuses` | User | The user's games on today's puzzles, plus open games from other dates (with `date`). |
+| POST | `/api/game/new` | User | Start a game on today's puzzle for a ready topic+difficulty, drawing it from the pool if needed. 409 if the series already offers a game, 410 if the series has finished, 503 if the topic has run out of puzzles. |
+| POST | `/api/game/end` | User | End a game with result (`win`/`loss`), whatever its date. Returns solution and hints. 409 if already ended. |
+| POST | `/api/ask` | User | Ask a question in an open game (`game_id`, `question_number`). LLM judges against the game's puzzle. Counts against today's question limit. 409 if the game has ended. |
 | POST | `/api/hint` | User | Get a hint by index (0-4). Requires `(hint_index + 1) * 4` questions asked. |
 | GET | `/api/history` | User | Get all past games with questions for the current user. |
 

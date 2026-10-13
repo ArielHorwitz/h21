@@ -69,13 +69,13 @@ Composite primary key: `(date, topic_slug, difficulty)`.
 | Column | Type | Notes |
 |--------|------|-------|
 | `game_id` | INTEGER PK | Auto-increment |
-| `date` | TEXT | ISO date |
+| `date` | TEXT | The puzzle's ISO date (a game can end on a later day) |
 | `topic_slug` | TEXT FK | |
 | `difficulty` | TEXT | |
 | `user_id` | INTEGER | Player |
 | `started_at` | TEXT | UTC ISO timestamp |
 | `ended_at` | TEXT | Null while in progress |
-| `result` | TEXT | `win`, `loss`, or null |
+| `result` | TEXT | `win`, `loss`, `abandoned` (rare, set by the system or an admin), or null while open |
 | `questions_asked` | INTEGER | Counter, updated on each question |
 
 ### `questions`
@@ -102,8 +102,7 @@ Composite primary key: `(date, topic_slug, difficulty)`.
 | `daily_topic_limit` | INTEGER | Default 1 |
 | `invite_code` | TEXT | Code used to register; NULL for an open sign-up |
 | `avatar_version` | INTEGER | Bumped on each avatar change (0 = no avatar) |
-| `avatar_generations_used` | INTEGER | Monthly counter for avatar generations |
-| `avatar_generation_reset` | TEXT | ISO date of last counter reset (nullable) |
+| `time_zone` | TEXT | Last IANA time zone the player's browser reported, for admin views of their date |
 | `monthly_avatar_limit` | INTEGER | Max avatar generations per month (default 3) |
 | `created_at` | TEXT | UTC ISO timestamp |
 
@@ -134,6 +133,8 @@ Admin-editable values. A missing row means the default applies.
 | `date` | TEXT | ISO date |
 | `questions_used` | INTEGER | |
 | `topic_suggestions_used` | INTEGER | |
+
+Also `avatar_generations_used` (picture generations, summed over the month for the monthly limit). `date` is the player's local date.
 
 Composite primary key: `(user_id, date)`. Rows created on first use via `INSERT ... ON CONFLICT DO UPDATE`.
 

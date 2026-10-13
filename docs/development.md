@@ -95,8 +95,12 @@ The sandbox is meant to reach every corner of the app:
 - **Games:** today, `dev` has a puzzle solved, one not solved and one in
   progress with a hint revealed, with the rest unplayed. Their history has a
   one-question win, a five-hint win, an out-of-questions loss, a give-up and
-  an abandoned game. Friends are mid-game today and didn't solve puzzles
-  `dev` solved (which must stay private).
+  an abandoned game, and a game from yesterday still in progress, which
+  carries over with today's puzzle waiting. Friends are mid-game today and
+  didn't solve puzzles `dev` solved (which must stay private).
+- **Dates:** the sandbox's "today" is the system's date, or `dev`'s with
+  `--time-zone America/New_York` (stored on `dev`, so `--add-activity`
+  follows it).
 - **Series:** one winding down with a few puzzles left, one on its last
   puzzle, one finished, a whole topic finished, one unavailable, and one
   flagged for the control panel.
