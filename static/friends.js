@@ -1,5 +1,7 @@
 const recentResultsSection = document.getElementById("recent-results-section");
 const anonymousNotice = document.getElementById("anonymous-notice");
+const privacySection = document.getElementById("privacy-section");
+const anonymousToggle = document.getElementById("anonymous-toggle");
 const socialContent = document.getElementById("social-content");
 const myPlayerCode = document.getElementById("my-player-code");
 const copyCodeBtn = document.getElementById("copy-code-btn");
@@ -345,8 +347,30 @@ async function loadRecentResults() {
   }
 }
 
+anonymousToggle.addEventListener("change", async () => {
+  anonymousToggle.disabled = true;
+  try {
+    const response = await fetch("/api/me", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ anonymous: anonymousToggle.checked }),
+    });
+    if (response.ok) {
+      // The whole page depends on it, so start over.
+      window.location.reload();
+      return;
+    }
+  } catch {
+    // Fall through and restore the switch.
+  }
+  anonymousToggle.checked = !anonymousToggle.checked;
+  anonymousToggle.disabled = false;
+});
+
 async function init() {
   const user = await loadCurrentUser();
+  privacySection.hidden = user === null;
+  anonymousToggle.checked = Boolean(user && user.anonymous);
   if (user && user.anonymous) {
     anonymousNotice.hidden = false;
     return;

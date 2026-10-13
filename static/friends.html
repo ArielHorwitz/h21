@@ -26,7 +26,6 @@
 
     <p id="anonymous-notice" class="empty-state" hidden>
       Friends are turned off while you're in anonymous mode.
-      You can change this on your <a href="/account">profile</a>.
     </p>
 
     <div id="social-content" hidden>
@@ -53,6 +52,16 @@
         <div id="following-list" class="person-list"></div>
       </section>
     </div>
+    <section class="settings-list privacy-section" id="privacy-section" hidden>
+      <h2 class="section-title">Privacy</h2>
+      <label class="setting-row">
+        <span class="setting-text">
+          <span>Anonymous mode</span>
+          <span class="field-hint">Hide your name, picture and results from others, and turn off friends.</span>
+        </span>
+        <input type="checkbox" id="anonymous-toggle" class="switch">
+      </label>
+    </section>
   </main>
   <!--TAB_BAR-->
   <script src="/static/nav.js"></script>

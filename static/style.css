@@ -2344,3 +2344,7 @@ a.history-row:hover {
   font-size: 0.9rem;
   font-style: italic;
 }
+
+.privacy-section {
+  margin-top: 1.5rem;
+}

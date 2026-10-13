@@ -6,7 +6,6 @@ const displayNameInput = document.getElementById("display-name-input");
 const saveDisplayNameBtn = document.getElementById("save-display-name-btn");
 const displayNameStatus = document.getElementById("display-name-status");
 const playerCodeValue = document.getElementById("player-code-value");
-const anonymousToggle = document.getElementById("anonymous-toggle");
 
 const avatarImg = document.getElementById("avatar-img");
 const avatarPlaceholder = document.getElementById("avatar-placeholder");
@@ -27,7 +26,6 @@ const avatarUseBtn = document.getElementById("avatar-use-btn");
 const avatarRetryBtn = document.getElementById("avatar-retry-btn");
 const avatarDiscardBtn = document.getElementById("avatar-discard-btn");
 
-let currentAnonymous = false;
 let currentPlayerCode = null;
 let currentAvatarVersion = 0;
 let avatarGenerationsUsed = 0;
@@ -48,8 +46,6 @@ async function loadAccount() {
       displayNameInput.value = savedDisplayName;
       displayNameInput.placeholder = data.username;
       playerCodeValue.textContent = data.player_code;
-      anonymousToggle.checked = data.anonymous;
-      currentAnonymous = data.anonymous;
       currentPlayerCode = data.player_code;
       currentAvatarVersion = data.avatar_version;
       avatarGenerationsUsed = data.avatar_generations_used;
@@ -98,24 +94,6 @@ saveDisplayNameBtn.addEventListener("click", async () => {
     }
   } catch {
     showStatus(displayNameStatus, "Network error", true);
-  }
-});
-
-anonymousToggle.addEventListener("change", async () => {
-  const anonymous = anonymousToggle.checked;
-  try {
-    const response = await fetch("/api/me", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ anonymous }),
-    });
-    if (response.ok) {
-      currentAnonymous = anonymous;
-    } else {
-      anonymousToggle.checked = currentAnonymous;
-    }
-  } catch {
-    anonymousToggle.checked = currentAnonymous;
   }
 });
 
