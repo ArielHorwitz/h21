@@ -82,7 +82,16 @@ function renderSuggested(person) {
 
 const RENDERERS = { following: renderFollowing, followers: renderFollower, suggested: renderSuggested };
 
+// The counts on the Following and Followers tabs, refreshed with every list
+// since following someone back changes them.
+async function loadCounts() {
+  const [following, followers] = await Promise.all([fetchList("following"), fetchList("followers")]);
+  document.getElementById("following-count").textContent = String(following.length);
+  document.getElementById("followers-count").textContent = String(followers.length);
+}
+
 async function showList(name) {
+  loadCounts().catch((error) => console.error("Failed to load people counts:", error));
   currentList = name;
   for (const tab of peopleTabs) {
     tab.setAttribute("aria-selected", String(tab.dataset.list === name));

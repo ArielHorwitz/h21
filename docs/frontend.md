@@ -26,7 +26,7 @@ Colors and sizes are CSS custom properties at the top of `style.css`. The
 | Game | `index.html`, `game.js` | Gameplay: 21-segment answer meter, starter questions, answer chips with *Why?*, inline hints from one hint button, pinned composer, resume. Finished games go to the results page. |
 | Results | `replay.html`, `replay.js` | Outcome, answer, meter and stats, Share / Leaderboard / More puzzles, then the question log with hints inline. Spoiler-gated for viewers who haven't played the puzzle. |
 | Friends | `friends.html`, `friends.js` | Recent games with friends, search by name or player code, three suggestions (See all), links to Following and Followers with counts, and the anonymous-mode switch. |
-| People | `people.html`, `people.js` | Following, Followers and Suggested lists as tabs: "Follows you" on people who follow back, Follow back for followers you don't follow, the full suggestions list. |
+| People | `people.html`, `people.js` | Following, Followers (both with counts) and Suggested lists as tabs: "Follows you" on people who follow back, Follow back for followers you don't follow, the full suggestions list. |
 | Leaderboard | `leaderboard.html`, `leaderboard.js` | Ranked list for one puzzle with an Everyone / Friends switch. Redirects to Friends without query parameters. |
 | Profile | `account.html`, `account.js` | Picture (AI generation flow), inline display name, stats, history list, settings (log out). |
 | Login | `login.html`, `login.js` | Log in / Join switch, invite request behind a link. The invite code is optional while open spots last; otherwise Join says so and requires one. `?invite=CODE` opens Join prefilled. |
