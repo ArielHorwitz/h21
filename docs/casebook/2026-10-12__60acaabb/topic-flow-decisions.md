@@ -2,6 +2,10 @@
 
 The user's responses to `topic-flow-recommendations.md` (2026-10-13), organized. Nothing is implemented yet. "Open" marks what still needs discussion.
 
+## Terminology
+
+Settled before the work starts and recorded in `docs/glossary.md`: **topic** (the name), **series** (topic + difficulty, which owns pools, thresholds and lifecycle states), **puzzle** (a series' daily instance), **game** (one player's attempt at a puzzle, with its own share code), **answer** (a puzzle's secret; what pools hold and previews sample), **pool**. Where this document says "puzzle" for a topic + difficulty, read **series**. Since the relaunch wipes the data, the schema and code are renamed to these terms as part of the work (e.g. `daily_puzzles` becomes `puzzles`, `solution` becomes `answer`), with no migration.
+
 ## Principles
 
 - **Keep the model simple.** A topic is just its name; that name is what generation and validation see. No extra scope field, no topic validation gates beyond "can puzzles be made".

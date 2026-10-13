@@ -39,6 +39,7 @@ An AI-powered 21 questions trivia game. Players pick a topic (user-submitted or 
 
 Before modifying a module, read the relevant doc in `docs/` for detailed context:
 
+- **`docs/glossary.md`** -- the terms topic, series, puzzle, game, answer, pool; use them in code, copy and docs
 - **`docs/architecture.md`** -- module responsibilities, request flow, auth model, middleware
 - **`docs/database.md`** -- full schema, how schema changes work
 - **`docs/api.md`** -- all API endpoints with methods, paths, auth requirements
