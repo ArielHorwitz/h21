@@ -199,7 +199,7 @@ requestForm.addEventListener("submit", async (event) => {
     const data = await response.json();
 
     if (response.ok) {
-      requestStatus.textContent = `Creating "${data.name}". This takes a minute or two, and it will appear on Today when ready.`;
+      requestStatus.textContent = `Creating "${data.name}". This takes a few minutes, and it will appear on Today when ready.`;
       requestStatus.className = "status-success";
       topicNameInput.value = "";
       await loadMyTopics();

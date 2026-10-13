@@ -164,7 +164,7 @@ function renderBuildingStatus() {
   mark.innerHTML = THINKING_MARK_SVG;
   status.appendChild(mark);
   const text = document.createElement("span");
-  text.textContent = "Creating puzzles… this takes a minute or two.";
+  text.textContent = "Creating puzzles… this takes a few minutes.";
   status.appendChild(text);
   return status;
 }
