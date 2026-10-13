@@ -44,9 +44,9 @@ Per-user daily quotas tracked in `daily_usage` table:
 
 - All persistent state is in SQLite (WAL mode, foreign keys enabled). No in-memory caches.
 - LLM calls are async. The app uses `AsyncOpenAI`.
-- Puzzles come from a pre-generated pool per topic and difficulty. Each refill generates a batch of 100 subjects in one LLM call and validates them in a second (topic fit, difficulty, duplicates); only kept subjects enter the pool. `get_today_solution` draws one at random on the first request for a date/topic/difficulty (serialized by a per-puzzle lock), generates its hints, and persists it.
-- A new topic is built in the background: both difficulty pools are filled, and the topic becomes `ready`, or `failed` if either pool kept fewer than 50 subjects. Builds interrupted by a restart, and the seeded default topics, are built at startup.
-- A pool is refilled in the background once it drops below 50 subjects. If a refill keeps fewer than 10, the pool is treated as exhausted and not refilled again; when it empties, the topic answers 503.
+- Puzzles come from a pre-generated pool per topic and difficulty. Each refill generates a batch of 100 solutions in one LLM call and validates them in a second (topic fit, difficulty, duplicates); only kept solutions enter the pool. `get_today_solution` draws one at random on the first request for a date/topic/difficulty (serialized by a per-puzzle lock), generates its hints, and persists it.
+- A new topic is built in the background: both difficulty pools are filled, and the topic becomes `ready`, or `failed` if either pool kept fewer than 50 solutions. Builds interrupted by a restart, and the seeded default topics, are built at startup.
+- A pool is refilled in the background once it drops below 50 solutions. If a refill keeps fewer than 10, the pool is treated as exhausted and not refilled again; when it empties, the topic answers 503.
 - Hints are backfilled for a puzzle whose hint generation failed.
 - Global in-memory state is limited to in-flight background task bookkeeping and the draw locks.
 - Global module-level variables (`llm_client`, `database`, `signing_secret`) are initialized in the lifespan context manager.

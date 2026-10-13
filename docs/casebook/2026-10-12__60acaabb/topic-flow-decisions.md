@@ -4,7 +4,7 @@ The user's responses to `topic-flow-recommendations.md` (2026-10-13), organized.
 
 ## Terminology
 
-Settled before the work starts and recorded in `docs/glossary.md`: **topic** (the name), **series** (topic + difficulty, which owns pools, thresholds and lifecycle states), **puzzle** (a series' daily instance), **game** (one player's attempt at a puzzle, with its own share code), **answer** (a puzzle's secret; what pools hold and previews sample), **pool**. Where this document says "puzzle" for a topic + difficulty, read **series**. Since the relaunch wipes the data, the schema and code are renamed to these terms as part of the work (e.g. `daily_puzzles` becomes `puzzles`, `solution` becomes `answer`), with no migration.
+Settled before the work starts and recorded in `docs/glossary.md`: **topic** (the name), **series** (topic + difficulty, which owns pools, thresholds and lifecycle states), **puzzle** (a series' daily instance), **game** (one player's attempt at a puzzle, with its own share code), **solution** (a puzzle's secret; what pools hold and previews sample), **answer** (the host's reply to a question), **pool**. "Answer" was first proposed for the secret, but it already means the host's yes/no reply throughout the code, copy and prompts, so the secret is the **solution**. Where this document says "puzzle" for a topic + difficulty, read **series**. Since the relaunch wipes the data, the schema and code are renamed to these terms as part of the work (e.g. `daily_puzzles` becomes `puzzles`, `puzzle_pool` becomes `pool_solutions`, "subject" becomes "solution"; model-facing prompt wording is left as is), with no migration.
 
 ## Principles
 

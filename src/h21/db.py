@@ -40,7 +40,7 @@ class GameDatabase:
                 created_at    TEXT NOT NULL
             );
 
-            CREATE TABLE IF NOT EXISTS daily_puzzles (
+            CREATE TABLE IF NOT EXISTS puzzles (
                 date        TEXT NOT NULL,
                 topic_slug  TEXT NOT NULL,
                 difficulty  TEXT NOT NULL,
@@ -50,7 +50,7 @@ class GameDatabase:
                 FOREIGN KEY (topic_slug) REFERENCES topics(slug)
             );
 
-            CREATE TABLE IF NOT EXISTS puzzle_pool (
+            CREATE TABLE IF NOT EXISTS pool_solutions (
                 pool_id      INTEGER PRIMARY KEY AUTOINCREMENT,
                 topic_slug   TEXT NOT NULL REFERENCES topics(slug),
                 difficulty   TEXT NOT NULL,
@@ -258,7 +258,7 @@ class GameDatabase:
             friend_rows = self._connection.execute(
                 "SELECT dp.topic_slug, dp.difficulty, "
                 "fa.display_name, fa.player_code, fa.avatar_version "
-                "FROM daily_puzzles dp "
+                "FROM puzzles dp "
                 "JOIN friends f ON f.user_id = ? "
                 "JOIN games fg ON fg.user_id = f.friend_id "
                 "  AND fg.date = dp.date "
@@ -346,7 +346,7 @@ class GameDatabase:
 
     def delete_topic(self, slug: str) -> None:
         """Delete a topic that was never played, along with its pool."""
-        self._connection.execute("DELETE FROM puzzle_pool WHERE topic_slug = ?", (slug,))
+        self._connection.execute("DELETE FROM pool_solutions WHERE topic_slug = ?", (slug,))
         self._connection.execute("DELETE FROM pool_refills WHERE topic_slug = ?", (slug,))
         self._connection.execute("DELETE FROM topics WHERE slug = ?", (slug,))
         self._connection.commit()
@@ -358,7 +358,7 @@ class GameDatabase:
         hints: Optional[list[str]] = None,
     ) -> None:
         self._connection.execute(
-            "INSERT OR IGNORE INTO daily_puzzles (date, topic_slug, difficulty, solution, hints) "
+            "INSERT OR IGNORE INTO puzzles (date, topic_slug, difficulty, solution, hints) "
             "VALUES (?, ?, ?, ?, ?)",
             (puzzle_date.isoformat(), topic_slug, difficulty, solution,
              json.dumps(hints or [])),
@@ -369,7 +369,7 @@ class GameDatabase:
         self, puzzle_date: date, topic_slug: str, difficulty: str, hints: list[str],
     ) -> None:
         self._connection.execute(
-            "UPDATE daily_puzzles SET hints = ? "
+            "UPDATE puzzles SET hints = ? "
             "WHERE date = ? AND topic_slug = ? AND difficulty = ?",
             (json.dumps(hints), puzzle_date.isoformat(), topic_slug, difficulty),
         )
@@ -379,7 +379,7 @@ class GameDatabase:
         self, puzzle_date: date, topic_slug: str, difficulty: str
     ) -> Optional[str]:
         row = self._connection.execute(
-            "SELECT solution FROM daily_puzzles WHERE date = ? AND topic_slug = ? AND difficulty = ?",
+            "SELECT solution FROM puzzles WHERE date = ? AND topic_slug = ? AND difficulty = ?",
             (puzzle_date.isoformat(), topic_slug, difficulty),
         ).fetchone()
         if row is None:
@@ -390,7 +390,7 @@ class GameDatabase:
         self, puzzle_date: date, topic_slug: str, difficulty: str
     ) -> list[str]:
         row = self._connection.execute(
-            "SELECT hints FROM daily_puzzles WHERE date = ? AND topic_slug = ? AND difficulty = ?",
+            "SELECT hints FROM puzzles WHERE date = ? AND topic_slug = ? AND difficulty = ?",
             (puzzle_date.isoformat(), topic_slug, difficulty),
         ).fetchone()
         if row is None:
@@ -402,9 +402,9 @@ class GameDatabase:
     def draw_random_from_pool(
         self, topic_slug: str, difficulty: str,
     ) -> Optional[str]:
-        """Draw and remove a random subject from the puzzle pool."""
+        """Draw and remove a random solution from the puzzle pool."""
         row = self._connection.execute(
-            "SELECT pool_id, solution FROM puzzle_pool "
+            "SELECT pool_id, solution FROM pool_solutions "
             "WHERE topic_slug = ? AND difficulty = ? "
             "ORDER BY RANDOM() LIMIT 1",
             (topic_slug, difficulty),
@@ -412,16 +412,16 @@ class GameDatabase:
         if row is None:
             return None
         self._connection.execute(
-            "DELETE FROM puzzle_pool WHERE pool_id = ?",
+            "DELETE FROM pool_solutions WHERE pool_id = ?",
             (row["pool_id"],),
         )
         self._connection.commit()
         return row["solution"]
 
     def pool_count(self, topic_slug: str, difficulty: str) -> int:
-        """Return the number of undrawn subjects in the pool."""
+        """Return the number of undrawn solutions in the pool."""
         row = self._connection.execute(
-            "SELECT COUNT(*) AS cnt FROM puzzle_pool "
+            "SELECT COUNT(*) AS cnt FROM pool_solutions "
             "WHERE topic_slug = ? AND difficulty = ?",
             (topic_slug, difficulty),
         ).fetchone()
@@ -430,24 +430,24 @@ class GameDatabase:
     def get_all_known_solutions(self, topic_slug: str) -> list[str]:
         """Return all solutions (used + pooled) for a topic, for dedup."""
         rows = self._connection.execute(
-            "SELECT solution FROM daily_puzzles WHERE topic_slug = ? "
+            "SELECT solution FROM puzzles WHERE topic_slug = ? "
             "UNION "
-            "SELECT solution FROM puzzle_pool WHERE topic_slug = ?",
+            "SELECT solution FROM pool_solutions WHERE topic_slug = ?",
             (topic_slug, topic_slug),
         ).fetchall()
         return [row["solution"] for row in rows]
 
-    def insert_pool_subjects(
+    def insert_pool_solutions(
         self,
         topic_slug: str,
         difficulty: str,
         solutions: list[str],
     ) -> int:
-        """Insert subjects into the pool, skipping duplicates. Returns count inserted."""
+        """Insert solutions into the pool, skipping duplicates. Returns count inserted."""
         generated_at = _utcnow_iso()
         before = self._connection.total_changes
         self._connection.executemany(
-            "INSERT OR IGNORE INTO puzzle_pool "
+            "INSERT OR IGNORE INTO pool_solutions "
             "(topic_slug, difficulty, solution, generated_at) "
             "VALUES (?, ?, ?, ?)",
             [(topic_slug, difficulty, solution, generated_at) for solution in solutions],
@@ -456,15 +456,15 @@ class GameDatabase:
         return self._connection.total_changes - before
 
     def remove_cross_difficulty_pool_duplicates(self, topic_slug: str) -> int:
-        """Drop non-normal pool subjects that also appear in the normal pool.
+        """Drop non-normal pool solutions that also appear in the normal pool.
 
         Returns count deleted.
         """
         before = self._connection.total_changes
         self._connection.execute(
-            "DELETE FROM puzzle_pool "
+            "DELETE FROM pool_solutions "
             "WHERE topic_slug = ? AND difficulty != 'normal' AND solution IN ("
-            "  SELECT solution FROM puzzle_pool "
+            "  SELECT solution FROM pool_solutions "
             "  WHERE topic_slug = ? AND difficulty = 'normal')",
             (topic_slug, topic_slug),
         )
@@ -692,7 +692,7 @@ class GameDatabase:
                        g.difficulty, dp.solution, g.started_at, g.ended_at,
                        g.result, g.questions_asked, g.share_code
                 FROM games g
-                JOIN daily_puzzles dp
+                JOIN puzzles dp
                     ON g.date = dp.date
                     AND g.topic_slug = dp.topic_slug
                     AND g.difficulty = dp.difficulty
@@ -710,7 +710,7 @@ class GameDatabase:
                        g.difficulty, dp.solution, g.started_at, g.ended_at,
                        g.result, g.questions_asked, g.share_code
                 FROM games g
-                JOIN daily_puzzles dp
+                JOIN puzzles dp
                     ON g.date = dp.date
                     AND g.topic_slug = dp.topic_slug
                     AND g.difficulty = dp.difficulty

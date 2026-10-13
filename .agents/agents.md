@@ -1,6 +1,6 @@
 # H21
 
-An AI-powered 21 questions trivia game. Players pick a topic (user-submitted or built-in), choose a difficulty, and ask yes/no questions to guess a secret subject. Built with Python/FastAPI backend, vanilla JS frontend, SQLite database, and OpenAI API for game logic.
+An AI-powered 21 questions trivia game. Players pick a topic (user-submitted or built-in), choose a difficulty, and ask yes/no questions to guess a secret solution. Built with Python/FastAPI backend, vanilla JS frontend, SQLite database, and OpenAI API for game logic.
 
 ## Source Layout
 

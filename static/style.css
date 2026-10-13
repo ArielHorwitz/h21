@@ -1554,7 +1554,7 @@ body[data-tab="profile"] .tab-bar a[data-tab="profile"] .tab-avatar img {
   color: var(--accent);
 }
 
-.result-answer-label {
+.result-solution-label {
   margin-top: 0.6rem;
   font-size: 0.75rem;
   text-transform: uppercase;
@@ -1562,7 +1562,7 @@ body[data-tab="profile"] .tab-bar a[data-tab="profile"] .tab-avatar img {
   color: var(--text-faint);
 }
 
-.result-answer {
+.result-solution {
   font-size: 1.35rem;
   font-weight: 700;
   line-height: 1.3;

@@ -69,7 +69,7 @@ SAMPLE_AVATARS_DIR = Path(__file__).resolve().parents[2].joinpath(
 )
 SAMPLE_SIZE = 512
 
-# Each persona's avatar subject as (style, noun), using avatar.py's own styles
+# Each persona's avatar solution as (style, noun), using avatar.py's own styles
 # and nouns so samples match what live in-game generation produces.
 SAMPLE_AVATAR_SUBJECTS: dict[str, tuple[str, str]] = {
     "dev": ("stained glass", "octopus"),
@@ -89,7 +89,7 @@ SAMPLE_AVATAR_SUBJECTS: dict[str, tuple[str, str]] = {
 EXTRA_TOPICS = ["Movie Classics", "Great Inventions"]
 
 # Pre-generated puzzle pools for the sandbox topics (topic slug -> difficulty
-# -> subjects), produced once by the real generation and validation pipeline
+# -> solutions), produced once by the real generation and validation pipeline
 # and committed, so playing in the sandbox draws puzzles without API calls.
 SAMPLE_POOLS_PATH = Path(__file__).resolve().parents[2].joinpath(
     "assets", "sandbox-pools.json",
@@ -201,18 +201,18 @@ SOLUTION_POOLS: dict[str, list[tuple[str, list[str]]]] = {
 # Answers use the LLM vocabulary: yes, no, partially, depends, win.
 QUESTION_POOLS: dict[str, list[tuple[str, str, str]]] = {
     "notable-people": [
-        ("Is it a real person?", "yes", "The subject is a real historical figure."),
-        ("Is the person alive today?", "no", "The subject died long ago."),
-        ("Is the person from Europe?", "yes", "The subject lived and worked in Europe."),
-        ("Is the person known for sports?", "no", "The subject is not an athlete."),
-        ("Is the person a fictional character?", "no", "The subject really existed."),
-        ("Was the person born before the 20th century?", "yes", "The subject was born well before 1900."),
-        ("Is the person primarily known as a politician?", "no", "The subject is not known for holding office."),
-        ("Is the person known for music?", "no", "The subject is not a musician."),
-        ("Is the person widely taught about in schools?", "yes", "The subject appears in most school curricula."),
-        ("Is the person considered a genius?", "partially", "Many consider the subject a genius, though the term is subjective."),
-        ("Did the person contribute to science or invention?", "yes", "The subject is known for such contributions."),
-        ("Was the person wealthy?", "depends", "The subject's fortunes varied over their lifetime."),
+        ("Is it a real person?", "yes", "The solution is a real historical figure."),
+        ("Is the person alive today?", "no", "The solution died long ago."),
+        ("Is the person from Europe?", "yes", "The solution lived and worked in Europe."),
+        ("Is the person known for sports?", "no", "The solution is not an athlete."),
+        ("Is the person a fictional character?", "no", "The solution really existed."),
+        ("Was the person born before the 20th century?", "yes", "The solution was born well before 1900."),
+        ("Is the person primarily known as a politician?", "no", "The solution is not known for holding office."),
+        ("Is the person known for music?", "no", "The solution is not a musician."),
+        ("Is the person widely taught about in schools?", "yes", "The solution appears in most school curricula."),
+        ("Is the person considered a genius?", "partially", "Many consider the solution a genius, though the term is subjective."),
+        ("Did the person contribute to science or invention?", "yes", "The solution is known for such contributions."),
+        ("Was the person wealthy?", "depends", "The solution's fortunes varied over their lifetime."),
     ],
     "world-geography": [
         ("Is it a natural feature?", "yes", "It formed naturally, without human intervention."),
@@ -229,7 +229,7 @@ QUESTION_POOLS: dict[str, list[tuple[str, str, str]]] = {
         ("Is it dangerous to visit?", "partially", "Parts of it can be dangerous without preparation."),
     ],
     "movie-classics": [
-        ("Is it a movie?", "yes", "The subject is a film."),
+        ("Is it a movie?", "yes", "The solution is a film."),
         ("Was it released before 1980?", "yes", "It premiered decades ago."),
         ("Is it animated?", "no", "It is a live-action film."),
         ("Is it in English?", "yes", "It is an English-language film."),
@@ -243,7 +243,7 @@ QUESTION_POOLS: dict[str, list[tuple[str, str, str]]] = {
         ("Is it suitable for young children?", "partially", "It is not explicit, but its themes suit older audiences."),
     ],
     "great-inventions": [
-        ("Is it an invention?", "yes", "The subject is an invention."),
+        ("Is it an invention?", "yes", "The solution is an invention."),
         ("Is it a person?", "no", "It is a thing, not a person."),
         ("Was it invented in the last 100 years?", "no", "It is far older than a century."),
         ("Is it electronic?", "no", "It predates electronics."),
@@ -262,13 +262,13 @@ QUESTION_POOLS: dict[str, list[tuple[str, str, str]]] = {
 # Questions for topics without hand-written ones. Answers are fabricated,
 # so they only need to read plausibly in a transcript.
 GENERIC_QUESTIONS: list[tuple[str, str, str]] = [
-    ("Is it a person?", "no", "The subject is not a person."),
-    ("Is it well known?", "yes", "Most people would recognize the subject."),
+    ("Is it a person?", "no", "The solution is not a person."),
+    ("Is it well known?", "yes", "Most people would recognize the solution."),
     ("Is it older than a hundred years?", "partially", "Parts of its story go back that far."),
     ("Is it associated with Europe?", "depends", "That depends on which aspect you mean."),
-    ("Is it something you can touch?", "yes", "The subject is physical."),
-    ("Is it bigger than a car?", "no", "The subject is smaller than a car."),
-    ("Is it still around today?", "yes", "The subject still exists."),
+    ("Is it something you can touch?", "yes", "The solution is physical."),
+    ("Is it bigger than a car?", "no", "The solution is smaller than a car."),
+    ("Is it still around today?", "yes", "The solution still exists."),
     ("Is it connected to entertainment?", "partially", "It has some ties to entertainment."),
     ("Is it from the 20th century?", "no", "It is not from the 20th century."),
     ("Is it used every day?", "depends", "That depends on who you ask."),
@@ -376,10 +376,10 @@ def _generate_pools() -> None:
             client, exclusion_list, topic_name, difficulty, batch_size=100,
         )
         validation = await validate_solution_batch(
-            client, batch.subjects, exclusion_list, topic_name, difficulty,
+            client, batch.solutions, exclusion_list, topic_name, difficulty,
         )
-        kept = [result.subject for result in validation.results if result.kept]
-        print(f"  {topic_slug} {difficulty}: kept {len(kept)} of {len(batch.subjects)}")
+        kept = [result.solution for result in validation.results if result.kept]
+        print(f"  {topic_slug} {difficulty}: kept {len(kept)} of {len(batch.solutions)}")
         return kept
 
     async def generate_all() -> dict[str, dict[str, list[str]]]:
@@ -390,8 +390,8 @@ def _generate_pools() -> None:
         ]
         results = await asyncio.gather(*(generate_one(*key) for key in keys))
         pools: dict[str, dict[str, list[str]]] = {}
-        for (topic_slug, difficulty), subjects in zip(keys, results):
-            pools.setdefault(topic_slug, {})[difficulty] = subjects
+        for (topic_slug, difficulty), solutions in zip(keys, results):
+            pools.setdefault(topic_slug, {})[difficulty] = solutions
         return pools
 
     print(f"Generating sandbox puzzle pools with {config.model}...")
@@ -403,20 +403,20 @@ def _generate_pools() -> None:
 def _seed_pools(database: GameDatabase) -> int:
     """Fill the sandbox topics' puzzle pools from the committed sample pools.
 
-    Subjects already used as fabricated puzzles, or already pooled at the
-    other difficulty, are skipped. Returns the number of subjects pooled.
+    Solutions already used as fabricated puzzles, or already pooled at the
+    other difficulty, are skipped. Returns the number of solutions pooled.
     """
     if not SAMPLE_POOLS_PATH.is_file():
         return 0
     pools = json.loads(SAMPLE_POOLS_PATH.read_text())
     pooled = 0
-    for topic_slug, subjects_by_difficulty in pools.items():
+    for topic_slug, solutions_by_difficulty in pools.items():
         if database.get_topic(topic_slug) is None:
             continue
-        for difficulty, subjects in subjects_by_difficulty.items():
+        for difficulty, solutions in solutions_by_difficulty.items():
             known = set(database.get_all_known_solutions(topic_slug))
-            fresh_subjects = [subject for subject in subjects if subject not in known]
-            pooled += database.insert_pool_subjects(topic_slug, difficulty, fresh_subjects)
+            fresh_solutions = [solution for solution in solutions if solution not in known]
+            pooled += database.insert_pool_solutions(topic_slug, difficulty, fresh_solutions)
     return pooled
 
 
@@ -799,7 +799,7 @@ def add_activity(
         account for account in database.get_all_accounts()
         if account["username"] != DEV_USERNAME
     ]
-    puzzles = [
+    series = [
         (topic["slug"], difficulty)
         for topic in database.get_topics_with_status("ready")
         for difficulty in ("normal", "expert")
@@ -819,8 +819,8 @@ def add_activity(
     added: list[dict[str, str]] = []
     for account in personas:
         unplayed = [
-            puzzle for puzzle in puzzles
-            if database.get_existing_game(account["user_id"], today, *puzzle) is None
+            one_series for one_series in series
+            if database.get_existing_game(account["user_id"], today, *one_series) is None
         ]
         for topic_slug, difficulty in unplayed:
             outcome = rng.choices(outcomes, weights)[0]
@@ -1028,7 +1028,7 @@ def _print_summary(
     print(f"Sandbox created at {sandbox_dir}")
     print(f"Seeded {summary['game_count']} games and {summary['puzzle_count']} puzzles "
           f"over {summary['history_days']} days, with {summary['pooled_count']} "
-          f"pre-generated subjects in the puzzle pools.")
+          f"pre-generated solutions in the puzzle pools.")
     print()
     print(f"Accounts (password for all: {password!r}):")
     print(f"  {summary['dev_username']:12s} your account (role: dev)")

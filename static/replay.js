@@ -8,7 +8,7 @@ const gatedPlayBtn = document.getElementById("gated-play-btn");
 const replaySummary = document.getElementById("replay-summary");
 const resultMeta = document.getElementById("result-meta");
 const resultHeading = document.getElementById("result-heading");
-const resultAnswer = document.getElementById("result-answer");
+const resultSolution = document.getElementById("result-solution");
 const resultMeter = document.getElementById("result-meter");
 const resultStats = document.getElementById("result-stats");
 const resultActions = document.getElementById("result-actions");
@@ -115,8 +115,8 @@ function renderSummary(game) {
     resultHeading.textContent = owner ? `${owner} didn't solve it` : "Not this time";
   }
   replaySummary.classList.add(won ? "is-won" : "is-lost");
-  resultAnswer.textContent = game.solution || "";
-  for (const element of [resultAnswer, document.querySelector(".result-answer-label")]) {
+  resultSolution.textContent = game.solution || "";
+  for (const element of [resultSolution, document.querySelector(".result-solution-label")]) {
     element.hidden = !game.solution;
   }
 

@@ -14,16 +14,16 @@ SQLite database managed by `GameDatabase` in `src/h21/db.py`. Uses WAL journal m
 | `status_detail` | TEXT | User-facing reason when `failed` (nullable) |
 | `created_at` | TEXT | UTC ISO timestamp |
 
-### `puzzle_pool`
+### `pool_solutions`
 | Column | Type | Notes |
 |--------|------|-------|
 | `pool_id` | INTEGER PK | Auto-increment |
 | `topic_slug` | TEXT FK | References `topics.slug` |
 | `difficulty` | TEXT | `normal` or `expert` |
-| `solution` | TEXT | A validated, undrawn subject |
+| `solution` | TEXT | A validated, undrawn solution |
 | `generated_at` | TEXT | UTC ISO timestamp |
 
-Unique on `(topic_slug, difficulty, solution)`. Drawing a subject deletes its row and records it in `daily_puzzles`.
+Unique on `(topic_slug, difficulty, solution)`. Drawing a solution deletes its row and records it in `puzzles`.
 
 ### `pool_refills`
 | Column | Type | Notes |
@@ -31,13 +31,13 @@ Unique on `(topic_slug, difficulty, solution)`. Drawing a subject deletes its ro
 | `refill_id` | INTEGER PK | Auto-increment |
 | `topic_slug` | TEXT FK | |
 | `difficulty` | TEXT | |
-| `generated` | INTEGER | Subjects the generation call returned |
-| `kept` | INTEGER | Subjects that passed validation and entered the pool |
+| `generated` | INTEGER | Solutions the generation call returned |
+| `kept` | INTEGER | Solutions that passed validation and entered the pool |
 | `finished_at` | TEXT | UTC ISO timestamp |
 
 One row per successful refill. The latest row's `kept` drives the exhaustion guard.
 
-### `daily_puzzles`
+### `puzzles`
 | Column | Type | Notes |
 |--------|------|-------|
 | `date` | TEXT | ISO date |

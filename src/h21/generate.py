@@ -26,7 +26,7 @@ def main() -> None:
     )
     parser.add_argument(
         "topic",
-        help="Topic name to generate subjects for (e.g. 'Notable People')",
+        help="Topic name to generate solutions for (e.g. 'Notable People')",
     )
     parser.add_argument(
         "--difficulty", default="normal", choices=sorted(VALID_DIFFICULTIES),
@@ -34,19 +34,19 @@ def main() -> None:
     )
     parser.add_argument(
         "--count", type=int, default=100,
-        help="Total number of subjects to generate (default: 100)",
+        help="Total number of solutions to generate (default: 100)",
     )
     parser.add_argument(
         "--batch-size", type=int, default=25,
-        help="Subjects per LLM call (default: 25)",
+        help="Solutions per LLM call (default: 25)",
     )
     parser.add_argument(
         "--exclude", "-e", type=str, default=None,
-        help="File with subjects to exclude (one per line)",
+        help="File with solutions to exclude (one per line)",
     )
     parser.add_argument(
         "--output", "-o", type=str, default=None,
-        help="Output file for accepted subjects (one per line)",
+        help="Output file for accepted solutions (one per line)",
     )
     parser.add_argument(
         "--verbose", "-v", action="store_true",
@@ -102,11 +102,11 @@ def main() -> None:
         print(f"LLM error: {exc}", file=sys.stderr)
         sys.exit(1)
 
-    # Write accepted subjects to output file (one per line).
+    # Write accepted solutions to output file (one per line).
     if args.output and kept:
         output_path = Path(args.output)
         output_path.write_text("\n".join(kept) + "\n")
-        print(f"Wrote {len(kept)} subjects to {output_path}", file=sys.stderr)
+        print(f"Wrote {len(kept)} solutions to {output_path}", file=sys.stderr)
 
     # Print summary to stderr.
     _print_summary(kept, rejected)
@@ -146,14 +146,14 @@ async def _run(
         )
 
         print(
-            f"\n--- Generation response ({len(batch.subjects)} subjects) ---",
+            f"\n--- Generation response ({len(batch.solutions)} solutions) ---",
             file=sys.stderr,
         )
         print(batch.raw_response, file=sys.stderr)
 
-        subjects = batch.subjects
+        solutions = batch.solutions
 
-        if not subjects:
+        if not solutions:
             consecutive_poor_batches += 1
             if consecutive_poor_batches >= 2:
                 print(
@@ -165,13 +165,13 @@ async def _run(
 
         # Validate this batch.
         validation = await validate_solution_batch(
-            client, subjects, exclusion_list, topic_name, difficulty,
+            client, solutions, exclusion_list, topic_name, difficulty,
         )
 
         print("\n--- Validation response ---", file=sys.stderr)
         print(validation.raw_response, file=sys.stderr)
 
-        batch_kept = [r.subject for r in validation.results if r.kept]
+        batch_kept = [r.solution for r in validation.results if r.kept]
         batch_rejected = [r for r in validation.results if not r.kept]
         batch_rejected_count = len(batch_rejected)
         all_rejected.extend(batch_rejected)
@@ -181,11 +181,11 @@ async def _run(
             file=sys.stderr,
         )
 
-        exclusion_list.extend(subjects)
+        exclusion_list.extend(solutions)
 
         # Track exhaustion: if at least half the batch was rejected (or empty),
         # count it as a poor batch.
-        if batch_rejected_count >= len(subjects) / 2:
+        if batch_rejected_count >= len(solutions) / 2:
             consecutive_poor_batches += 1
             if consecutive_poor_batches >= 2:
                 print(
@@ -205,25 +205,25 @@ async def _run(
 
 
 def _print_summary(
-    kept_subjects: list[str],
-    rejected_subjects: list[ValidationResult],
+    kept_solutions: list[str],
+    rejected_solutions: list[ValidationResult],
 ) -> None:
-    total = len(kept_subjects) + len(rejected_subjects)
+    total = len(kept_solutions) + len(rejected_solutions)
     print(f"\n{'=' * 60}", file=sys.stderr)
     print("SUMMARY", file=sys.stderr)
     print(f"{'=' * 60}", file=sys.stderr)
     print(
-        f"{len(kept_subjects)} kept, {len(rejected_subjects)} "
+        f"{len(kept_solutions)} kept, {len(rejected_solutions)} "
         f"rejected out of {total} generated",
         file=sys.stderr,
     )
 
-    if kept_subjects:
-        print(f"\nKEPT ({len(kept_subjects)}):", file=sys.stderr)
-        for subject in kept_subjects:
-            print(f"  {subject}", file=sys.stderr)
+    if kept_solutions:
+        print(f"\nKEPT ({len(kept_solutions)}):", file=sys.stderr)
+        for solution in kept_solutions:
+            print(f"  {solution}", file=sys.stderr)
 
-    if rejected_subjects:
-        print(f"\nREJECTED ({len(rejected_subjects)}):", file=sys.stderr)
-        for result in rejected_subjects:
-            print(f"  {result.subject}  — {result.reason}", file=sys.stderr)
+    if rejected_solutions:
+        print(f"\nREJECTED ({len(rejected_solutions)}):", file=sys.stderr)
+        for result in rejected_solutions:
+            print(f"  {result.solution}  — {result.reason}", file=sys.stderr)

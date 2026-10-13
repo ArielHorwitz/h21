@@ -244,13 +244,13 @@ async def require_auth(request: Request, call_next):
 # -- Puzzle pool --
 
 POOL_BATCH_SIZE = 100
-# Refill a pool in the background once it drops below this many subjects.
+# Refill a pool in the background once it drops below this many solutions.
 POOL_LOW_THRESHOLD = 50
 # A new topic is rejected unless its first batch keeps at least this many
-# subjects at every difficulty.
-TOPIC_MIN_SUBJECTS = 50
+# solutions at every difficulty.
+SERIES_MIN_SOLUTIONS = 50
 # Interim guard against topics running dry: once a refill keeps fewer than
-# this many subjects, the pool is not refilled again.
+# this many solutions, the pool is not refilled again.
 POOL_EXHAUSTED_KEPT = 10
 
 TOPIC_TOO_NARROW_DETAIL = "Not enough puzzles could be made for this topic. Try something broader."
@@ -312,24 +312,24 @@ async def get_today_solution(topic_slug: str, difficulty: str) -> str:
 
 
 async def _refill_pool(topic_slug: str, difficulty: str, topic_name: str) -> int:
-    """Generate and validate a batch of subjects, and add the keepers to the pool.
+    """Generate and validate a batch of solutions, and add the keepers to the pool.
 
-    Returns the number of subjects added. Raises LLMError if either call fails,
-    in which case nothing is added: unvalidated subjects never enter the pool.
+    Returns the number of solutions added. Raises LLMError if either call fails,
+    in which case nothing is added: unvalidated solutions never enter the pool.
     """
     exclusion_list = database.get_all_known_solutions(topic_slug)
     batch = await generate_solution_batch(
         llm_client, exclusion_list, topic_name, difficulty, batch_size=POOL_BATCH_SIZE,
     )
     validation = await validate_solution_batch(
-        llm_client, batch.subjects, exclusion_list, topic_name, difficulty,
+        llm_client, batch.solutions, exclusion_list, topic_name, difficulty,
     )
-    kept_subjects = [result.subject for result in validation.results if result.kept]
-    inserted = database.insert_pool_subjects(topic_slug, difficulty, kept_subjects)
-    database.record_pool_refill(topic_slug, difficulty, len(batch.subjects), inserted)
+    kept_solutions = [result.solution for result in validation.results if result.kept]
+    inserted = database.insert_pool_solutions(topic_slug, difficulty, kept_solutions)
+    database.record_pool_refill(topic_slug, difficulty, len(batch.solutions), inserted)
     logger.info(
         "Pool refill for topic=%r difficulty=%r: generated %d, kept %d, inserted %d",
-        topic_slug, difficulty, len(batch.subjects), len(kept_subjects), inserted,
+        topic_slug, difficulty, len(batch.solutions), len(kept_solutions), inserted,
     )
     return inserted
 
@@ -381,7 +381,7 @@ def _start_topic_build(topic_slug: str, topic_name: str) -> None:
     async def build() -> None:
         try:
             # Difficulties are generated concurrently to halve the creator's
-            # wait, so they cannot exclude each other's subjects. Overlaps
+            # wait, so they cannot exclude each other's solutions. Overlaps
             # are removed afterwards instead.
             await asyncio.gather(*(
                 _refill_pool(topic_slug, difficulty, topic_name)
@@ -392,7 +392,7 @@ def _start_topic_build(topic_slug: str, topic_name: str) -> None:
                 difficulty: database.pool_count(topic_slug, difficulty)
                 for difficulty in sorted(VALID_DIFFICULTIES)
             }
-            if min(pool_sizes.values()) < TOPIC_MIN_SUBJECTS:
+            if min(pool_sizes.values()) < SERIES_MIN_SOLUTIONS:
                 logger.info("Topic %r rejected as too narrow: %s", topic_slug, pool_sizes)
                 database.set_topic_status(topic_slug, "failed", TOPIC_TOO_NARROW_DETAIL)
             else:

@@ -71,7 +71,7 @@ class SandboxSeedTests(unittest.TestCase):
     def test_every_game_has_a_matching_puzzle(self) -> None:
         orphans = self.database.execute_readonly_query(
             "SELECT COUNT(*) FROM games g "
-            "LEFT JOIN daily_puzzles dp ON dp.date = g.date "
+            "LEFT JOIN puzzles dp ON dp.date = g.date "
             "AND dp.topic_slug = g.topic_slug AND dp.difficulty = g.difficulty "
             "WHERE dp.date IS NULL"
         )

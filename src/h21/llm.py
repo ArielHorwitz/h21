@@ -260,8 +260,8 @@ class OpenAIClient:
 
 @dataclass
 class BatchResult:
-    """Result of batch generation: parsed subjects and raw LLM response."""
-    subjects: list[str]
+    """Result of batch generation: parsed solutions and raw LLM response."""
+    solutions: list[str]
     raw_response: str
 
 
@@ -272,9 +272,9 @@ async def generate_solution_batch(
     difficulty: str,
     batch_size: int = 100,
 ) -> BatchResult:
-    """Ask the LLM to generate a batch of subjects, avoiding repeats.
+    """Ask the LLM to generate a batch of solutions, avoiding repeats.
 
-    Returns a BatchResult with parsed subjects and the raw LLM response.
+    Returns a BatchResult with parsed solutions and the raw LLM response.
     Raises LLMError if the LLM call itself fails.
     """
     guidance = DIFFICULTY_GUIDANCE.get(difficulty, DIFFICULTY_GUIDANCE["normal"])
@@ -292,50 +292,50 @@ async def generate_solution_batch(
 
     response = await client.ask(prompt, "Generate the subjects.")
 
-    subjects = _parse_line_per_subject(response)
-    if not subjects:
+    solutions = _parse_line_per_solution(response)
+    if not solutions:
         raise LLMError(
-            "Batch generation returned no valid subjects",
+            "Batch generation returned no valid solutions",
             "AI returned an empty or unparseable batch response.",
         )
 
     logger.info(
-        "Batch generated %d subjects (requested %d) for topic=%r difficulty=%r",
-        len(subjects), batch_size, topic_name, difficulty,
+        "Batch generated %d solutions (requested %d) for topic=%r difficulty=%r",
+        len(solutions), batch_size, topic_name, difficulty,
     )
-    return BatchResult(subjects=subjects, raw_response=response)
+    return BatchResult(solutions=solutions, raw_response=response)
 
 
 @dataclass
 class ValidationResult:
-    """Result of validating a single subject."""
-    subject: str
+    """Result of validating a single solution."""
+    solution: str
     kept: bool
     reason: str
 
 
 @dataclass
 class ValidationBatchResult:
-    """Result of batch validation: per-subject results and raw LLM response."""
+    """Result of batch validation: per-solution results and raw LLM response."""
     results: list[ValidationResult]
     raw_response: str
 
 
 async def validate_solution_batch(
     client: LLMClient,
-    subjects: list[str],
+    solutions: list[str],
     exclusion_list: list[str],
     topic_name: str,
     difficulty: str,
 ) -> ValidationBatchResult:
-    """Validate a batch of subjects for topic relevance, difficulty, and duplication.
+    """Validate a batch of solutions for topic relevance, difficulty, and duplication.
 
-    Returns a ValidationBatchResult with per-subject results and the raw LLM response.
+    Returns a ValidationBatchResult with per-solution results and the raw LLM response.
     """
     difficulty_label = "well-known (normal)" if difficulty == "normal" else "obscure (expert)"
     guidance = DIFFICULTY_GUIDANCE.get(difficulty, DIFFICULTY_GUIDANCE["normal"])
 
-    subject_list = "\n".join(f"- {subject}" for subject in subjects)
+    solution_list = "\n".join(f"- {solution}" for solution in solutions)
 
     prompt = VALIDATE_SOLUTION_BATCH_PROMPT_TEMPLATE.format(
         topic=topic_name,
@@ -350,7 +350,7 @@ async def validate_solution_batch(
             + formatted
         )
 
-    prompt += "\n\nSubjects to review:\n" + subject_list
+    prompt += "\n\nSubjects to review:\n" + solution_list
 
     response = await client.ask(prompt, "Review the subjects.")
 
@@ -360,17 +360,17 @@ async def validate_solution_batch(
         if not line:
             continue
         if line.upper().startswith("KEEP "):
-            subject = line[5:].strip()
-            results.append(ValidationResult(subject=subject, kept=True, reason=""))
+            solution = line[5:].strip()
+            results.append(ValidationResult(solution=solution, kept=True, reason=""))
         elif line.upper().startswith("REJECT "):
             rest = line[7:].strip()
             if " | " in rest:
-                subject, reason = rest.split(" | ", 1)
+                solution, reason = rest.split(" | ", 1)
             else:
-                subject = rest
+                solution = rest
                 reason = "no reason given"
             results.append(ValidationResult(
-                subject=subject.strip(), kept=False, reason=reason.strip(),
+                solution=solution.strip(), kept=False, reason=reason.strip(),
             ))
         else:
             logger.warning("Unparseable validation line: %r", line)
@@ -379,23 +379,23 @@ async def validate_solution_batch(
     rejected_count = sum(1 for result in results if not result.kept)
     logger.info(
         "Validation for topic=%r difficulty=%r: %d kept, %d rejected out of %d submitted",
-        topic_name, difficulty, kept_count, rejected_count, len(subjects),
+        topic_name, difficulty, kept_count, rejected_count, len(solutions),
     )
     return ValidationBatchResult(results=results, raw_response=response)
 
 
-def _parse_line_per_subject(response: str) -> list[str]:
-    """Parse an LLM response with one subject per line."""
-    subjects = []
+def _parse_line_per_solution(response: str) -> list[str]:
+    """Parse an LLM response with one solution per line."""
+    solutions = []
     for line in response.strip().splitlines():
         # Strip list markers like "1. ", "1) ", "- ", "* ", but not digits
-        # that belong to the subject, as in "1984" or "2001: A Space Odyssey".
+        # that belong to the solution, as in "1984" or "2001: A Space Odyssey".
         cleaned = _LIST_MARKER_PATTERN.sub("", line.strip(), count=1).strip()
         if len(cleaned) >= 2 and (cleaned[0], cleaned[-1]) in _QUOTE_PAIRS:
             cleaned = cleaned[1:-1].strip()
         if cleaned:
-            subjects.append(cleaned)
-    return subjects
+            solutions.append(cleaned)
+    return solutions
 
 
 _LIST_MARKER_PATTERN = re.compile(r"^(?:\d+[.)]|[-*•])\s+")

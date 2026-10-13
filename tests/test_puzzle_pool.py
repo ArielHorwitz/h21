@@ -6,21 +6,21 @@ from datetime import date
 from pathlib import Path
 
 from h21.db import GameDatabase
-from h21.llm import _parse_line_per_subject
+from h21.llm import _parse_line_per_solution
 
 
 class ParseLinePerSubjectTests(unittest.TestCase):
     def test_strips_list_markers_and_quotes(self) -> None:
         response = "1. Apollo 11\n2) “Across the Universe”\n- 'Hey Jude'\n* Mir\n\n"
         self.assertEqual(
-            _parse_line_per_subject(response),
+            _parse_line_per_solution(response),
             ["Apollo 11", "Across the Universe", "Hey Jude", "Mir"],
         )
 
-    def test_keeps_leading_digits_that_belong_to_the_subject(self) -> None:
+    def test_keeps_leading_digits_that_belong_to_the_solution(self) -> None:
         response = "1984\n2001: A Space Odyssey\n1948 Arab-Israeli War"
         self.assertEqual(
-            _parse_line_per_subject(response),
+            _parse_line_per_solution(response),
             ["1984", "2001: A Space Odyssey", "1948 Arab-Israeli War"],
         )
 
@@ -60,15 +60,15 @@ class PuzzlePoolDatabaseTests(unittest.TestCase):
 
     def test_cross_difficulty_duplicates_are_removed_from_expert(self) -> None:
         self.database.add_topic("jazz", "Jazz", user_id=self.creator_id)
-        self.database.insert_pool_subjects("jazz", "normal", ["Miles Davis", "Bebop"])
-        self.database.insert_pool_subjects("jazz", "expert", ["Bebop", "Sun Ra"])
+        self.database.insert_pool_solutions("jazz", "normal", ["Miles Davis", "Bebop"])
+        self.database.insert_pool_solutions("jazz", "expert", ["Bebop", "Sun Ra"])
         self.assertEqual(self.database.remove_cross_difficulty_pool_duplicates("jazz"), 1)
         self.assertEqual(self.database.pool_count("jazz", "normal"), 2)
         self.assertEqual(self.database.pool_count("jazz", "expert"), 1)
 
-    def test_draw_removes_subject_from_pool(self) -> None:
+    def test_draw_removes_solution_from_pool(self) -> None:
         self.database.add_topic("jazz", "Jazz", user_id=self.creator_id)
-        self.database.insert_pool_subjects("jazz", "normal", ["Miles Davis"])
+        self.database.insert_pool_solutions("jazz", "normal", ["Miles Davis"])
         self.assertEqual(self.database.draw_random_from_pool("jazz", "normal"), "Miles Davis")
         self.assertIsNone(self.database.draw_random_from_pool("jazz", "normal"))
 
@@ -81,7 +81,7 @@ class PuzzlePoolDatabaseTests(unittest.TestCase):
 
     def test_delete_topic_removes_pool_and_refills(self) -> None:
         self.database.add_topic("jazz", "Jazz", user_id=self.creator_id)
-        self.database.insert_pool_subjects("jazz", "normal", ["Miles Davis"])
+        self.database.insert_pool_solutions("jazz", "normal", ["Miles Davis"])
         self.database.record_pool_refill("jazz", "normal", generated=100, kept=1)
         self.database.delete_topic("jazz")
         self.assertIsNone(self.database.get_topic("jazz"))
