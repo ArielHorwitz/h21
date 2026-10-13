@@ -70,15 +70,21 @@ How the topic flow review was run, to repeat for the UX review: each reviewer go
 - **Topic flow:** two independent agents (Opus 5.5 and GPT-6.1 Sol), the same neutral brief (current behavior and observed problems as facts, none of our ideas), code without the casebook. Their reports are synthesized into one recommendation report for the user to review before anything is changed. The topic flow case (60ac) holds the work that follows.
 - **Whole-app UX:** eight blind agents on regular-user features only (no admin), each running its own local sandbox and driving it at phone size: two starting points (a brand-new player, and a returning regular with friends and history), four models each (Opus, Sonnet, Sol, Terra). Synthesized into one report for the user to review before addressing. Fable and Astra are not used.
 
-## Open items
+## Roadmap (agreed 2026-10-13)
 
-- **Playtest finishing touches** from the user's next few days of use.
-- **Blind UX review** (planned above, not run yet): eight agents, two starting points, Opus, Sonnet, Sol and Terra, synthesized into one report for the user before anything changes.
-- **Limited open registration**, wanted before the relaunch: strangers can register without an invite, throttled to about three new registrations a day, with a way to switch it off if abused. The invite requirement exists to keep strangers from running up the API bill; the API spending limit now caps that risk, and links that need an invite code are an unpleasant start.
-- **Topic builds at high effort take about five minutes** (with a retry): keep, or build at a lower effort than the game. Unanswered.
-- **Deferred:** a third reviewer per generation batch; per-player local dates (Wordle-like; today the server's local date applies to everyone, and midnight-crossing requests and games need a rule); second seasons for finished series.
-- **Noted, no action:** Firefox for Android with the address bar at the top briefly misplaces the bottom tab bar while its toolbar animates (Firefox behavior; revisit if the gap persists or appears in Chrome). No iPhone check. No avatar style picker. Stats, including solve rates, out of scope.
-- **For the relaunch session** (separate): overhaul deployment, wipe game data, and remove production's config override (`model = "gpt-5.4-mini"`, `reasoning_effort = "high"`), otherwise the new default (`gpt-6-luna`, high) never takes effect. Production today runs `master` as root under systemd (`/etc/systemd/system/h21.service`, code in `/opt/h21`, config in `/root/.config/h21/config.toml`), behind Caddy at h21.ariel.tools; changing it needs the user's sudo.
+1. **Continuous playtest** by the user until the relaunch, reporting issues as they come; the lab slot stays up throughout.
+2. Remaining features, in order:
+   - **a. Limited open registration** (next; discuss the design first). Strangers can register without an invite, throttled to about three new registrations a day, with a way to switch it off if abused. The invite requirement exists to keep strangers from running up the API bill; the API spending limit now caps that risk, and links that need an invite code are an unpleasant start.
+   - **b. Per-player local dates** (needs an in-depth discussion). Wordle-like: each player's day follows their own local time. Today one server-local date decides the puzzle for everyone, which runs through puzzles, games, leaderboards and every "today"; midnight-crossing requests and games need a rule. The riskiest remaining change, so it goes early enough for the playtest to shake it out.
+   - **c. A third reviewer per generation batch** (generator, validator, reviewer), guarding against the first two going off the rails together. Weigh against build time: high-effort validation of 100 expert solutions takes about 1m40s, and topic builds stay at high effort (lowering it was considered and rejected).
+3. **Release-candidate mode:** feature freeze, merge `playtest` into `dev`, run the blind UX review (planned above), and give the user a last round of fixes and changes.
+4. **Relaunch**, probably in a separate session (see below).
+
+Dropped: second seasons (easy to add later if the app takes off; series already carry a state). No longer considered: the Firefox toolbar gap, an iPhone check, an avatar style picker, stats and solve rates.
+
+## For the relaunch session
+
+Overhaul deployment, wipe game data, and remove production's config override (`model = "gpt-5.4-mini"`, `reasoning_effort = "high"`), otherwise the new default (`gpt-6-luna`, high) never takes effect. Production today runs `master` as root under systemd (`/etc/systemd/system/h21.service`, code in `/opt/h21`, config in `/root/.config/h21/config.toml`), behind Caddy at h21.ariel.tools; changing it needs the user's sudo.
 
 ## Decisions on models
 
