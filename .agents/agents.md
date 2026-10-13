@@ -1,6 +1,6 @@
 # H21
 
-An AI-powered 21 questions trivia game. Players pick a topic (user-submitted or built-in), choose a difficulty, and ask yes/no questions to guess a secret solution. Built with Python/FastAPI backend, vanilla JS frontend, SQLite database, and OpenAI API for game logic.
+An AI-powered 21 questions trivia game. Players pick a topic (suggested by players), choose a difficulty, and ask yes/no questions to guess a secret solution. Built with Python/FastAPI backend, vanilla JS frontend, SQLite database, and OpenAI API for game logic.
 
 ## Source Layout
 
@@ -39,7 +39,7 @@ An AI-powered 21 questions trivia game. Players pick a topic (user-submitted or 
 
 Before modifying a module, read the relevant doc in `docs/` for detailed context:
 
-- **`docs/glossary.md`** -- the terms topic, series, puzzle, game, answer, pool; use them in code, copy and docs
+- **`docs/glossary.md`** -- the terms topic, series, puzzle, game, solution, answer, pool; use them in code, copy and docs
 - **`docs/architecture.md`** -- module responsibilities, request flow, auth model, middleware
 - **`docs/database.md`** -- full schema, how schema changes work
 - **`docs/api.md`** -- all API endpoints with methods, paths, auth requirements

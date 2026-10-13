@@ -408,6 +408,49 @@ _LIST_MARKER_PATTERN = re.compile(r"^(?:\d+[.)]|[-*•])\s+")
 _QUOTE_PAIRS = frozenset({('"', '"'), ("'", "'"), ("\u201c", "\u201d"), ("\u2018", "\u2019")})
 
 
+SELECT_PREVIEW_PROMPT_TEMPLATE = """\
+You are helping present a topic in a 21-questions trivia game.
+
+The topic is: {topic}.
+
+Below is a list of possible secret solutions for this topic. Pick exactly \
+{count} of them that together best show the range of what the topic covers: \
+as different from each other as possible in kind (for example people, places, \
+events, objects, works), era and region. Prefer well-known ones.
+
+Reply with exactly {count} lines, each copied exactly from the list. No \
+numbering, no extra text.\
+"""
+
+
+async def select_preview_solutions(
+    client: LLMClient,
+    topic_name: str,
+    candidates: list[str],
+    count: int = 5,
+) -> list[str]:
+    """Pick `count` candidates that best represent the range of a topic.
+
+    Raises LLMError unless the reply names `count` distinct candidates.
+    """
+    prompt = SELECT_PREVIEW_PROMPT_TEMPLATE.format(topic=topic_name, count=count)
+    prompt += "\n\nPossible solutions:\n" + "\n".join(f"- {candidate}" for candidate in candidates)
+    response = await client.ask(prompt, "Pick the solutions.")
+
+    by_normalized_name = {candidate.casefold(): candidate for candidate in candidates}
+    picked: list[str] = []
+    for line in _parse_line_per_solution(response):
+        candidate = by_normalized_name.get(line.casefold())
+        if candidate is not None and candidate not in picked:
+            picked.append(candidate)
+    if len(picked) < count:
+        raise LLMError(
+            f"Preview selection named {len(picked)} of {count} candidates",
+            "AI could not pick preview solutions.",
+        )
+    return picked[:count]
+
+
 async def generate_hints(
     client: LLMClient,
     topic_name: str,

@@ -5,12 +5,15 @@ import json
 import re
 import secrets
 import sqlite3
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Optional
 
 
 VALID_DIFFICULTIES = frozenset({"normal", "expert"})
+
+# Topics created within this long carry a "New" tag on Today.
+NEW_TOPIC_AGE = timedelta(days=3)
 
 
 def slugify(name: str) -> str:
@@ -57,6 +60,21 @@ class GameDatabase:
                 solution     TEXT NOT NULL,
                 generated_at TEXT NOT NULL,
                 UNIQUE(topic_slug, difficulty, solution)
+            );
+
+            CREATE TABLE IF NOT EXISTS series (
+                topic_slug      TEXT NOT NULL REFERENCES topics(slug),
+                difficulty      TEXT NOT NULL,
+                status          TEXT NOT NULL,
+                needs_attention TEXT,
+                PRIMARY KEY (topic_slug, difficulty)
+            );
+
+            CREATE TABLE IF NOT EXISTS preview_solutions (
+                topic_slug TEXT NOT NULL REFERENCES topics(slug),
+                position   INTEGER NOT NULL,
+                solution   TEXT NOT NULL,
+                PRIMARY KEY (topic_slug, position)
             );
 
             CREATE TABLE IF NOT EXISTS pool_refills (
@@ -165,20 +183,6 @@ class GameDatabase:
                 FOREIGN KEY (user_id) REFERENCES accounts(user_id)
             );
         """)
-        self._seed_default_topics()
-
-
-    def _seed_default_topics(self) -> None:
-        default_topics = [
-            ("notable-people", "Notable People"),
-            ("world-geography", "World Geography"),
-        ]
-        self._connection.executemany(
-            "INSERT OR IGNORE INTO topics (slug, name, created_at) VALUES (?, ?, ?)",
-            [(slug, name, _utcnow_iso()) for slug, name in default_topics],
-        )
-        self._connection.commit()
-
 
     def _generate_player_code(self, hex_bytes: int = 2) -> str:
         """Generate a unique player code. Starts at 4 hex chars, grows on exhaustion."""
@@ -214,8 +218,10 @@ class GameDatabase:
     def get_topics_ranked(self, user_id: int, today: date) -> list[dict[str, Any]]:
         """Return playable topics sorted to surface unplayed puzzles first.
 
-        Topics that are not ready yet (still generating, or failed) are only
-        included for the user who suggested them, so they can follow progress.
+        Topics still being built are only included for the user who suggested
+        them, so they can follow progress. Each topic carries its series'
+        display states (see ``_series_display_state``), its preview solutions
+        and whether it is new. Topics whose series have all finished sort last.
 
         Each topic includes a ``friends`` dict mapping difficulty to a list of
         friend avatar entries for today's puzzles.  Topics are grouped into
@@ -227,14 +233,15 @@ class GameDatabase:
 
         # All topics with their total play count.
         topic_rows = self._connection.execute(
-            "SELECT t.slug, t.name, t.status, t.status_detail, t.user_id, "
+            "SELECT t.slug, t.name, t.status, t.status_detail, t.user_id, t.created_at, "
             "COUNT(g.game_id) AS play_count "
             "FROM topics t "
             "LEFT JOIN games g ON g.topic_slug = t.slug "
-            "WHERE t.status = 'ready' OR t.user_id = ? "
+            "WHERE t.status = 'ready' OR (t.status = 'generating' AND t.user_id = ?) "
             "GROUP BY t.slug, t.name",
             (user_id,),
         ).fetchall()
+        new_since = (datetime.now(timezone.utc) - NEW_TOPIC_AGE).isoformat()
 
         topics: dict[str, dict[str, Any]] = {}
         for row in topic_rows:
@@ -244,9 +251,19 @@ class GameDatabase:
                 "status": row["status"],
                 "status_detail": row["status_detail"],
                 "suggested_by_me": row["user_id"] == user_id,
+                "is_new": row["created_at"] >= new_since,
                 "play_count": row["play_count"],
+                "series": {},
+                "preview": self.get_preview_solutions(row["slug"]),
                 "friends": {},
             }
+        for series_row in self._connection.execute("SELECT topic_slug, difficulty, status FROM series").fetchall():
+            topic = topics.get(series_row["topic_slug"])
+            if topic is None or series_row["status"] == "unavailable":
+                continue
+            topic["series"][series_row["difficulty"]] = self._series_display_state(
+                series_row["topic_slug"], series_row["difficulty"], series_row["status"], today,
+            )
 
         # Friend activity on today's puzzles.
         account = self._connection.execute(
@@ -298,9 +315,13 @@ class GameDatabase:
             friend_count = sum(len(v) for v in topic["friends"].values())
             score = topic["play_count"] + friend_count * friend_boost_weight
             # Tier surfaces unplayed puzzles first: friend-played (0) before
-            # untouched (1) before played by the user (2).  Popularity score
-            # (negated for descending) then name break ties within a tier.
-            if topic["slug"] in played_slugs:
+            # untouched (1) before played by the user (2), with finished
+            # topics (3) last.  Popularity score (negated for descending)
+            # then name break ties within a tier.
+            states = [series["state"] for series in topic["series"].values()]
+            if states and all(state == "finished" for state in states):
+                tier = 3
+            elif topic["slug"] in played_slugs:
                 tier = 2
             elif friend_count > 0:
                 tier = 0
@@ -313,13 +334,24 @@ class GameDatabase:
     def add_topic(
         self, slug: str, name: str, user_id: Optional[int] = None,
         status: str = "generating",
-    ) -> None:
-        self._connection.execute(
+    ) -> bool:
+        """Insert a topic. Returns False if one with that slug already exists."""
+        cursor = self._connection.execute(
             "INSERT OR IGNORE INTO topics (slug, name, user_id, status, created_at) "
             "VALUES (?, ?, ?, ?, ?)",
             (slug, name, user_id, status, _utcnow_iso()),
         )
         self._connection.commit()
+        return cursor.rowcount == 1
+
+    def get_turned_down_topics(self, limit: int = 30) -> list[dict[str, Any]]:
+        """Return the most recently turned-down topics, newest first."""
+        rows = self._connection.execute(
+            "SELECT slug, name, status_detail, created_at FROM topics "
+            "WHERE status = 'failed' ORDER BY created_at DESC LIMIT ?",
+            (limit,),
+        ).fetchall()
+        return [dict(row) for row in rows]
 
     def get_topic(self, slug: str) -> Optional[dict[str, Any]]:
         row = self._connection.execute(
@@ -347,6 +379,8 @@ class GameDatabase:
     def delete_topic(self, slug: str) -> None:
         """Delete a topic that was never played, along with its pool."""
         self._connection.execute("DELETE FROM pool_solutions WHERE topic_slug = ?", (slug,))
+        self._connection.execute("DELETE FROM series WHERE topic_slug = ?", (slug,))
+        self._connection.execute("DELETE FROM preview_solutions WHERE topic_slug = ?", (slug,))
         self._connection.execute("DELETE FROM pool_refills WHERE topic_slug = ?", (slug,))
         self._connection.execute("DELETE FROM topics WHERE slug = ?", (slug,))
         self._connection.commit()
@@ -399,24 +433,123 @@ class GameDatabase:
 
     # -- Puzzle Pool --
 
-    def draw_random_from_pool(
-        self, topic_slug: str, difficulty: str,
+    def draw_puzzle(
+        self, puzzle_date: date, topic_slug: str, difficulty: str,
     ) -> Optional[str]:
-        """Draw and remove a random solution from the puzzle pool."""
-        row = self._connection.execute(
-            "SELECT pool_id, solution FROM pool_solutions "
-            "WHERE topic_slug = ? AND difficulty = ? "
-            "ORDER BY RANDOM() LIMIT 1",
+        """Draw a random pooled solution and record it as that date's puzzle.
+
+        Both happen in one transaction, so a solution is never lost between
+        leaving the pool and becoming a puzzle. Hints are added afterwards.
+        Returns the solution, or None if the pool is empty.
+        """
+        with self._connection:
+            row = self._connection.execute(
+                "SELECT pool_id, solution FROM pool_solutions "
+                "WHERE topic_slug = ? AND difficulty = ? ORDER BY RANDOM() LIMIT 1",
+                (topic_slug, difficulty),
+            ).fetchone()
+            if row is None:
+                return None
+            self._connection.execute("DELETE FROM pool_solutions WHERE pool_id = ?", (row["pool_id"],))
+            self._connection.execute(
+                "INSERT INTO puzzles (date, topic_slug, difficulty, solution, hints) "
+                "VALUES (?, ?, ?, ?, '[]')",
+                (puzzle_date.isoformat(), topic_slug, difficulty, row["solution"]),
+            )
+        return row["solution"]
+
+    def get_pool_solutions(self, topic_slug: str, difficulty: str) -> list[str]:
+        rows = self._connection.execute(
+            "SELECT solution FROM pool_solutions WHERE topic_slug = ? AND difficulty = ? "
+            "ORDER BY pool_id",
             (topic_slug, difficulty),
-        ).fetchone()
-        if row is None:
-            return None
+        ).fetchall()
+        return [row["solution"] for row in rows]
+
+    def set_preview_solutions(self, topic_slug: str, solutions: list[str]) -> None:
+        """Move solutions out of the topic's pools into its preview.
+
+        Preview solutions are never drawn as puzzles and stay excluded from
+        future batches, like used solutions.
+        """
+        with self._connection:
+            self._connection.execute("DELETE FROM preview_solutions WHERE topic_slug = ?", (topic_slug,))
+            for position, solution in enumerate(solutions):
+                self._connection.execute(
+                    "DELETE FROM pool_solutions WHERE topic_slug = ? AND solution = ?",
+                    (topic_slug, solution),
+                )
+                self._connection.execute(
+                    "INSERT INTO preview_solutions (topic_slug, position, solution) VALUES (?, ?, ?)",
+                    (topic_slug, position, solution),
+                )
+
+    def get_preview_solutions(self, topic_slug: str) -> list[str]:
+        rows = self._connection.execute(
+            "SELECT solution FROM preview_solutions WHERE topic_slug = ? ORDER BY position",
+            (topic_slug,),
+        ).fetchall()
+        return [row["solution"] for row in rows]
+
+    # -- Series --
+
+    def set_series_status(self, topic_slug: str, difficulty: str, status: str) -> None:
+        """Set a series' status: available, winding_down, finished or unavailable."""
         self._connection.execute(
-            "DELETE FROM pool_solutions WHERE pool_id = ?",
-            (row["pool_id"],),
+            "INSERT INTO series (topic_slug, difficulty, status) VALUES (?, ?, ?) "
+            "ON CONFLICT (topic_slug, difficulty) DO UPDATE SET status = excluded.status",
+            (topic_slug, difficulty, status),
         )
         self._connection.commit()
-        return row["solution"]
+
+    def get_series_status(self, topic_slug: str, difficulty: str) -> Optional[str]:
+        row = self._connection.execute(
+            "SELECT status FROM series WHERE topic_slug = ? AND difficulty = ?",
+            (topic_slug, difficulty),
+        ).fetchone()
+        return row["status"] if row is not None else None
+
+    def set_series_attention(
+        self, topic_slug: str, difficulty: str, detail: Optional[str],
+    ) -> None:
+        """Flag a series for the admin (or clear the flag with None)."""
+        self._connection.execute(
+            "UPDATE series SET needs_attention = ? WHERE topic_slug = ? AND difficulty = ?",
+            (detail, topic_slug, difficulty),
+        )
+        self._connection.commit()
+
+    def get_all_series(self) -> list[dict[str, Any]]:
+        """Every series with its pool size and latest refill, for the control panel."""
+        rows = self._connection.execute(
+            "SELECT s.topic_slug, t.name AS topic_name, s.difficulty, s.status, s.needs_attention, "
+            "(SELECT COUNT(*) FROM pool_solutions p "
+            " WHERE p.topic_slug = s.topic_slug AND p.difficulty = s.difficulty) AS pool_size, "
+            "(SELECT COUNT(*) FROM puzzles z "
+            " WHERE z.topic_slug = s.topic_slug AND z.difficulty = s.difficulty) AS puzzles_played, "
+            "(SELECT generated || '/' || kept || ' at ' || finished_at FROM pool_refills r "
+            " WHERE r.topic_slug = s.topic_slug AND r.difficulty = s.difficulty "
+            " ORDER BY refill_id DESC LIMIT 1) AS last_refill "
+            "FROM series s JOIN topics t ON t.slug = s.topic_slug "
+            "ORDER BY s.needs_attention IS NULL, t.name, s.difficulty"
+        ).fetchall()
+        return [dict(row) for row in rows]
+
+    def _series_display_state(
+        self, topic_slug: str, difficulty: str, status: str, today: date,
+    ) -> dict[str, Any]:
+        """How a series shows to players today.
+
+        A finished series still offers today's puzzle if one was drawn, and
+        a winding-down series reports how many puzzles remain.
+        """
+        remaining = self.pool_count(topic_slug, difficulty)
+        has_puzzle_today = self.get_puzzle_solution(today, topic_slug, difficulty) is not None
+        if status == "finished" and not has_puzzle_today:
+            return {"state": "finished", "remaining": 0}
+        if status in ("winding_down", "finished"):
+            return {"state": "winding_down", "remaining": remaining}
+        return {"state": "available", "remaining": remaining}
 
     def pool_count(self, topic_slug: str, difficulty: str) -> int:
         """Return the number of undrawn solutions in the pool."""
@@ -428,12 +561,14 @@ class GameDatabase:
         return row["cnt"]
 
     def get_all_known_solutions(self, topic_slug: str) -> list[str]:
-        """Return all solutions (used + pooled) for a topic, for dedup."""
+        """Return all solutions (used, pooled and in the preview) for a topic, for dedup."""
         rows = self._connection.execute(
             "SELECT solution FROM puzzles WHERE topic_slug = ? "
             "UNION "
-            "SELECT solution FROM pool_solutions WHERE topic_slug = ?",
-            (topic_slug, topic_slug),
+            "SELECT solution FROM pool_solutions WHERE topic_slug = ? "
+            "UNION "
+            "SELECT solution FROM preview_solutions WHERE topic_slug = ?",
+            (topic_slug, topic_slug, topic_slug),
         ).fetchall()
         return [row["solution"] for row in rows]
 

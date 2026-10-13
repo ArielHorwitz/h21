@@ -420,6 +420,27 @@ def _seed_pools(database: GameDatabase) -> int:
     return pooled
 
 
+def _seed_series(database: GameDatabase, rng: random.Random) -> None:
+    """Give each ready topic its series and preview, as a topic build would.
+
+    A series is available if its pool meets the same minimum as a real build,
+    and unavailable otherwise. The preview is a random sample here, where a
+    real build has a model choose it.
+    """
+    from h21.main import PREVIEW_SIZE, SERIES_MIN_SOLUTIONS
+
+    for topic in database.get_topics_with_status("ready"):
+        available = []
+        for difficulty in ("normal", "expert"):
+            enough = database.pool_count(topic["slug"], difficulty) >= SERIES_MIN_SOLUTIONS
+            database.set_series_status(topic["slug"], difficulty, "available" if enough else "unavailable")
+            if enough:
+                available.append(difficulty)
+        if available:
+            candidates = database.get_pool_solutions(topic["slug"], available[0])
+            database.set_preview_solutions(topic["slug"], rng.sample(candidates, PREVIEW_SIZE))
+
+
 def _shrink_sample(image_bytes: bytes) -> bytes:
     """Downscale a generated image to keep committed samples small."""
     image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
@@ -496,9 +517,10 @@ def seed_database(
 
     database = GameDatabase(db_path)
     database.ensure_schema()
-    # Seeded topics skip the build: their pools fill lazily on first draw.
-    for topic in database.get_topics_with_status("generating"):
-        database.set_topic_status(topic["slug"], "ready")
+    # The base topics are created ready, like an admin's first suggestions;
+    # their pools come from the committed sample pools below.
+    for topic_slug in ("notable-people", "world-geography"):
+        database.add_topic(topic_slug, SANDBOX_TOPIC_NAMES[topic_slug], status="ready")
 
     invite_code = database.create_invite(alias="sandbox", uses=64)
 
@@ -627,7 +649,7 @@ def seed_database(
         return 1
 
     game_count += seed_unplayed(dev_id, today, topic_slugs[1], "normal", win=True)
-    game_count += seed_unplayed(dev_id, today, topic_slugs[2 % len(topic_slugs)], "expert", win=False)
+    game_count += seed_unplayed(dev_id, today, topic_slugs[0], "expert", win=False)
     game_count += seed_unplayed(
         dev_id, today, topic_slugs[0], "normal", win=False, finished=False, question_count=6,
     )
@@ -665,6 +687,7 @@ def seed_database(
     )
 
     pooled_count = _seed_pools(database)
+    _seed_series(database, rng)
     database.close()
     _apply_timestamp_fixups(db_path, fixups)
 
@@ -803,15 +826,13 @@ def add_activity(
         (topic["slug"], difficulty)
         for topic in database.get_topics_with_status("ready")
         for difficulty in ("normal", "expert")
+        if database.get_series_status(topic["slug"], difficulty) in ("available", "winding_down")
     ]
 
     def todays_solution(topic_slug: str, difficulty: str) -> Optional[str]:
         solution = database.get_puzzle_solution(today, topic_slug, difficulty)
         if solution is None:
-            solution = database.draw_random_from_pool(topic_slug, difficulty)
-            if solution is None:
-                return None
-            database.record_puzzle(today, topic_slug, difficulty, solution, hints=[])
+            solution = database.draw_puzzle(today, topic_slug, difficulty)
         return solution
 
     outcomes = [outcome for outcome, _ in ACTIVITY_OUTCOMES]

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import tempfile
 import unittest
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 
 from h21.db import GameDatabase
@@ -42,9 +42,8 @@ class PuzzlePoolDatabaseTests(unittest.TestCase):
             username, "password", daily_question_limit=10, daily_topic_limit=1,
         )
 
-    def test_default_topics_start_generating(self) -> None:
-        slugs = {topic["slug"] for topic in self.database.get_topics_with_status("generating")}
-        self.assertEqual(slugs, {"notable-people", "world-geography"})
+    def test_fresh_database_has_no_topics(self) -> None:
+        self.assertEqual(self.database.get_all_topics(), [])
 
     def test_unready_topics_are_only_listed_for_their_creator(self) -> None:
         self.database.add_topic("jazz", "Jazz", user_id=self.creator_id)
@@ -69,8 +68,10 @@ class PuzzlePoolDatabaseTests(unittest.TestCase):
     def test_draw_removes_solution_from_pool(self) -> None:
         self.database.add_topic("jazz", "Jazz", user_id=self.creator_id)
         self.database.insert_pool_solutions("jazz", "normal", ["Miles Davis"])
-        self.assertEqual(self.database.draw_random_from_pool("jazz", "normal"), "Miles Davis")
-        self.assertIsNone(self.database.draw_random_from_pool("jazz", "normal"))
+        today = date(2026, 10, 10)
+        self.assertEqual(self.database.draw_puzzle(today, "jazz", "normal"), "Miles Davis")
+        self.assertEqual(self.database.get_puzzle_solution(today, "jazz", "normal"), "Miles Davis")
+        self.assertIsNone(self.database.draw_puzzle(today + timedelta(days=1), "jazz", "normal"))
 
     def test_last_pool_refill_is_most_recent(self) -> None:
         self.database.add_topic("jazz", "Jazz", user_id=self.creator_id)

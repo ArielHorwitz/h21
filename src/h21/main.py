@@ -4,6 +4,7 @@ import asyncio
 import collections
 import logging
 import logging.handlers
+import random
 import sqlite3
 from contextlib import asynccontextmanager
 from datetime import date as date_type, datetime, timezone
@@ -38,6 +39,7 @@ from h21.llm import (
     ask_question,
     generate_hints,
     generate_solution_batch,
+    select_preview_solutions,
     normalize_topic,
     validate_solution_batch,
 )
@@ -208,7 +210,7 @@ async def no_cache_static(request: Request, call_next):
     return response
 
 
-DEV_PATHS = ("/control", "/api/invites", "/api/accounts", "/api/query", "/api/invite-requests", "/api/logs")
+DEV_PATHS = ("/control", "/api/invites", "/api/accounts", "/api/query", "/api/invite-requests", "/api/logs", "/api/series")
 
 
 @app.middleware("http")
@@ -246,14 +248,15 @@ async def require_auth(request: Request, call_next):
 POOL_BATCH_SIZE = 100
 # Refill a pool in the background once it drops below this many solutions.
 POOL_LOW_THRESHOLD = 50
-# A new topic is rejected unless its first batch keeps at least this many
-# solutions at every difficulty.
+# A series needs at least this many solutions to be offered when its topic
+# is built. It also keeps the preview to a tenth of the smallest pool.
 SERIES_MIN_SOLUTIONS = 50
-# Interim guard against topics running dry: once a refill keeps fewer than
-# this many solutions, the pool is not refilled again.
-POOL_EXHAUSTED_KEPT = 10
+# A refill keeping fewer than this many solutions (after one retry) means the
+# series is running dry: it winds down instead of refilling again.
+REFILL_MIN_KEPT = 10
+# Representative solutions set aside to show what a topic covers.
+PREVIEW_SIZE = 5
 
-TOPIC_TOO_NARROW_DETAIL = "Not enough puzzles could be made for this topic. Try something broader."
 TOPIC_BUILD_FAILED_DETAIL = "Something went wrong while creating puzzles. Try again later."
 
 # Strong references to fire-and-forget tasks, so they are not garbage collected.
@@ -264,6 +267,8 @@ _topic_builds_in_flight: set[str] = set()
 _puzzle_draw_locks: collections.defaultdict[tuple[str, str], asyncio.Lock] = (
     collections.defaultdict(asyncio.Lock)
 )
+# Only one pool refill runs at a time.
+_refill_lock = asyncio.Lock()
 
 
 def _spawn(coroutine: Any) -> asyncio.Task[None]:
@@ -273,8 +278,16 @@ def _spawn(coroutine: Any) -> asyncio.Task[None]:
     return task
 
 
+def _too_narrow_detail(pool_sizes: dict[str, int]) -> str:
+    counts = " and ".join(f"{count} {difficulty}" for difficulty, count in pool_sizes.items())
+    return (
+        f"We could only make {counts} solutions; "
+        f"each difficulty needs at least {SERIES_MIN_SOLUTIONS}."
+    )
+
+
 async def get_today_solution(topic_slug: str, difficulty: str) -> str:
-    """Return today's solution for a given topic+difficulty, drawing from the pool."""
+    """Return today's solution for a series, drawing it from the pool if needed."""
     today = date_type.today()
     async with _puzzle_draw_locks[(topic_slug, difficulty)]:
         existing = database.get_puzzle_solution(today, topic_slug, difficulty)
@@ -283,30 +296,32 @@ async def get_today_solution(topic_slug: str, difficulty: str) -> str:
             return existing
 
         topic = database.get_topic(topic_slug)
-        if topic is None or topic["status"] != "ready":
-            raise HTTPException(status_code=404, detail="Topic not found")
+        status = database.get_series_status(topic_slug, difficulty)
+        if topic is None or topic["status"] != "ready" or status in (None, "unavailable"):
+            raise HTTPException(status_code=404, detail="Puzzle not found")
+        if status == "finished":
+            raise HTTPException(status_code=410, detail="This puzzle series has finished.")
 
-        solution = database.draw_random_from_pool(topic_slug, difficulty)
-        if solution is None and database.get_last_pool_refill(topic_slug, difficulty) is None:
-            # A ready topic whose pool was never filled, e.g. one seeded by
-            # the sandbox. Fill it now, once.
-            try:
-                await _refill_pool(topic_slug, difficulty, topic["name"])
-            except LLMError as exc:
-                raise HTTPException(status_code=502, detail=exc.detail)
-            solution = database.draw_random_from_pool(topic_slug, difficulty)
+        solution = database.draw_puzzle(today, topic_slug, difficulty)
+        if solution is None and status == "available":
+            # The pool should never be empty while the series is available:
+            # a background refill must have failed. Try once more, now.
+            await _refill_series(topic_slug, difficulty, topic["name"])
+            solution = database.draw_puzzle(today, topic_slug, difficulty)
         if solution is None:
+            if database.get_series_status(topic_slug, difficulty) == "winding_down":
+                database.set_series_status(topic_slug, difficulty, "finished")
+                raise HTTPException(status_code=410, detail="This puzzle series has finished.")
             raise HTTPException(
-                status_code=503, detail="This topic has run out of puzzles.",
+                status_code=503,
+                detail="Today's puzzle isn't ready yet. Please try again later.",
             )
+        await ensure_hints_exist(today, topic_slug, difficulty, solution)
 
-        try:
-            hints = await generate_hints(llm_client, topic["name"], solution)
-        except LLMError as exc:
-            logger.error("Failed to generate hints: %s", exc)
-            hints = []
-        database.record_puzzle(today, topic_slug, difficulty, solution, hints=hints)
-
+    if database.get_series_status(topic_slug, difficulty) == "winding_down" \
+            and database.pool_count(topic_slug, difficulty) == 0:
+        # That was the last one: today's puzzle stays playable, then it ends.
+        database.set_series_status(topic_slug, difficulty, "finished")
     _maybe_refill_pool(topic_slug, difficulty, topic["name"])
     return solution
 
@@ -334,29 +349,69 @@ async def _refill_pool(topic_slug: str, difficulty: str, topic_name: str) -> int
     return inserted
 
 
-def _pool_exhausted(topic_slug: str, difficulty: str) -> bool:
-    last_refill = database.get_last_pool_refill(topic_slug, difficulty)
-    return last_refill is not None and last_refill["kept"] < POOL_EXHAUSTED_KEPT
+async def _refill_with_retry(
+    topic_slug: str, difficulty: str, topic_name: str, minimum: int,
+) -> int:
+    """Refill once more if the first attempt errors or keeps fewer than `minimum`.
+
+    Returns the solutions added across both attempts. Raises LLMError only if
+    both attempts error: a bad outcome is believed once the retry agrees.
+    """
+    inserted = 0
+    errors: list[LLMError] = []
+    for attempt in range(2):
+        try:
+            inserted += await _refill_pool(topic_slug, difficulty, topic_name)
+        except LLMError as exc:
+            logger.warning(
+                "Refill attempt %d failed for topic=%r difficulty=%r: %s",
+                attempt + 1, topic_slug, difficulty, exc,
+            )
+            errors.append(exc)
+            continue
+        if inserted >= minimum:
+            break
+    if len(errors) == 2:
+        raise errors[-1]
+    return inserted
+
+
+async def _refill_series(topic_slug: str, difficulty: str, topic_name: str) -> None:
+    """Refill a series' pool, one refill at a time across the app.
+
+    A refill that still keeps fewer than REFILL_MIN_KEPT after its retry winds
+    the series down. One that errors twice flags the series for the admin.
+    """
+    async with _refill_lock:
+        try:
+            inserted = await _refill_with_retry(topic_slug, difficulty, topic_name, REFILL_MIN_KEPT)
+        except LLMError as exc:
+            logger.error("Refill failed twice for topic=%r difficulty=%r: %s", topic_slug, difficulty, exc)
+            database.set_series_attention(topic_slug, difficulty, f"Refill failed twice: {exc}")
+            return
+        database.set_series_attention(topic_slug, difficulty, None)
+        if inserted < REFILL_MIN_KEPT:
+            logger.info(
+                "Series topic=%r difficulty=%r is running dry (kept %d), winding down",
+                topic_slug, difficulty, inserted,
+            )
+            database.set_series_status(topic_slug, difficulty, "winding_down")
 
 
 def _maybe_refill_pool(topic_slug: str, difficulty: str, topic_name: str) -> None:
-    """Start a background refill if the pool is running low and not exhausted."""
+    """Start a background refill if an available series' pool is running low."""
     key = (topic_slug, difficulty)
     if key in _pool_refills_in_flight:
+        return
+    if database.get_series_status(topic_slug, difficulty) != "available":
         return
     remaining = database.pool_count(topic_slug, difficulty)
     if remaining >= POOL_LOW_THRESHOLD:
         return
-    if _pool_exhausted(topic_slug, difficulty):
-        logger.warning(
-            "Pool for topic=%r difficulty=%r is exhausted (%d remaining), not refilling",
-            topic_slug, difficulty, remaining,
-        )
-        return
 
     async def refill() -> None:
         try:
-            await _refill_pool(topic_slug, difficulty, topic_name)
+            await _refill_series(topic_slug, difficulty, topic_name)
         except Exception:
             logger.exception(
                 "Background pool refill failed for topic=%r difficulty=%r",
@@ -373,31 +428,71 @@ def _maybe_refill_pool(topic_slug: str, difficulty: str, topic_name: str) -> Non
     _spawn(refill())
 
 
+async def _choose_preview(topic_slug: str, topic_name: str, difficulty: str) -> None:
+    """Set aside PREVIEW_SIZE representative solutions from a series' pool.
+
+    A model picks them for variety; if it fails twice, a random sample is
+    used rather than failing the topic.
+    """
+    candidates = database.get_pool_solutions(topic_slug, difficulty)
+    for attempt in range(2):
+        try:
+            preview = await select_preview_solutions(llm_client, topic_name, candidates, PREVIEW_SIZE)
+            break
+        except LLMError as exc:
+            logger.warning("Preview selection attempt %d failed for %r: %s", attempt + 1, topic_slug, exc)
+    else:
+        preview = random.sample(candidates, PREVIEW_SIZE)
+    database.set_preview_solutions(topic_slug, preview)
+
+
 def _start_topic_build(topic_slug: str, topic_name: str) -> None:
-    """Fill a new topic's pools in the background, then mark it ready or failed."""
+    """Build a new topic in the background, then mark it ready or failed.
+
+    Each difficulty gets a first batch (retried once if it errors or falls
+    short). Difficulties with at least SERIES_MIN_SOLUTIONS become available
+    series; the rest are unavailable. The topic is ready if any series is
+    available, and fails if none is, or if either difficulty errors twice.
+    """
     if topic_slug in _topic_builds_in_flight:
         return
 
     async def build() -> None:
         try:
+            difficulties = sorted(VALID_DIFFICULTIES)
             # Difficulties are generated concurrently to halve the creator's
             # wait, so they cannot exclude each other's solutions. Overlaps
             # are removed afterwards instead.
-            await asyncio.gather(*(
-                _refill_pool(topic_slug, difficulty, topic_name)
-                for difficulty in sorted(VALID_DIFFICULTIES)
-            ))
+            outcomes = await asyncio.gather(*(
+                _refill_with_retry(topic_slug, difficulty, topic_name, SERIES_MIN_SOLUTIONS)
+                for difficulty in difficulties
+            ), return_exceptions=True)
+            errors = [outcome for outcome in outcomes if isinstance(outcome, BaseException)]
+            if errors:
+                raise errors[0]
             database.remove_cross_difficulty_pool_duplicates(topic_slug)
             pool_sizes = {
                 difficulty: database.pool_count(topic_slug, difficulty)
-                for difficulty in sorted(VALID_DIFFICULTIES)
+                for difficulty in difficulties
             }
-            if min(pool_sizes.values()) < SERIES_MIN_SOLUTIONS:
-                logger.info("Topic %r rejected as too narrow: %s", topic_slug, pool_sizes)
-                database.set_topic_status(topic_slug, "failed", TOPIC_TOO_NARROW_DETAIL)
-            else:
-                logger.info("Topic %r ready: %s", topic_slug, pool_sizes)
-                database.set_topic_status(topic_slug, "ready")
+            available = [
+                difficulty for difficulty, size in pool_sizes.items()
+                if size >= SERIES_MIN_SOLUTIONS
+            ]
+            if not available:
+                logger.info("Topic %r turned down: %s", topic_slug, pool_sizes)
+                database.set_topic_status(topic_slug, "failed", _too_narrow_detail(pool_sizes))
+                return
+            for difficulty in difficulties:
+                database.set_series_status(
+                    topic_slug, difficulty,
+                    "available" if difficulty in available else "unavailable",
+                )
+            # The preview shows the topic's range, best seen at normal difficulty.
+            preview_difficulty = "normal" if "normal" in available else available[0]
+            await _choose_preview(topic_slug, topic_name, preview_difficulty)
+            logger.info("Topic %r ready: %s", topic_slug, pool_sizes)
+            database.set_topic_status(topic_slug, "ready")
         except Exception:
             logger.exception("Building topic %r failed", topic_slug)
             database.set_topic_status(topic_slug, "failed", TOPIC_BUILD_FAILED_DETAIL)
@@ -411,7 +506,7 @@ def _start_topic_build(topic_slug: str, topic_name: str) -> None:
 async def ensure_hints_exist(
     puzzle_date: date_type, topic_slug: str, difficulty: str, solution: str
 ) -> None:
-    """Backfill hints for puzzles that were created before the hints feature."""
+    """Generate a puzzle's hints if it has none yet (new, or a failed attempt)."""
     existing_hints = database.get_puzzle_hints(puzzle_date, topic_slug, difficulty)
     if existing_hints:
         return
@@ -1314,29 +1409,56 @@ async def create_topic(request_body: NewTopicRequest, request: Request) -> dict[
     if not slug:
         raise HTTPException(status_code=400, detail="Invalid topic name")
 
+    # Topics are identified by their tidied name. One that exists or is being
+    # built is refused; a turned-down one may be tried again.
     existing = database.get_topic(slug)
     if existing is not None:
         if existing["status"] != "failed":
-            raise HTTPException(status_code=409, detail="Topic already exists")
-        # A failed topic was never playable, so anyone may try it again.
+            raise HTTPException(status_code=409, detail=f"\"{existing['name']}\" already exists")
         database.delete_topic(slug)
-
-    database.add_topic(slug, name, user_id=user_id)
+    if not database.add_topic(slug, name, user_id=user_id):
+        # Someone else suggested the same name a moment ago.
+        raise HTTPException(status_code=409, detail=f"\"{name}\" already exists")
     database.increment_daily_topic_suggestions(user_id, date_type.today())
     database.log_activity(user_id, "suggest_topic", {"topic_name": name, "topic_slug": slug})
     _start_topic_build(slug, name)
     return {"slug": slug, "name": name, "status": "generating"}
 
 
-@app.delete("/api/topics/{slug}")
-async def dismiss_failed_topic(slug: str, request: Request) -> dict[str, str]:
-    """Let a topic's creator dismiss it after it failed to build."""
-    topic = database.get_topic(slug)
-    if topic is None or topic["user_id"] != request.state.user_id:
-        raise HTTPException(status_code=404, detail="Topic not found")
-    if topic["status"] != "failed":
-        raise HTTPException(status_code=409, detail="Only failed topics can be dismissed")
-    database.delete_topic(slug)
+@app.get("/api/topics/turned-down")
+async def get_turned_down_topics() -> list[dict[str, Any]]:
+    """Recently turned-down topics, so players can see what didn't work."""
+    return [
+        {"name": topic["name"], "detail": topic["status_detail"]}
+        for topic in database.get_turned_down_topics()
+    ]
+
+
+# -- Series management (dev only, protected by middleware) --
+
+@app.get("/api/series")
+async def list_series() -> list[dict[str, Any]]:
+    return database.get_all_series()
+
+
+@app.post("/api/series/{topic_slug}/{difficulty}/refill")
+async def refill_series(topic_slug: str, difficulty: str) -> dict[str, Any]:
+    """Run a refill now, e.g. after a series was flagged."""
+    topic = database.get_topic(topic_slug)
+    if topic is None or database.get_series_status(topic_slug, difficulty) is None:
+        raise HTTPException(status_code=404, detail="Series not found")
+    before = database.pool_count(topic_slug, difficulty)
+    await _refill_series(topic_slug, difficulty, topic["name"])
+    return {"added": database.pool_count(topic_slug, difficulty) - before}
+
+
+@app.post("/api/series/{topic_slug}/{difficulty}/reopen")
+async def reopen_series(topic_slug: str, difficulty: str) -> dict[str, str]:
+    """Make a winding-down or finished series available again and clear its flag."""
+    if database.get_series_status(topic_slug, difficulty) is None:
+        raise HTTPException(status_code=404, detail="Series not found")
+    database.set_series_status(topic_slug, difficulty, "available")
+    database.set_series_attention(topic_slug, difficulty, None)
     return {"status": "ok"}
 
 
