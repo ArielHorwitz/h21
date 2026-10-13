@@ -26,6 +26,8 @@ All API endpoints are defined in `src/h21/main.py`. JSON request/response bodies
 |--------|------|------|-------------|
 | GET | `/api/settings` | Admin | Admin settings (open sign-ups per day and their quotas) and open sign-ups used today. |
 | POST | `/api/settings` | Admin | Update settings: `{"values": {key: int}}`. 400 for unknown keys or negative values. |
+| GET | `/api/admin/new-topics` | Admin | Ready topics currently tagged New (their first 3 days). |
+| DELETE | `/api/admin/new-topics/{slug}` | Admin | Remove a topic's New tag, e.g. from topics seeded at launch. |
 | GET | `/api/admin/attention` | Admin | What needs the admin, for the Admin tab badge: pending invite requests, flagged series, whether today's open spots are used up, and their `total`. |
 
 ## Series (admin only)

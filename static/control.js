@@ -820,6 +820,69 @@ for (const tab of controlTabs) {
 const initialPanel = location.hash.slice(1);
 showPanel(Array.from(controlTabs).some((tab) => tab.dataset.panel === initialPanel) ? initialPanel : "invites");
 
+// -- New tags --
+
+const newTopicsList = document.getElementById("new-topics-list");
+
+async function removeNewTags(topics) {
+  for (const topic of topics) {
+    await fetch(`/api/admin/new-topics/${encodeURIComponent(topic.slug)}`, { method: "DELETE" });
+  }
+  loadNewTopics();
+}
+
+async function loadNewTopics() {
+  let topics = [];
+  try {
+    const response = await fetch("/api/admin/new-topics");
+    if (response.ok) topics = await response.json();
+  } catch (error) {
+    console.error("Failed to load new topics:", error);
+  }
+  newTopicsList.innerHTML = "";
+  if (topics.length === 0) {
+    newTopicsList.innerHTML = '<p class="field-hint">No topics are tagged New.</p>';
+    return;
+  }
+  const table = document.createElement("table");
+  table.className = "data-table";
+  table.innerHTML = "<thead><tr><th>Topic</th><th>Created</th><th></th></tr></thead>";
+  const body = document.createElement("tbody");
+  for (const topic of topics) {
+    const row = document.createElement("tr");
+    const nameCell = document.createElement("td");
+    nameCell.textContent = topic.name;
+    const createdCell = document.createElement("td");
+    createdCell.textContent = new Date(topic.created_at).toLocaleString();
+    const actionCell = document.createElement("td");
+    const removeBtn = document.createElement("button");
+    removeBtn.type = "button";
+    removeBtn.className = "secondary-btn small-btn";
+    removeBtn.textContent = "Remove tag";
+    removeBtn.addEventListener("click", () => removeNewTags([topic]));
+    actionCell.appendChild(removeBtn);
+    row.append(nameCell, createdCell, actionCell);
+    body.appendChild(row);
+  }
+  table.appendChild(body);
+  const wrapper = document.createElement("div");
+  wrapper.className = "table-scroll-wrapper";
+  wrapper.appendChild(table);
+  newTopicsList.appendChild(wrapper);
+  if (topics.length > 1) {
+    const removeAllBtn = document.createElement("button");
+    removeAllBtn.type = "button";
+    removeAllBtn.className = "secondary-btn";
+    removeAllBtn.textContent = "Remove all";
+    removeAllBtn.addEventListener("click", () => {
+      if (confirm(`Remove the New tag from ${topics.length} topics?`)) removeNewTags(topics);
+    });
+    newTopicsList.appendChild(removeAllBtn);
+  }
+}
+
+loadNewTopics();
+
 // -- Series --
 
 const seriesList = document.getElementById("series-list");

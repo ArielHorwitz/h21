@@ -53,6 +53,8 @@ class GameDatabase:
                 user_id INTEGER,
                 status  TEXT NOT NULL DEFAULT 'generating',
                 status_detail TEXT,
+                -- Set when an admin removes the New tag (e.g. from seeded topics).
+                new_tag_removed INTEGER NOT NULL DEFAULT 0,
                 created_at    TEXT NOT NULL
             );
 
@@ -233,6 +235,24 @@ class GameDatabase:
         ).fetchall()
         return [dict(row) for row in rows]
 
+    def get_new_topics(self) -> list[dict[str, Any]]:
+        """Ready topics currently tagged New, newest first."""
+        new_since = (datetime.now(timezone.utc) - NEW_TOPIC_AGE).isoformat()
+        rows = self._connection.execute(
+            "SELECT slug, name, created_at FROM topics "
+            "WHERE status = 'ready' AND created_at >= ? AND new_tag_removed = 0 "
+            "ORDER BY created_at DESC",
+            (new_since,),
+        ).fetchall()
+        return [dict(row) for row in rows]
+
+    def remove_new_tag(self, slug: str) -> bool:
+        cursor = self._connection.execute(
+            "UPDATE topics SET new_tag_removed = 1 WHERE slug = ?", (slug,),
+        )
+        self._connection.commit()
+        return cursor.rowcount > 0
+
     def get_topics_ranked(self, user_id: int, today: date) -> list[dict[str, Any]]:
         """Return playable topics sorted to surface unplayed puzzles first.
 
@@ -252,7 +272,7 @@ class GameDatabase:
         # All topics with their total play count.
         topic_rows = self._connection.execute(
             "SELECT t.slug, t.name, t.status, t.status_detail, t.user_id, t.created_at, "
-            "COUNT(g.game_id) AS play_count "
+            "t.new_tag_removed, COUNT(g.game_id) AS play_count "
             "FROM topics t "
             "LEFT JOIN games g ON g.topic_slug = t.slug "
             "WHERE t.status = 'ready' OR (t.status = 'generating' AND t.user_id = ?) "
@@ -269,7 +289,7 @@ class GameDatabase:
                 "status": row["status"],
                 "status_detail": row["status_detail"],
                 "suggested_by_me": row["user_id"] == user_id,
-                "is_new": row["created_at"] >= new_since,
+                "is_new": row["created_at"] >= new_since and not row["new_tag_removed"],
                 "play_count": row["play_count"],
                 "series": {},
                 "preview": self.get_preview_solutions(row["slug"]),

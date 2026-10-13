@@ -173,6 +173,16 @@ class TopicFlowTests(unittest.TestCase):
             asyncio.run(main.get_or_draw_solution(date(2026, 10, 10), "jazz", "expert"))
         self.assertEqual(raised.exception.status_code, 404)
 
+    def test_admin_can_remove_the_new_tag(self) -> None:
+        self.database.set_topic_status("jazz", "ready")
+        user_id = self.database.create_account("player", "secret", daily_question_limit=200, daily_topic_limit=2)
+        is_new = lambda: self.database.get_topics_ranked(user_id, date(2026, 10, 10))[0]["is_new"]
+        self.assertTrue(is_new())
+        self.assertEqual([topic["slug"] for topic in self.database.get_new_topics()], ["jazz"])
+        asyncio.run(main.remove_new_tag("jazz"))
+        self.assertFalse(is_new())
+        self.assertEqual(self.database.get_new_topics(), [])
+
 
 if __name__ == "__main__":
     unittest.main()

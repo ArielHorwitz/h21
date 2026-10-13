@@ -1582,6 +1582,21 @@ async def admin_attention() -> dict[str, Any]:
     }
 
 
+# -- New tags (admin only, protected by middleware) --
+
+@app.get("/api/admin/new-topics")
+async def get_new_topics() -> list[dict[str, Any]]:
+    return database.get_new_topics()
+
+
+@app.delete("/api/admin/new-topics/{slug}")
+async def remove_new_tag(slug: str) -> dict[str, str]:
+    """Remove a topic's New tag, e.g. from the topics an admin seeds at launch."""
+    if not database.remove_new_tag(slug):
+        raise HTTPException(status_code=404, detail="Topic not found")
+    return {"status": "ok"}
+
+
 # -- Series management (admin only, protected by middleware) --
 
 @app.get("/api/series")

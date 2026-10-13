@@ -12,6 +12,7 @@ SQLite database managed by `GameDatabase` in `src/h21/db.py`. Uses WAL journal m
 | `user_id` | INTEGER | User who suggested the topic (nullable) |
 | `status` | TEXT | `generating`, `ready`, or `failed` |
 | `status_detail` | TEXT | User-facing reason when `failed` (nullable) |
+| `new_tag_removed` | INTEGER | 1 once an admin removes the New tag (shown for a topic's first 3 days) |
 | `created_at` | TEXT | UTC ISO timestamp |
 
 ### `series`
