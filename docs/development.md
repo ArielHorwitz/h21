@@ -90,10 +90,25 @@ rendered identicon). Regenerate the samples with
 `h21-sandbox --generate-samples` (uses the image API). Log in
 as `dev`
 (role `dev`) to see the app with friends, history, and suggestions populated.
-Today, `dev` has one puzzle solved, one not solved and one in progress, with
-the rest unplayed; a friend is mid-game; there is an abandoned game earlier
-in the week and a topic `dev` suggested that was turned down, so every UI
-state has an example;
+The sandbox is meant to reach every corner of the app:
+
+- **Games:** today, `dev` has a puzzle solved, one not solved and one in
+  progress with a hint revealed, with the rest unplayed. Their history has a
+  one-question win, a five-hint win, an out-of-questions loss, a give-up and
+  an abandoned game. Friends are mid-game today and didn't solve puzzles
+  `dev` solved (which must stay private).
+- **Series:** one winding down with a few puzzles left, one on its last
+  puzzle, one finished, a whole topic finished, one unavailable, and one
+  flagged for the control panel.
+- **Topics:** turned-down topics from several players with different
+  reasons, a ready topic of `dev`'s marked New, and one of `dev`'s left
+  mid-build, which the server builds for real on startup (a few cents).
+- **People:** strangers outside `dev`'s circle on the global leaderboards,
+  one with a very long display name, one without a picture, and a blocked
+  account.
+- **Limits and requests:** `dev` has used a topic suggestion today; a friend
+  has used up both topic suggestions and picture generations; two invite
+  requests wait in the control panel;
 the friend personas (`alice`, `bob`, ...) can be logged into as well. The
 sandbox config copies the real `config.toml` (including the OpenAI key, with
 `secure_cookies` and `auto_generate_missing_avatars` forced off), so playing

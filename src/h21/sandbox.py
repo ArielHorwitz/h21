@@ -86,6 +86,30 @@ SAMPLE_AVATAR_SUBJECTS: dict[str, tuple[str, str]] = {
     "gwen": ("mosaic", "butterfly"),
 }
 
+# Players outside dev's circle: they fill global leaderboards beyond friends.
+# One has a very long display name, one has no picture, one is blocked.
+STRANGER_PERSONAS = [
+    ("sam", "Sam"), ("priya", "Priya"), ("lena", "Lena"), ("kofi", "Kofi"),
+    ("bartholomew", "Bartholomew Fitzgerald-Montgomery III"),
+]
+NO_PICTURE_PERSONA = ("omar", "Omar")
+BLOCKED_PERSONA = ("troll", "Troll")
+
+# Topics turned down for different players and reasons, as (slug, name,
+# suggester index into the friends, detail); index None means dev.
+TURNED_DOWN_TOPICS = [
+    ("left-handed-accordion-makers", "Left-Handed Accordion Makers", None,
+     "We could only make 4 expert and 11 normal solutions; each difficulty needs at least 50."),
+    ("medieval-belgian-tax-law", "Medieval Belgian Tax Law", 0,
+     "We could only make 2 expert and 9 normal solutions; each difficulty needs at least 50."),
+    ("my-cats-favorite-toys", "My Cat's Favorite Toys", 1,
+     "We could only make 0 expert and 0 normal solutions; each difficulty needs at least 50."),
+    ("ancient-roman-pottery", "Ancient Roman Pottery", 2,
+     "Something went wrong while creating puzzles. Try again later."),
+]
+# A topic of dev's left mid-build: the server builds it for real on startup.
+BUILDING_TOPIC = ("jazz-musicians", "Jazz Musicians")
+
 EXTRA_TOPICS = ["Movie Classics", "Great Inventions"]
 
 # Pre-generated puzzle pools for the sandbox topics (topic slug -> difficulty
@@ -527,7 +551,7 @@ def seed_database(
 
     def create_player(
         username: str, display_name: str,
-        role: str = "user", anonymous: bool = False,
+        role: str = "user", anonymous: bool = False, with_picture: bool = True,
     ) -> int:
         database.consume_invite(invite_code)
         user_id = database.create_account(
@@ -538,8 +562,9 @@ def seed_database(
         )
         database.update_profile(user_id, display_name, anonymous)
         player_code = database.get_account_by_id(user_id)["player_code"]
-        _install_avatar(db_path.parent, player_code, username)
-        database.bump_avatar_version(user_id)
+        if with_picture:
+            _install_avatar(db_path.parent, player_code, username)
+            database.bump_avatar_version(user_id)
         joined = datetime.combine(
             today - timedelta(days=history_days), datetime.min.time(), timezone.utc,
         ) + timedelta(hours=rng.randint(8, 20), minutes=rng.randint(0, 59))
@@ -592,13 +617,14 @@ def seed_database(
     def seed_game(
         user_id: int, day: date, topic_slug: str, difficulty: str, win: bool,
         finished: bool = True, question_count: Optional[int] = None,
+        hint_count: Optional[int] = None,
     ) -> None:
         solution = puzzle_solutions[(day, topic_slug, difficulty)]
         _seed_game(
             database, rng, fixups, now,
             user_id=user_id, day=day, topic_slug=topic_slug,
             difficulty=difficulty, solution=solution, win=win,
-            finished=finished, question_count=question_count,
+            finished=finished, question_count=question_count, hint_count=hint_count,
         )
 
     game_count = 0
@@ -653,6 +679,7 @@ def seed_database(
     game_count += seed_unplayed(dev_id, today, topic_slugs[0], "expert", win=False)
     game_count += seed_unplayed(
         dev_id, today, topic_slugs[0], "normal", win=False, finished=False, question_count=6,
+        hint_count=1,
     )
     game_count += seed_unplayed(
         friend_ids[0], today, topic_slugs[1], "expert", win=False, finished=False, question_count=4,
@@ -677,24 +704,122 @@ def seed_database(
             win=False, finished=False,
         )
 
-    # A topic dev suggested that was turned down, to show the failed state.
-    database.add_topic(
-        "left-handed-accordion-makers", "Left-Handed Accordion Makers",
-        user_id=dev_id, status="failed",
-    )
-    database.set_topic_status(
-        "left-handed-accordion-makers", "failed",
-        "Not enough puzzles could be made for this topic. Try something broader.",
-    )
+    # -- Edge cases: everything else the app can show --
+
+    # Dev's history covers every way a game can end.
+    def seed_dev_special(**options: Any) -> int:
+        """Seed a game for dev on the most recent past day with an unplayed puzzle."""
+        for day_offset in range(1, history_days):
+            day = today - timedelta(days=day_offset)
+            for topic_slug in topic_slugs:
+                for difficulty in difficulties:
+                    if (day, topic_slug, difficulty) in puzzle_solutions and \
+                            database.get_existing_game(dev_id, day, topic_slug, difficulty) is None:
+                        seed_game(dev_id, day, topic_slug, difficulty, **options)
+                        return 1
+        return 0
+
+    game_count += seed_dev_special(win=True, question_count=1, hint_count=0)
+    game_count += seed_dev_special(win=True, question_count=20, hint_count=5)
+    game_count += seed_dev_special(win=False, question_count=21, hint_count=2)
+    game_count += seed_dev_special(win=False, question_count=3, hint_count=0)
+
+    # Strangers play today's popular puzzles, mostly solving them.
+    stranger_ids = [create_player(username, display_name) for username, display_name in STRANGER_PERSONAS]
+    stranger_ids.append(create_player(*NO_PICTURE_PERSONA, with_picture=False))
+    blocked_id = create_player(*BLOCKED_PERSONA)
+    database.set_account_blocked(blocked_id, True)
+    for stranger_id in stranger_ids:
+        for topic_slug in topic_slugs[:2]:
+            for difficulty in difficulties:
+                if rng.random() < 0.6:
+                    game_count += seed_unplayed(
+                        stranger_id, today, topic_slug, difficulty, win=rng.random() < 0.75,
+                    )
+
+    # Topics turned down for several players, and one of dev's still building.
+    for slug, name, suggester_index, detail in TURNED_DOWN_TOPICS:
+        suggester = dev_id if suggester_index is None else friend_ids[suggester_index % len(friend_ids)]
+        database.add_topic(slug, name, user_id=suggester, status="failed")
+        database.set_topic_status(slug, "failed", detail)
+    database.add_topic(*BUILDING_TOPIC, user_id=dev_id, status="generating")
+    # The newest extra topic is dev's own, so "Your topics" has a ready one.
+    database.set_topic_owner(slugify(EXTRA_TOPICS[-1]), dev_id)
+
+    # Usage: dev has used a suggestion today; one friend has used up both
+    # topic suggestions and picture generations, so their limits show.
+    database.increment_daily_topic_suggestions(dev_id, today)
+    exhausted_id = friend_ids[1 % len(friend_ids)]
+    for _ in range(DAILY_TOPIC_LIMIT):
+        database.increment_daily_topic_suggestions(exhausted_id, today)
+    for _ in range(MONTHLY_AVATAR_LIMIT):
+        database.increment_avatar_generation(exhausted_id, today)
+
+    # Requests for invites waiting in the control panel.
+    database.create_invite_request("curious.neighbor@example.com")
+    database.create_invite_request("+1 555 0100")
 
     pooled_count = _seed_pools(database)
     _seed_series(database, rng)
+
+    # Series in every state. A finished series must have no puzzle today, so
+    # it goes to a series nobody played today and its unplayed puzzle is
+    # removed; a series on its last puzzle keeps today's.
+    def played_today(topic_slug: str, difficulty: str) -> bool:
+        return database.execute_readonly_query(
+            "SELECT COUNT(*) FROM games "
+            f"WHERE date = '{today.isoformat()}' AND topic_slug = '{topic_slug}' AND difficulty = '{difficulty}'"
+        )["rows"][0][0] > 0
+
+    available = [
+        (topic_slug, difficulty) for topic_slug in topic_slugs for difficulty in difficulties
+        if database.get_series_status(topic_slug, difficulty) == "available"
+    ]
+    unplayed = [key for key in available if not played_today(*key)]
+    played = [key for key in available if played_today(*key)]
+    states: dict[str, tuple[str, str]] = {}
+    # A whole topic finished: its only offered series, if nobody played it today.
+    for key in unplayed:
+        others = [
+            database.get_series_status(key[0], difficulty)
+            for difficulty in difficulties if difficulty != key[1]
+        ]
+        if all(status == "unavailable" for status in others):
+            states["topic_finished"] = key
+            unplayed.remove(key)
+            break
+    if unplayed:
+        states["finished"] = unplayed.pop()
+    if played:
+        states["last_puzzle"] = played.pop()
+    remaining = unplayed + played
+    if remaining:
+        states["winding_down"] = remaining.pop()
+    if remaining:
+        states["flagged"] = remaining.pop()
+
+    for state in ("finished", "topic_finished"):
+        if state in states:
+            database.delete_unplayed_puzzle(today, *states[state])
+            database.trim_pool(*states[state], keep=0)
+            database.set_series_status(*states[state], "finished")
+    if "last_puzzle" in states:
+        database.trim_pool(*states["last_puzzle"], keep=0)
+        database.set_series_status(*states["last_puzzle"], "winding_down")
+    if "winding_down" in states:
+        database.trim_pool(*states["winding_down"], keep=8)
+        database.set_series_status(*states["winding_down"], "winding_down")
+    if "flagged" in states:
+        database.set_series_attention(
+            *states["flagged"], "Refill failed twice: example flag seeded by the sandbox",
+        )
+
     # Topics date from the start of the history, except the last extra topic,
     # which stays new so the New tag has an example.
     history_start = datetime.combine(today - timedelta(days=history_days), datetime.min.time(), timezone.utc)
     newest_slug = slugify(EXTRA_TOPICS[-1])
     for topic in database.get_all_topics():
-        if topic["slug"] != newest_slug:
+        if topic["slug"] not in (newest_slug, BUILDING_TOPIC[0]):
             fixups.topics.append((history_start.isoformat(), topic["slug"]))
     database.close()
     _apply_timestamp_fixups(db_path, fixups)
@@ -712,6 +837,7 @@ def seed_database(
         "pooled_count": pooled_count,
         "history_days": history_days,
         "invite_code": invite_code,
+        "series_states": states,
     }
 
 
@@ -731,13 +857,17 @@ def _seed_game(
     question_count: Optional[int] = None,
     decoys: Optional[list[str]] = None,
     reveal_hints: bool = True,
+    hint_count: Optional[int] = None,
 ) -> str:
     """Fabricate one game with a plausible transcript. Returns its share code.
 
     Unfinished games stop after `question_count` questions (default: a
-    random handful) with no guess at the solution. Topics without
-    hand-written questions (e.g. ones suggested on a live sandbox) get
-    generic ones, and `decoys` overrides the wrong guesses.
+    random handful) with no guess at the solution. For finished games,
+    `question_count` fixes the total number of questions, including the
+    winning guess. `hint_count` fixes how many hints were revealed (as far
+    as the questions unlock them). Topics without hand-written questions
+    (e.g. ones suggested on a live sandbox) get generic ones, and `decoys`
+    overrides the wrong guesses.
     """
     question_pool = QUESTION_POOLS.get(topic_slug, GENERIC_QUESTIONS)
     if decoys is None:
@@ -747,9 +877,16 @@ def _seed_game(
         count = question_count or rng.randint(3, 7)
         transcript = rng.sample(question_pool, min(count, len(question_pool)))
         win = False
+    elif question_count is not None:
+        # An exact length, e.g. a one-question win or all 21 used up.
+        candidates = list(question_pool) + [
+            question for question in GENERIC_QUESTIONS if question not in question_pool
+        ] + [(f"Is it {decoy}?", "no", f"It is not {decoy}.") for decoy in decoys]
+        rng.shuffle(candidates)
+        transcript = candidates[:question_count - 1 if win else question_count]
     else:
         transcript = rng.sample(question_pool, rng.randint(5, min(12, len(question_pool))))
-    if finished:
+    if finished and question_count is None:
         guess_count = rng.randint(1, 3) if win else rng.randint(2, 5)
         wrong_guesses = [
             (f"Is it {decoy}?", "no", f"It is not {decoy}.")
@@ -781,9 +918,15 @@ def _seed_game(
 
     # A hint unlocks every 4 questions; reveal some of the unlocked ones.
     hints_unlocked = min(len(transcript) // 4, 5)
-    if reveal_hints and hints_unlocked > 0 and rng.random() < 0.5:
+    if hint_count is not None:
+        hints_to_reveal = min(hint_count, hints_unlocked)
+    elif reveal_hints and hints_unlocked > 0 and rng.random() < 0.5:
+        hints_to_reveal = rng.randint(1, min(3, hints_unlocked))
+    else:
+        hints_to_reveal = 0
+    if hints_to_reveal > 0:
         revealed_at = started_at
-        for hint_index in range(rng.randint(1, min(3, hints_unlocked))):
+        for hint_index in range(hints_to_reveal):
             after_question = (hint_index + 1) * 4
             revealed_at += timedelta(seconds=rng.randint(60, 300))
             database.record_hint_reveal(game_id, hint_index, after_question)

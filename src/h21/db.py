@@ -344,6 +344,10 @@ class GameDatabase:
         self._connection.commit()
         return cursor.rowcount == 1
 
+    def set_topic_owner(self, slug: str, user_id: int) -> None:
+        self._connection.execute("UPDATE topics SET user_id = ? WHERE slug = ?", (user_id, slug))
+        self._connection.commit()
+
     def get_turned_down_topics(self, limit: int = 30) -> list[dict[str, Any]]:
         """Return the most recently turned-down topics, newest first."""
         rows = self._connection.execute(
@@ -457,6 +461,28 @@ class GameDatabase:
                 (puzzle_date.isoformat(), topic_slug, difficulty, row["solution"]),
             )
         return row["solution"]
+
+    def trim_pool(self, topic_slug: str, difficulty: str, keep: int) -> int:
+        """Drop all but the first `keep` pooled solutions of a series. Returns count dropped."""
+        cursor = self._connection.execute(
+            "DELETE FROM pool_solutions WHERE topic_slug = ? AND difficulty = ? AND pool_id NOT IN ("
+            "  SELECT pool_id FROM pool_solutions WHERE topic_slug = ? AND difficulty = ? "
+            "  ORDER BY pool_id LIMIT ?)",
+            (topic_slug, difficulty, topic_slug, difficulty, keep),
+        )
+        self._connection.commit()
+        return cursor.rowcount
+
+    def delete_unplayed_puzzle(self, puzzle_date: date, topic_slug: str, difficulty: str) -> bool:
+        """Delete a puzzle nobody has played. Returns whether one was deleted."""
+        cursor = self._connection.execute(
+            "DELETE FROM puzzles WHERE date = ? AND topic_slug = ? AND difficulty = ? "
+            "AND NOT EXISTS (SELECT 1 FROM games g WHERE g.date = puzzles.date "
+            "  AND g.topic_slug = puzzles.topic_slug AND g.difficulty = puzzles.difficulty)",
+            (puzzle_date.isoformat(), topic_slug, difficulty),
+        )
+        self._connection.commit()
+        return cursor.rowcount == 1
 
     def get_pool_solutions(self, topic_slug: str, difficulty: str) -> list[str]:
         rows = self._connection.execute(

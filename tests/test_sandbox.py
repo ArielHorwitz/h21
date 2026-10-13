@@ -6,7 +6,7 @@ from datetime import date, timedelta
 from pathlib import Path
 
 from h21.db import GameDatabase
-from h21.sandbox import DEV_USERNAME, add_activity, seed_database
+from h21.sandbox import DEV_USERNAME, NO_PICTURE_PERSONA, add_activity, seed_database
 
 
 class SandboxSeedTests(unittest.TestCase):
@@ -41,12 +41,21 @@ class SandboxSeedTests(unittest.TestCase):
             self.summary["dev_user_id"],
         )
 
-    def test_topics_are_ready_with_pooled_puzzles(self) -> None:
+    def test_series_cover_every_state(self) -> None:
         self.assertGreater(self.summary["pooled_count"], 0)
-        for topic_slug in self.summary["topic_slugs"]:
-            self.assertEqual(self.database.get_topic(topic_slug)["status"], "ready")
-            for difficulty in ("normal", "expert"):
-                self.assertGreater(self.database.pool_count(topic_slug, difficulty), 0)
+        states = self.summary["series_states"]
+        expected_status = {
+            "finished": "finished", "topic_finished": "finished",
+            "last_puzzle": "winding_down", "winding_down": "winding_down",
+        }
+        for state, status in expected_status.items():
+            self.assertIn(state, states)
+            self.assertEqual(self.database.get_series_status(*states[state]), status)
+        self.assertEqual(self.database.pool_count(*states["last_puzzle"]), 0)
+        self.assertIsNotNone(self.database.get_puzzle_solution(self.today, *states["last_puzzle"]))
+        self.assertIsNone(self.database.get_puzzle_solution(self.today, *states["finished"]))
+        flagged = [series for series in self.database.get_all_series() if series["needs_attention"]]
+        self.assertEqual(len(flagged), 1)
 
     def test_friend_connections_are_mutual(self) -> None:
         dev_id = self.summary["dev_user_id"]
@@ -105,9 +114,11 @@ class SandboxSeedTests(unittest.TestCase):
         today_puzzles = len(self.summary["topic_slugs"]) * 2
         self.assertLess(today_games, today_puzzles, "some puzzles stay unplayed for live play")
 
-    def test_failed_topic_is_seeded_for_dev(self) -> None:
+    def test_turned_down_topics_for_several_players(self) -> None:
         failed = self.database.get_topics_with_status("failed")
-        self.assertEqual([topic["user_id"] for topic in failed], [self.summary["dev_user_id"]])
+        suggesters = {topic["user_id"] for topic in failed}
+        self.assertIn(self.summary["dev_user_id"], suggesters)
+        self.assertGreater(len(suggesters), 1)
 
     def test_friends_have_completed_games_today(self) -> None:
         completed_today = self.database.execute_readonly_query(
@@ -154,10 +165,13 @@ class SandboxSeedTests(unittest.TestCase):
         )
         self.assertEqual(invalid["rows"][0][0], 0)
 
-    def test_all_accounts_have_avatars(self) -> None:
+    def test_accounts_have_avatars_except_the_one_without(self) -> None:
         accounts = self.database.get_all_accounts()
         self.assertGreater(len(accounts), 0)
         for account in accounts:
+            if account["username"] == NO_PICTURE_PERSONA[0]:
+                self.assertEqual(account["avatar_version"], 0)
+                continue
             self.assertGreaterEqual(account["avatar_version"], 1)
             thumbnail = Path(self.temporary_directory.name).joinpath(
                 "avatars", f"{account['player_code']}.webp",
