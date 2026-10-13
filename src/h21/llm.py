@@ -153,17 +153,23 @@ NORMALIZE_TOPIC_PROMPT = """\
 You are helping organize topics for a trivia game.
 
 Given a user's suggested topic (which may be in any language, misspelled, \
-informal, or vaguely described), return a clean, concise English topic name \
-suitable for display.
+informal, or abbreviated), return a clean English topic name suitable for \
+display.
+
+Only fix language, spelling, capitalization and abbreviations. Never change \
+what the topic covers: keep every qualifier the user gave, and don't add, \
+drop, narrow or broaden anything.
 
 Examples:
 - "la guerra civil española" -> "Spanish Civil War"
 - "dinos" -> "Dinosaurs"
 - "ww2 pacific" -> "World War II: Pacific Theater"
 - "古代ローマ" -> "Ancient Rome"
-- "marvel movies and comics" -> "Marvel"
+- "marvel movies and comics" -> "Marvel Movies and Comics"
+- "disney" -> "Disney"
+- "disney movies" -> "Disney Movies"
 
-Reply with ONLY the normalized topic name. No quotes, no explanation.\
+Reply with ONLY the topic name. No quotes, no explanation.\
 """
 
 
