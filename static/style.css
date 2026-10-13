@@ -2348,3 +2348,20 @@ a.history-row:hover {
 .privacy-section {
   margin-top: 1.5rem;
 }
+
+.people-links {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.people-count {
+  margin-left: 0.4rem;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.people-tabs {
+  grid-template-columns: repeat(3, 1fr);
+}
+

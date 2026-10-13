@@ -43,13 +43,20 @@
       </section>
 
       <section id="friend-suggestions-section" hidden>
-        <h2 class="section-title">People you may know</h2>
+        <div class="section-header">
+          <h2 class="section-title">People you may know</h2>
+          <a class="text-btn" href="/people#suggested">See all ›</a>
+        </div>
         <div id="friend-suggestions-list" class="person-list"></div>
       </section>
 
-      <section id="following-section">
-        <h2 class="section-title">Following</h2>
-        <div id="following-list" class="person-list"></div>
+      <section class="people-links">
+        <a class="setting-row setting-link" href="/people#following">
+          <span>Following <span class="people-count" id="following-count"></span></span><span aria-hidden="true">›</span>
+        </a>
+        <a class="setting-row setting-link" href="/people#followers">
+          <span>Followers <span class="people-count" id="followers-count"></span></span><span aria-hidden="true">›</span>
+        </a>
       </section>
     </div>
     <section class="settings-list privacy-section" id="privacy-section" hidden>
@@ -65,6 +72,7 @@
   </main>
   <!--TAB_BAR-->
   <script src="/static/nav.js"></script>
+  <script src="/static/people-list.js"></script>
   <script src="/static/friends.js"></script>
 </body>
 </html>

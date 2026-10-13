@@ -9,7 +9,8 @@ const searchPlayersInput = document.getElementById("search-players-input");
 const searchResults = document.getElementById("search-results");
 const friendSuggestionsSection = document.getElementById("friend-suggestions-section");
 const friendSuggestionsList = document.getElementById("friend-suggestions-list");
-const followingList = document.getElementById("following-list");
+const followingCount = document.getElementById("following-count");
+const followersCount = document.getElementById("followers-count");
 
 const SEARCH_DEBOUNCE_MS = 300;
 
@@ -17,69 +18,8 @@ let currentUserPlayerCode = null;
 let currentUserAvatarVersion = 0;
 let searchTimeout = null;
 
-function avatarUrl(playerCode, avatarVersion) {
-  return "/avatars/" + encodeURIComponent(playerCode) + ".webp?v=" + avatarVersion;
-}
-
-// A row for a person: avatar, name, a detail line, and an optional action.
-function renderPersonRow({ name, detail, playerCode, avatarVersion, actionLabel, actionClass, onAction }) {
-  const row = document.createElement("div");
-  row.className = "person-row";
-
-  if (playerCode && avatarVersion > 0) {
-    const avatar = document.createElement("img");
-    avatar.className = "avatar-sm";
-    avatar.src = avatarUrl(playerCode, avatarVersion);
-    avatar.alt = "";
-    row.appendChild(avatar);
-  } else {
-    const placeholder = document.createElement("span");
-    placeholder.className = "avatar-sm avatar-placeholder";
-    placeholder.textContent = name.charAt(0).toUpperCase();
-    row.appendChild(placeholder);
-  }
-
-  const info = document.createElement("span");
-  info.className = "person-info";
-  const nameEl = document.createElement("span");
-  nameEl.className = "person-name";
-  nameEl.textContent = name;
-  info.appendChild(nameEl);
-  if (detail) {
-    const detailEl = document.createElement("span");
-    detailEl.className = "person-detail";
-    detailEl.textContent = detail;
-    info.appendChild(detailEl);
-  }
-  row.appendChild(info);
-
-  if (actionLabel) {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = `${actionClass || "secondary-btn"} small-btn`;
-    button.textContent = actionLabel;
-    button.addEventListener("click", async () => {
-      button.disabled = true;
-      const keepEnabled = await onAction(button);
-      if (keepEnabled) button.disabled = false;
-    });
-    row.appendChild(button);
-  }
-  return row;
-}
-
-async function follow(playerCode) {
-  const response = await fetch("/api/friends/" + encodeURIComponent(playerCode), { method: "POST" });
-  return response.ok || response.status === 409;
-}
-
-async function unfollow(playerCode) {
-  const response = await fetch("/api/friends/" + encodeURIComponent(playerCode), { method: "DELETE" });
-  return response.ok;
-}
-
 function refreshSocialLists() {
-  loadFollowing();
+  loadPeopleCounts();
   loadFriendSuggestions();
 }
 
@@ -107,38 +47,18 @@ copyCodeBtn.addEventListener("click", async () => {
   setTimeout(() => { copyCodeBtn.textContent = "Copy"; }, 1500);
 });
 
-// -- Following --
+// -- Following and followers --
 
-async function loadFollowing() {
+async function loadPeopleCounts() {
   try {
-    const response = await fetch("/api/friends");
-    if (!response.ok) return;
-    const friends = await response.json();
-    followingList.innerHTML = "";
-    if (friends.length === 0) {
-      followingList.innerHTML = '<p class="field-hint">You aren\'t following anyone yet. Search above, or share your player code.</p>';
-      return;
-    }
-    for (const friend of friends) {
-      const name = friend.display_name || friend.username;
-      followingList.appendChild(renderPersonRow({
-        name,
-        detail: friend.anonymous ? "Playing anonymously" : `Code ${friend.player_code}`,
-        playerCode: friend.anonymous ? null : friend.player_code,
-        avatarVersion: friend.avatar_version,
-        actionLabel: "Unfollow",
-        onAction: async () => {
-          if (!confirm(`Unfollow ${name}?`)) return true;
-          if (await unfollow(friend.player_code)) {
-            refreshSocialLists();
-            return false;
-          }
-          return true;
-        },
-      }));
-    }
+    const [following, followers] = await Promise.all([
+      fetch("/api/friends").then((response) => (response.ok ? response.json() : [])),
+      fetch("/api/followers").then((response) => (response.ok ? response.json() : [])),
+    ]);
+    followingCount.textContent = String(following.length);
+    followersCount.textContent = String(followers.length);
   } catch (error) {
-    console.error("Failed to load friends:", error);
+    console.error("Failed to load people counts:", error);
   }
 }
 
@@ -191,7 +111,7 @@ async function searchPlayers(query) {
 
 async function loadFriendSuggestions() {
   try {
-    const response = await fetch("/api/friend-suggestions");
+    const response = await fetch("/api/friend-suggestions?limit=3");
     if (!response.ok) return;
     const suggestions = await response.json();
     friendSuggestionsList.innerHTML = "";

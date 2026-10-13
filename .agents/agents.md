@@ -25,7 +25,9 @@ An AI-powered 21 questions trivia game. Players pick a topic (suggested by playe
 | `static/suggest.html/js` | Suggest a topic: form with quota, your topics |
 | `static/index.html`, `static/game.js` | Main gameplay: Q&A loop, hints, game state |
 | `static/replay.html/js` | Game results and replays |
-| `static/friends.html/js` | Recent games with friends, search, suggestions, following |
+| `static/friends.html/js` | Recent games with friends, search, suggestions, people links, privacy |
+| `static/people.html/js` | Following, Followers and Suggested lists |
+| `static/people-list.js` | Person rows and follow actions shared by Friends and People |
 | `static/leaderboard.html/js` | Per-puzzle leaderboard |
 | `static/login.html/js` | Log in, join with invite, invite requests |
 | `static/account.html/js` | Profile: picture, name, stats, history, settings |

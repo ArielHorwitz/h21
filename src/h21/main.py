@@ -579,6 +579,11 @@ async def suggest_page(request: Request) -> HTMLResponse:
     return render_page(request, "suggest.html")
 
 
+@app.get("/people")
+async def people_page(request: Request) -> HTMLResponse:
+    return render_page(request, "people.html")
+
+
 @app.get("/friends")
 async def friends_page(request: Request) -> HTMLResponse:
     return render_page(request, "friends.html")
@@ -779,8 +784,26 @@ async def list_friends(request: Request) -> list[dict[str, Any]]:
         {"username": friend["username"], "display_name": friend["display_name"],
          "player_code": friend["player_code"],
          "avatar_version": friend.get("avatar_version", 0),
-         "anonymous": bool(friend["anonymous"])}
+         "anonymous": bool(friend["anonymous"]),
+         "follows_you": bool(friend["follows_you"])}
         for friend in friends
+    ]
+
+
+@app.get("/api/followers")
+async def list_followers(request: Request) -> list[dict[str, Any]]:
+    """People who follow the user, with whether the user follows them back."""
+    user_id = request.state.user_id
+    account = database.get_account_by_id(user_id)
+    if account and account["anonymous"]:
+        return []
+    return [
+        {"username": follower["username"], "display_name": follower["display_name"],
+         "player_code": follower["player_code"],
+         "avatar_version": follower.get("avatar_version", 0),
+         "anonymous": bool(follower["anonymous"]),
+         "followed_back": bool(follower["followed_back"])}
+        for follower in database.get_followers(user_id)
     ]
 
 
@@ -1007,7 +1030,7 @@ async def get_friend_suggestions(request: Request, limit: int = 3) -> list[dict[
     if not pool:
         return []
 
-    max_suggestions = max(1, min(limit, 10))
+    max_suggestions = max(1, min(limit, 50))
     today_days = (date_type.today() - date_type(2000, 1, 1)).days
     cadence_by_tier = {1: 1, 2: 2, 3: 3}
 

@@ -6,7 +6,7 @@ from datetime import date, timedelta
 from pathlib import Path
 
 from h21.db import GameDatabase
-from h21.sandbox import DEV_USERNAME, NO_PICTURE_PERSONA, add_activity, seed_database
+from h21.sandbox import BLOCKED_PERSONA, DEV_USERNAME, NO_PICTURE_PERSONA, add_activity, seed_database
 
 
 class SandboxSeedTests(unittest.TestCase):
@@ -157,6 +157,15 @@ class SandboxSeedTests(unittest.TestCase):
                     f"AND g.topic_slug = '{result['topic_slug']}' AND g.difficulty = '{result['difficulty']}'"
                 )
                 self.assertEqual(outcome["rows"], [["win"]])
+
+    def test_blocked_accounts_are_never_suggested_or_found(self) -> None:
+        blocked = self.database.get_account_by_username(BLOCKED_PERSONA[0])
+        self.assertTrue(blocked["blocked"])
+        dev_id = self.summary["dev_user_id"]
+        suggested = {entry["username"] for entry in self.database.get_friend_suggestions(dev_id)}
+        self.assertNotIn(BLOCKED_PERSONA[0], suggested)
+        found = {entry["username"] for entry in self.database.search_players(BLOCKED_PERSONA[0], exclude_user_id=dev_id)}
+        self.assertNotIn(BLOCKED_PERSONA[0], found)
 
     def test_answers_use_llm_vocabulary(self) -> None:
         invalid = self.database.execute_readonly_query(

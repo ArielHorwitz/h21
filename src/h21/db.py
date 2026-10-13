@@ -1114,12 +1114,12 @@ class GameDatabase:
     def search_players(self, query: str, exclude_user_id: int) -> list[dict[str, Any]]:
         """Search non-anonymous accounts by username or display_name (LIKE match),
         or by exact player code. Excludes the searching user and anonymous
-        players. Returns up to 20 results."""
+        or blocked players. Returns up to 20 results."""
         pattern = f"%{query}%"
         rows = self._connection.execute(
             "SELECT user_id, username, display_name, player_code, avatar_version "
             "FROM accounts "
-            "WHERE anonymous = 0 AND user_id != ? "
+            "WHERE anonymous = 0 AND blocked = 0 AND user_id != ? "
             "AND (username LIKE ? OR display_name LIKE ? OR player_code = ?) "
             "LIMIT 20",
             (exclude_user_id, pattern, pattern, query.strip().upper()),
@@ -1155,11 +1155,29 @@ class GameDatabase:
         anonymous — the API layer gates access."""
         rows = self._connection.execute(
             "SELECT a.user_id, a.username, a.display_name, a.player_code, "
-            "a.avatar_version, a.anonymous "
+            "a.avatar_version, a.anonymous, "
+            "EXISTS (SELECT 1 FROM friends back "
+            "        WHERE back.user_id = a.user_id AND back.friend_id = f.user_id) AS follows_you "
             "FROM friends f "
             "JOIN accounts a ON a.user_id = f.friend_id "
             "WHERE f.user_id = ? "
             "ORDER BY f.created_at",
+            (user_id,),
+        ).fetchall()
+        return [dict(row) for row in rows]
+
+    def get_followers(self, user_id: int) -> list[dict[str, Any]]:
+        """Return the accounts that follow the user, newest first, with
+        whether the user follows them back."""
+        rows = self._connection.execute(
+            "SELECT a.user_id, a.username, a.display_name, a.player_code, "
+            "a.avatar_version, a.anonymous, "
+            "EXISTS (SELECT 1 FROM friends back "
+            "        WHERE back.user_id = f.friend_id AND back.friend_id = a.user_id) AS followed_back "
+            "FROM friends f "
+            "JOIN accounts a ON a.user_id = f.user_id "
+            "WHERE f.friend_id = ? "
+            "ORDER BY f.created_at DESC",
             (user_id,),
         ).fetchall()
         return [dict(row) for row in rows]
@@ -1299,7 +1317,7 @@ class GameDatabase:
             "FROM friends f "
             "JOIN accounts a ON a.user_id = f.user_id "
             "WHERE f.friend_id = ? "
-            "  AND a.anonymous = 0 "
+            "  AND a.anonymous = 0 AND a.blocked = 0 "
             "  AND f.user_id NOT IN ("
             "    SELECT friend_id FROM friends WHERE user_id = ?"
             "  ) "
@@ -1325,7 +1343,7 @@ class GameDatabase:
             "JOIN accounts a ON a.user_id = fof.friend_id "
             "JOIN accounts connector ON connector.user_id = my_follows.friend_id "
             "WHERE my_follows.user_id = ? "
-            "  AND a.anonymous = 0 "
+            "  AND a.anonymous = 0 AND a.blocked = 0 "
             "  AND a.user_id != ? "
             "  AND a.user_id NOT IN ("
             "    SELECT friend_id FROM friends WHERE user_id = ?"
@@ -1358,7 +1376,7 @@ class GameDatabase:
                 "FROM accounts a "
                 "WHERE a.invite_code = ? "
                 "  AND a.user_id != ? "
-                "  AND a.anonymous = 0 "
+                "  AND a.anonymous = 0 AND a.blocked = 0 "
                 "  AND a.user_id NOT IN ("
                 "    SELECT friend_id FROM friends WHERE user_id = ?"
                 "  ) "
