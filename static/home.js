@@ -19,6 +19,8 @@ const THINKING_MARK_SVG = `
 
 let gameStatuses = {};
 let topicStatusPollTimer = null;
+// Topics whose preview is open, kept across re-renders while polling.
+const openPreviews = new Set();
 
 todayDate.textContent = new Date().toLocaleDateString("en-US", {
   weekday: "long",
@@ -155,7 +157,6 @@ function renderTopicName(topic, card) {
   const toggle = document.createElement("button");
   toggle.type = "button";
   toggle.className = "topic-name-toggle";
-  toggle.setAttribute("aria-expanded", "false");
   toggle.textContent = topic.name;
   const chevron = document.createElement("span");
   chevron.className = "topic-name-chevron";
@@ -165,11 +166,14 @@ function renderTopicName(topic, card) {
 
   const preview = document.createElement("p");
   preview.className = "topic-preview";
-  preview.hidden = true;
-  preview.textContent = `Solutions might be like: ${topic.preview.join(" · ")}`;
+  preview.hidden = !openPreviews.has(topic.slug);
+  toggle.setAttribute("aria-expanded", String(!preview.hidden));
+  preview.textContent = `Examples: ${topic.preview.join(" · ")}`;
   toggle.addEventListener("click", () => {
     preview.hidden = !preview.hidden;
     toggle.setAttribute("aria-expanded", String(!preview.hidden));
+    if (preview.hidden) openPreviews.delete(topic.slug);
+    else openPreviews.add(topic.slug);
   });
   card.appendChild(preview);
   name.appendChild(toggle);

@@ -657,9 +657,13 @@ h1 {
   background: rgba(244, 67, 54, 0.1);
 }
 
+/* A table cell of buttons: kept a table cell (not flex) so rows stay aligned. */
 .user-actions {
-  display: flex;
-  gap: 0.3rem;
+  white-space: nowrap;
+}
+
+.user-actions > * + * {
+  margin-left: 0.3rem;
 }
 
 .user-detail-row > td {
