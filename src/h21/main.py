@@ -47,7 +47,7 @@ from h21.llm import (
 STATIC_DIR = Path(__file__).resolve().parent.parent.parent / "static"
 
 # Routes that don't require authentication.
-PUBLIC_PATHS = frozenset({"/login", "/api/login", "/api/register", "/api/invite-request", "/api/invite-request-hint"})
+PUBLIC_PATHS = frozenset({"/login", "/api/login", "/api/register", "/api/invite-request", "/api/invite-request-hint", "/api/open-signups"})
 PUBLIC_PREFIXES = ("/static/", "/avatars/")
 
 
@@ -79,7 +79,8 @@ class LoginRequest(BaseModel):
 class RegisterRequest(BaseModel):
     username: str
     password: str
-    invite_code: str
+    # Optional: without one, the sign-up takes one of the day's open spots.
+    invite_code: str = ""
 
 
 # -- app state populated during lifespan --
@@ -210,7 +211,7 @@ async def no_cache_static(request: Request, call_next):
     return response
 
 
-DEV_PATHS = ("/control", "/api/invites", "/api/accounts", "/api/query", "/api/invite-requests", "/api/logs", "/api/series")
+DEV_PATHS = ("/control", "/api/invites", "/api/accounts", "/api/query", "/api/invite-requests", "/api/logs", "/api/series", "/api/settings", "/api/admin")
 
 
 @app.middleware("http")
@@ -601,6 +602,20 @@ async def login_page(request: Request) -> HTMLResponse:
 
 # -- Auth endpoints --
 
+NO_OPEN_SPOTS_DETAIL = "No open spots left today. Try again tomorrow, or request an invite."
+
+
+def _open_signups_left(settings: dict[str, int]) -> int:
+    used = database.count_open_signups(datetime.now(timezone.utc).date())
+    return settings["open_signups_per_day"] - used
+
+
+@app.get("/api/open-signups")
+async def open_signups() -> dict[str, bool]:
+    """Whether someone can join today without an invite."""
+    return {"available": _open_signups_left(database.get_settings()) > 0}
+
+
 @app.post("/api/register")
 async def register(request_body: RegisterRequest) -> JSONResponse:
     username = request_body.username.strip()
@@ -612,17 +627,30 @@ async def register(request_body: RegisterRequest) -> JSONResponse:
         raise HTTPException(status_code=400, detail="Password must be at least 4 characters")
 
     invite_code = request_body.invite_code.strip().upper()
+    if database.get_account_by_username(username) is not None:
+        raise HTTPException(status_code=409, detail="Username already taken")
 
-    invite = database.consume_invite(invite_code)
-    if invite is None:
-        raise HTTPException(status_code=400, detail="Invalid or exhausted invite code")
-
-    try:
+    if invite_code:
+        invite = database.consume_invite(invite_code)
+        if invite is None:
+            raise HTTPException(status_code=400, detail="Invalid or exhausted invite code")
+        role = invite["role"]
         question_limit = invite["daily_question_limit"] if invite["daily_question_limit"] is not None else default_daily_question_limit
         topic_limit = invite["daily_topic_limit"] if invite["daily_topic_limit"] is not None else default_daily_topic_limit
         avatar_limit = invite["monthly_avatar_limit"] if invite["monthly_avatar_limit"] is not None else default_monthly_avatar_limit
+    else:
+        # An open sign-up: limited per day, with its own (admin-set) quotas.
+        settings = database.get_settings()
+        if _open_signups_left(settings) <= 0:
+            raise HTTPException(status_code=403, detail=NO_OPEN_SPOTS_DETAIL)
+        role = "user"
+        question_limit = settings["open_signup_daily_question_limit"]
+        topic_limit = settings["open_signup_daily_topic_limit"]
+        avatar_limit = settings["open_signup_monthly_avatar_limit"]
+
+    try:
         user_id = database.create_account(
-            username, password, role=invite["role"], invite_code=invite_code,
+            username, password, role=role, invite_code=invite_code or None,
             daily_question_limit=question_limit,
             daily_topic_limit=topic_limit,
             monthly_avatar_limit=avatar_limit,
@@ -630,7 +658,7 @@ async def register(request_body: RegisterRequest) -> JSONResponse:
     except sqlite3.IntegrityError:
         raise HTTPException(status_code=409, detail="Username already taken")
 
-    database.log_activity(user_id, "register", {"invite_code": invite_code})
+    database.log_activity(user_id, "register", {"invite_code": invite_code or None})
 
     # Auto-generate a profile picture in the background (best-effort).
     account = database.get_account_by_id(user_id)
@@ -897,6 +925,9 @@ async def generate_avatar(
         )
 
     database.increment_avatar_generation(user_id, today)
+    database.log_activity(user_id, "generate_avatar", {
+        "prompt": prompt_text, "with_reference_photo": reference_bytes is not None,
+    })
 
     thumbnail_bytes = avatar_mod.save_pending(data_dir, player_code, image_bytes)
 
@@ -1457,6 +1488,48 @@ async def get_turned_down_topics() -> list[dict[str, Any]]:
         {"name": topic["name"], "detail": topic["status_detail"]}
         for topic in database.get_turned_down_topics()
     ]
+
+
+# -- Admin settings and attention (dev only, protected by middleware) --
+
+class SettingsUpdate(BaseModel):
+    values: dict[str, int]
+
+
+@app.get("/api/settings")
+async def get_settings() -> dict[str, Any]:
+    settings = database.get_settings()
+    return {
+        "settings": settings,
+        "open_signups_used_today": database.count_open_signups(datetime.now(timezone.utc).date()),
+    }
+
+
+@app.post("/api/settings")
+async def update_settings(request_body: SettingsUpdate) -> dict[str, Any]:
+    for key, value in request_body.values.items():
+        if value < 0:
+            raise HTTPException(status_code=400, detail=f"{key} can't be negative")
+        try:
+            database.set_setting(key, value)
+        except KeyError:
+            raise HTTPException(status_code=400, detail=f"Unknown setting: {key}")
+    return await get_settings()
+
+
+@app.get("/api/admin/attention")
+async def admin_attention() -> dict[str, Any]:
+    """What needs the admin: shown as a badge on the Admin tab."""
+    settings = database.get_settings()
+    invite_requests = len(database.get_all_invite_requests())
+    flagged_series = sum(1 for series in database.get_all_series() if series["needs_attention"])
+    open_spots_used_up = settings["open_signups_per_day"] > 0 and _open_signups_left(settings) <= 0
+    return {
+        "invite_requests": invite_requests,
+        "flagged_series": flagged_series,
+        "open_spots_used_up": open_spots_used_up,
+        "total": invite_requests + flagged_series + int(open_spots_used_up),
+    }
 
 
 # -- Series management (dev only, protected by middleware) --

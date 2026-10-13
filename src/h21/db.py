@@ -12,6 +12,16 @@ from typing import Any, Optional
 
 VALID_DIFFICULTIES = frozenset({"normal", "expert"})
 
+# Admin-adjustable settings and their defaults (stored as integers).
+SETTING_DEFAULTS = {
+    # Sign-ups without an invite allowed per day; 0 turns them off.
+    "open_signups_per_day": 3,
+    # Quotas for accounts created without an invite.
+    "open_signup_daily_question_limit": 200,
+    "open_signup_daily_topic_limit": 2,
+    "open_signup_monthly_avatar_limit": 3,
+}
+
 # Topics created within this long carry a "New" tag on Today.
 NEW_TOPIC_AGE = timedelta(days=3)
 
@@ -172,6 +182,11 @@ class GameDatabase:
                 request_id   INTEGER PRIMARY KEY AUTOINCREMENT,
                 contact_info TEXT NOT NULL,
                 created_at   TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS settings (
+                key   TEXT PRIMARY KEY,
+                value TEXT NOT NULL
             );
 
             CREATE TABLE IF NOT EXISTS activity_log (
@@ -516,6 +531,35 @@ class GameDatabase:
             (topic_slug,),
         ).fetchall()
         return [row["solution"] for row in rows]
+
+    # -- Settings --
+
+    def get_settings(self) -> dict[str, int]:
+        """All admin settings, with defaults for those never set."""
+        stored = {
+            row["key"]: int(row["value"])
+            for row in self._connection.execute("SELECT key, value FROM settings").fetchall()
+        }
+        return {key: stored.get(key, default) for key, default in SETTING_DEFAULTS.items()}
+
+    def set_setting(self, key: str, value: int) -> None:
+        if key not in SETTING_DEFAULTS:
+            raise KeyError(key)
+        self._connection.execute(
+            "INSERT INTO settings (key, value) VALUES (?, ?) "
+            "ON CONFLICT (key) DO UPDATE SET value = excluded.value",
+            (key, str(value)),
+        )
+        self._connection.commit()
+
+    def count_open_signups(self, day: date) -> int:
+        """Accounts created on `day` (UTC) without an invite."""
+        row = self._connection.execute(
+            "SELECT COUNT(*) AS count FROM accounts "
+            "WHERE invite_code IS NULL AND substr(created_at, 1, 10) = ?",
+            (day.isoformat(),),
+        ).fetchone()
+        return row["count"]
 
     # -- Series --
 
