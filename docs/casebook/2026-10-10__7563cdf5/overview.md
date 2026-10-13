@@ -117,7 +117,7 @@ Dropped: second seasons (easy to add later if the app takes off; series already 
 
 Overhaul deployment, wipe game data, and remove production's config override (`model = "gpt-5.4-mini"`, `reasoning_effort = "high"`), otherwise the new default (`gpt-6-luna`, high) never takes effect. Production today runs `master` as root under systemd (`/etc/systemd/system/h21.service`, code in `/opt/h21`, config in `/root/.config/h21/config.toml`), behind Caddy at h21.ariel.tools; changing it needs the user's sudo.
 
-Also for the relaunch: the database must be created fresh (no migrations; the schema changed throughout, e.g. `settings`, `accounts.time_zone`, `daily_usage.avatar_generations_used`). Open sign-ups default to 3 a day with their own quotas (200 questions, 2 topics, 3 pictures): the user may want to set these in the control panel (Admin tab, Invites) right after launch.
+Also for the relaunch: the database must be created fresh (no migrations; the schema changed throughout, e.g. `settings`, `accounts.time_zone`, `daily_usage.avatar_generations_used`). Open sign-ups default to 3 a day with their own quotas (200 questions, 2 topics, 3 pictures): the user may want to set these in the control panel (Admin tab, Invites) right after launch. After seeding the first topics, the admin can remove their New tags (control panel, Topics tab, "Remove all"), so they don't all look new at launch.
 
 ## Decisions on models
 
