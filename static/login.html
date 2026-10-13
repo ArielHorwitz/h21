@@ -25,7 +25,7 @@
     <section class="login-card">
       <div class="segmented" role="tablist">
         <button type="button" role="tab" id="login-tab" aria-selected="true">Log in</button>
-        <button type="button" role="tab" id="register-tab" aria-selected="false">Join with an invite</button>
+        <button type="button" role="tab" id="register-tab" aria-selected="false">Join</button>
       </div>
 
       <form id="login-form" class="login-form">
@@ -38,8 +38,9 @@
       </form>
 
       <form id="register-form" class="login-form" hidden>
-        <label for="register-invite">Invite code</label>
-        <input type="text" id="register-invite" autocomplete="off" maxlength="20" required>
+        <p id="open-signups-note" class="field-hint" hidden></p>
+        <label for="register-invite" id="register-invite-label">Invite code (optional)</label>
+        <input type="text" id="register-invite" autocomplete="off" maxlength="20">
         <label for="register-username">Choose a username</label>
         <input type="text" id="register-username" autocomplete="username" maxlength="40" required>
         <label for="register-password">Choose a password</label>

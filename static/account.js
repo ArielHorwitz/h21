@@ -1,5 +1,4 @@
 const accountUsername = document.getElementById("account-username");
-const controlLink = document.getElementById("control-link");
 const logoutBtn = document.getElementById("logout-btn");
 
 const displayNameInput = document.getElementById("display-name-input");
@@ -38,9 +37,6 @@ async function loadAccount() {
     if (response.ok) {
       const data = await response.json();
       accountUsername.textContent = data.username;
-      if (data.role === "dev") {
-        controlLink.hidden = false;
-      }
 
       savedDisplayName = data.display_name || "";
       displayNameInput.value = savedDisplayName;

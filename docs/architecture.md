@@ -14,8 +14,8 @@
 1. Request hits FastAPI
 2. `no_cache_static` middleware sets cache headers on static/page routes
 3. `require_auth` middleware checks the session cookie:
-   - Public paths (`/login`, `/api/login`, `/api/register`, `/static/*`) pass through
-   - Dev paths (`/control`, `/api/invites`, `/api/accounts`, `/api/query`, `/api/series` and a few more) require `role == "dev"`
+   - Public paths (`/login`, `/api/login`, `/api/register`, `/api/open-signups`, `/static/*`) pass through
+   - Dev paths (`/control`, `/api/invites`, `/api/accounts`, `/api/query`, `/api/series`, `/api/settings`, `/api/admin` and a few more) require `role == "dev"`
    - All other paths require a valid, non-blocked account
    - Sets `request.state.user_id` and `request.state.role` for downstream handlers
 4. Route handler executes, typically calling `database.*` and/or `llm_client` via helper functions
@@ -39,6 +39,12 @@ Per-user daily quotas tracked in `daily_usage` table:
 - `daily_question_limit` (default 105) -- max questions per day across all games
 - `daily_topic_limit` (default 1) -- max topic suggestions per day
 - Devs can reset usage or adjust limits per account
+
+## Registration
+
+Anyone can join without an invite while the day's open spots last (`open_signups_per_day`, default 3, counted per UTC day; 0 turns it off). Open sign-ups get their own quotas (200 questions and 2 topics a day, 3 pictures a month by default). Invites still work when the spots are gone, and their quotas come from the invite or the config defaults. All four values live in the `settings` table and are edited from the control panel. Picture prompts are recorded in the activity log for review.
+
+So newcomers without friends or an invite still have someone to follow, friend suggestions fill any slots left after followers, friends of friends and invite-mates with players active in the last week (most recent first, never anonymous or blocked ones).
 
 ## Key Patterns
 

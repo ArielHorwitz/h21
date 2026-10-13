@@ -100,7 +100,7 @@ Composite primary key: `(date, topic_slug, difficulty)`.
 | `blocked` | INTEGER | 0 or 1 |
 | `daily_question_limit` | INTEGER | Default 105 |
 | `daily_topic_limit` | INTEGER | Default 1 |
-| `invite_code` | TEXT | Code used to register |
+| `invite_code` | TEXT | Code used to register; NULL for an open sign-up |
 | `avatar_version` | INTEGER | Bumped on each avatar change (0 = no avatar) |
 | `avatar_generations_used` | INTEGER | Monthly counter for avatar generations |
 | `avatar_generation_reset` | TEXT | ISO date of last counter reset (nullable) |
@@ -118,6 +118,14 @@ Composite primary key: `(date, topic_slug, difficulty)`.
 | `daily_topic_limit` | INTEGER | Default topic limit for registrants (nullable, NULL = 1) |
 | `monthly_avatar_limit` | INTEGER | Default avatar generation limit for registrants (nullable, NULL = 3) |
 | `created_at` | TEXT | UTC ISO timestamp |
+
+### `settings`
+| Column | Type | Notes |
+|--------|------|-------|
+| `key` | TEXT PK | One of `SETTING_DEFAULTS` in `db.py` |
+| `value` | INTEGER | |
+
+Admin-editable values. A missing row means the default applies.
 
 ### `daily_usage`
 | Column | Type | Notes |

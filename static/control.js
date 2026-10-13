@@ -698,6 +698,61 @@ loadInviteRequests();
 loadActivityLog(false);
 loadUsers();
 
+// -- Open sign-up settings --
+
+const settingsForm = document.getElementById("settings-form");
+const settingsStatus = document.getElementById("settings-status");
+const settingInputs = settingsForm.querySelectorAll("[data-setting]");
+
+function renderSettings(data) {
+  for (const input of settingInputs) {
+    input.value = data.settings[input.dataset.setting];
+  }
+  document.getElementById("open-signups-usage").textContent =
+    `Sign-ups without an invite. Used today (UTC): ${data.open_signups_used_today} of ${data.settings.open_signups_per_day}. Quotas apply to new accounts only.`;
+}
+
+async function loadSettings() {
+  try {
+    const response = await fetch("/api/settings");
+    if (response.ok) renderSettings(await response.json());
+  } catch (error) {
+    console.error("Failed to load settings:", error);
+  }
+}
+
+settingsForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  settingsStatus.hidden = true;
+  const values = {};
+  for (const input of settingInputs) {
+    values[input.dataset.setting] = parseInt(input.value, 10);
+  }
+  try {
+    const response = await fetch("/api/settings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ values }),
+    });
+    const data = await response.json();
+    if (response.ok) {
+      renderSettings(data);
+      settingsStatus.textContent = "Saved.";
+      settingsStatus.className = "status-success";
+    } else {
+      settingsStatus.textContent = data.detail || "Failed to save.";
+      settingsStatus.className = "status-error";
+    }
+  } catch {
+    settingsStatus.textContent = "Network error. Please try again.";
+    settingsStatus.className = "status-error";
+  } finally {
+    settingsStatus.hidden = false;
+  }
+});
+
+loadSettings();
+
 // -- Tabs --
 
 const controlTabs = document.querySelectorAll(".control-tabs [data-panel]");

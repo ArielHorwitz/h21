@@ -13,6 +13,9 @@ from typing import Any, Optional
 VALID_DIFFICULTIES = frozenset({"normal", "expert"})
 
 # Admin-adjustable settings and their defaults (stored as integers).
+# How far back tier 4 friend suggestions look for active players.
+RECENTLY_ACTIVE_DAYS = 7
+
 SETTING_DEFAULTS = {
     # Sign-ups without an invite allowed per day; 0 turns them off.
     "open_signups_per_day": 3,
@@ -1345,6 +1348,8 @@ class GameDatabase:
         1. Users who follow you but you don't follow back
         2. 2nd-order connections (friends-of-friends), excluding tier 1
         3. Users who registered with the same invite code, excluding tiers 1-2
+        4. Recently active players (a game in the last week), most recent
+           first, excluding tiers 1-3; this only fills the remaining slots
 
         Returns empty list if the user is anonymous.  Each dict includes:
         user_id, username, display_name, player_code, avatar_version, tier, reason.
@@ -1441,6 +1446,35 @@ class GameDatabase:
                     "tier": 3,
                     "reason": "Joined from the same invite",
                 })
+
+        # Tier 4: recently active players, so newcomers without friends or
+        # an invite still have someone to follow.
+        since = (datetime.now(timezone.utc) - timedelta(days=RECENTLY_ACTIVE_DAYS)).isoformat()
+        tier4_rows = self._connection.execute(
+            "SELECT a.user_id, a.username, a.display_name, a.player_code, "
+            "a.avatar_version "
+            "FROM games g "
+            "JOIN accounts a ON a.user_id = g.user_id "
+            "WHERE g.started_at >= ? "
+            "  AND a.user_id != ? "
+            "  AND a.anonymous = 0 AND a.blocked = 0 "
+            "  AND a.user_id NOT IN ("
+            "    SELECT friend_id FROM friends WHERE user_id = ?"
+            "  ) "
+            "GROUP BY a.user_id "
+            "ORDER BY MAX(g.started_at) DESC "
+            "LIMIT 50",
+            (since, user_id, user_id),
+        ).fetchall()
+        for row in tier4_rows:
+            if row["user_id"] in seen_ids:
+                continue
+            seen_ids.add(row["user_id"])
+            pool.append({
+                **dict(row),
+                "tier": 4,
+                "reason": "Played recently",
+            })
 
         return pool
 

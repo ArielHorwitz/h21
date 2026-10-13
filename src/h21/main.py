@@ -1065,6 +1065,7 @@ async def get_friend_suggestions(request: Request, limit: int = 3) -> list[dict[
 
     max_suggestions = max(1, min(limit, 50))
     today_days = (date_type.today() - date_type(2000, 1, 1)).days
+    # Days between rotations; tier 4 doesn't rotate, it stays most recent first.
     cadence_by_tier = {1: 1, 2: 2, 3: 3}
 
     # Group pool by tier.
@@ -1075,12 +1076,12 @@ async def get_friend_suggestions(request: Request, limit: int = 3) -> list[dict[
     # Select up to max_suggestions, preferring higher-priority tiers.
     suggestions: list[dict[str, Any]] = []
     remaining = max_suggestions
-    for tier_number in (1, 2, 3):
+    for tier_number in (1, 2, 3, 4):
         tier_pool = tiers.get(tier_number, [])
         if not tier_pool:
             continue
-        cadence = cadence_by_tier[tier_number]
-        offset = (today_days // cadence + user_id) % len(tier_pool)
+        cadence = cadence_by_tier.get(tier_number)
+        offset = (today_days // cadence + user_id) % len(tier_pool) if cadence else 0
         # Take up to `remaining` items starting at offset, wrapping around.
         for i in range(min(remaining, len(tier_pool))):
             index = (offset + i) % len(tier_pool)

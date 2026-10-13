@@ -17,7 +17,7 @@
   <meta name="twitter:card" content="summary_large_image">
   <link rel="stylesheet" href="/static/style.css">
 </head>
-<body data-tab="profile">
+<body data-tab="admin">
   <!--TOP_BAR-->
   <main class="page page-wide">
     <header class="page-header">
@@ -32,6 +32,33 @@
       <button type="button" role="tab" data-panel="query">Query</button>
       <button type="button" role="tab" data-panel="logs">Logs</button>
     </nav>
+
+    <div class="control-section" data-panel="invites">
+      <h2>Open sign-ups</h2>
+      <p class="field-hint" id="open-signups-usage"></p>
+      <form id="settings-form">
+        <div class="control-row">
+          <div class="settings-field">
+            <label for="setting-open_signups_per_day">Per day (0 = off)</label>
+            <input type="number" id="setting-open_signups_per_day" data-setting="open_signups_per_day" min="0" max="10000" required>
+          </div>
+          <div class="settings-field">
+            <label for="setting-open_signup_daily_question_limit">Questions / day</label>
+            <input type="number" id="setting-open_signup_daily_question_limit" data-setting="open_signup_daily_question_limit" min="0" max="10000" required>
+          </div>
+          <div class="settings-field">
+            <label for="setting-open_signup_daily_topic_limit">Topics / day</label>
+            <input type="number" id="setting-open_signup_daily_topic_limit" data-setting="open_signup_daily_topic_limit" min="0" max="1000" required>
+          </div>
+          <div class="settings-field">
+            <label for="setting-open_signup_monthly_avatar_limit">Pictures / month</label>
+            <input type="number" id="setting-open_signup_monthly_avatar_limit" data-setting="open_signup_monthly_avatar_limit" min="0" max="1000" required>
+          </div>
+        </div>
+        <button type="submit" class="primary-btn">Save</button>
+        <p id="settings-status" hidden></p>
+      </form>
+    </div>
 
     <div class="control-section" data-panel="invites">
       <h2>Create invite</h2>

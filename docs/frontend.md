@@ -28,10 +28,12 @@ Colors and sizes are CSS custom properties at the top of `style.css`. The
 | Friends | `friends.html`, `friends.js` | Recent games with friends, search by name or player code, three suggestions (See all), links to Following and Followers with counts, and the anonymous-mode switch. |
 | People | `people.html`, `people.js` | Following, Followers and Suggested lists as tabs: "Follows you" on people who follow back, Follow back for followers you don't follow, the full suggestions list. |
 | Leaderboard | `leaderboard.html`, `leaderboard.js` | Ranked list for one puzzle with an Everyone / Friends switch. Redirects to Friends without query parameters. |
-| Profile | `account.html`, `account.js` | Picture (AI generation flow), inline display name, stats, history list, settings (anonymous mode, control panel, log out). |
-| Login | `login.html`, `login.js` | Log in / Join switch, invite request behind a link. `?invite=CODE` opens Join prefilled. |
+| Profile | `account.html`, `account.js` | Picture (AI generation flow), inline display name, stats, history list, settings (log out). |
+| Login | `login.html`, `login.js` | Log in / Join switch, invite request behind a link. The invite code is optional while open spots last; otherwise Join says so and requires one. `?invite=CODE` opens Join prefilled. |
 | Help | `help.html` | Rules, answers, hints, sharing, topics, tips. |
-| Control | `control.html`, `control.js` | Dev-only admin panel: SQL query tool, account management, invite management. |
+| Control | `control.html`, `control.js` | Dev-only admin panel, reached from the Admin tab: open sign-up settings, invites and requests, series, users, activity, SQL queries, logs. |
+
+The tab bar (`partials/tab-bar.html`) has Today, Friends and Profile, plus an Admin tab that `nav.js` shows to devs with a badge counting what needs attention (`/api/admin/attention`).
 
 `people-list.js` holds the person rows and follow/unfollow actions shared by Friends and People. `question-log.js` holds the question log rendering (entries, answer chips,
 hints, the meter) shared by the game and results pages.

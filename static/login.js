@@ -126,6 +126,19 @@ inviteRequestToggle.addEventListener("click", () => {
   document.getElementById("invite-request-contact").focus();
 });
 
+// Without open spots today, joining needs an invite.
+fetch("/api/open-signups")
+  .then((response) => response.json())
+  .then((data) => {
+    if (data.available) return;
+    const note = document.getElementById("open-signups-note");
+    note.textContent = "No open spots left today. Join with an invite, or try again tomorrow.";
+    note.hidden = false;
+    document.getElementById("register-invite-label").textContent = "Invite code";
+    document.getElementById("register-invite").required = true;
+  })
+  .catch(() => {});
+
 // An invite link (/login?invite=CODE) opens the join form with the code filled in.
 const inviteFromUrl = new URLSearchParams(window.location.search).get("invite");
 if (inviteFromUrl) {

@@ -29,13 +29,13 @@ An AI-powered 21 questions trivia game. Players pick a topic (suggested by playe
 | `static/people.html/js` | Following, Followers and Suggested lists |
 | `static/people-list.js` | Person rows and follow actions shared by Friends and People |
 | `static/leaderboard.html/js` | Per-puzzle leaderboard |
-| `static/login.html/js` | Log in, join with invite, invite requests |
+| `static/login.html/js` | Log in, join (invite optional while open spots last), invite requests |
 | `static/account.html/js` | Profile: picture, name, stats, history, settings |
 | `static/control.html/js` | Dev-only admin panel: SQL queries, account management |
 | `static/help.html` | Game rules and instructions |
 | `static/partials/*.html` | Shared top bar and tab bar, included by `render_page` |
 | `static/question-log.js` | Question log rendering shared by game and results |
-| `static/nav.js` | Shared script: replaces the Profile tab icon with the avatar |
+| `static/nav.js` | Shared script: Profile tab avatar, Admin tab and its badge for devs |
 
 ## Progressive Discovery
 

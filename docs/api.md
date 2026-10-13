@@ -6,7 +6,8 @@ All API endpoints are defined in `src/h21/main.py`. JSON request/response bodies
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| POST | `/api/register` | Public | Create account with username, password, invite code. Sets session cookie. |
+| POST | `/api/register` | Public | Create account with username, password and an optional invite code. Without one, it takes one of the day's open spots (403 when none are left) and gets the open sign-up quotas. Sets session cookie. |
+| GET | `/api/open-signups` | Public | `available`: whether someone can join today without an invite. |
 | POST | `/api/login` | Public | Authenticate with username/password. Sets session cookie. |
 | POST | `/api/logout` | User | Clears session cookie. |
 | GET | `/api/me` | User | Returns current user info and daily usage stats. |
@@ -18,6 +19,14 @@ All API endpoints are defined in `src/h21/main.py`. JSON request/response bodies
 | GET | `/api/topics` | User | List ready topics, plus the user's own topics still being built. Each has `series` (per difficulty: `state` available/winding_down/finished and `remaining`), `preview` (five solutions), `is_new` and `suggested_by_me`. |
 | POST | `/api/topics` | User | Submit a new topic. LLM tidies the name, then the topic is built in the background (status `generating`). Counts against the daily topic limit. 409 if a topic with the same tidied name exists or is being built; a turned-down one may be tried again. |
 | GET | `/api/topics/turned-down` | User | Recently turned-down topics with the reason (e.g. how many solutions each difficulty kept). |
+
+## Admin (dev only)
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/api/settings` | Dev | Admin settings (open sign-ups per day and their quotas) and open sign-ups used today. |
+| POST | `/api/settings` | Dev | Update settings: `{"values": {key: int}}`. 400 for unknown keys or negative values. |
+| GET | `/api/admin/attention` | Dev | What needs the admin, for the Admin tab badge: pending invite requests, flagged series, whether today's open spots are used up, and their `total`. |
 
 ## Series (dev only)
 
