@@ -126,6 +126,11 @@ committed, so drawing new puzzles makes no API calls either (answering
 questions and hints still do). Regenerate it with `h21-sandbox
 --generate-pools`.
 
+To add the sandbox's personas, topics and history to an instance that already
+has data (e.g. one started fresh and played for a while), use `--keep-data`
+with `--dir` pointing at it: existing accounts (including `admin`) are reused
+as they are, and existing topics keep their series, previews and dates.
+
 To make an existing sandbox feel lived-in over several days of play, add
 today's activity without resetting anything:
 

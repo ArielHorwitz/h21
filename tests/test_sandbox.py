@@ -234,3 +234,35 @@ class SandboxAddActivityTests(unittest.TestCase):
         self.assertEqual(after[:len(before)], before)
         puzzles_played = [(row[0], row[1], row[2], row[3]) for row in after]
         self.assertEqual(len(puzzles_played), len(set(puzzles_played)))
+
+
+class SandboxIntoExistingDataTests(unittest.TestCase):
+    def test_existing_accounts_and_topics_are_kept(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            db_path = Path(temporary_directory).joinpath("h21.db")
+            database = GameDatabase(db_path)
+            database.ensure_schema()
+            admin_id = database.create_account(
+                ADMIN_USERNAME, "own-password", role="admin", daily_question_limit=5, daily_topic_limit=1,
+            )
+            database.add_topic("roman-history", "Roman History", user_id=admin_id, status="ready")
+            database.insert_pool_solutions("roman-history", "normal", [f"Emperor {number}" for number in range(60)])
+            database.set_series_status("roman-history", "normal", "available")
+            database.set_series_status("roman-history", "expert", "unavailable")
+            database.set_preview_solutions("roman-history", ["Emperor 1", "Emperor 2", "Emperor 3", "Emperor 4", "Emperor 5"])
+            topic_created_at = lambda db: db.execute_readonly_query(
+                "SELECT created_at FROM topics WHERE slug = 'roman-history'"
+            )["rows"][0][0]
+            created_at = topic_created_at(database)
+            database.close()
+
+            seed_database(db_path, password="test-password", rng_seed=21, today=date(2026, 8, 28))
+
+            database = GameDatabase(db_path)
+            self.assertIsNotNone(database.authenticate(ADMIN_USERNAME, "own-password"))
+            self.assertEqual(database.get_account_by_username(ADMIN_USERNAME)["user_id"], admin_id)
+            self.assertEqual(database.get_series_status("roman-history", "expert"), "unavailable")
+            self.assertEqual(database.get_preview_solutions("roman-history")[0], "Emperor 1")
+            self.assertEqual(topic_created_at(database), created_at)
+            self.assertGreater(len(database.get_friends(admin_id)), 0)
+            database.close()

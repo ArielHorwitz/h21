@@ -444,8 +444,10 @@ def _seed_pools(database: GameDatabase) -> int:
     return pooled
 
 
-def _seed_series(database: GameDatabase, rng: random.Random) -> None:
+def _seed_series(database: GameDatabase, rng: random.Random, skip: frozenset[str] = frozenset()) -> None:
     """Give each ready topic its series and preview, as a topic build would.
+
+    Topics in `skip` (ones that existed before seeding) are left alone.
 
     A series is available if its pool meets the same minimum as a real build,
     and unavailable otherwise. The preview is a random sample here, where a
@@ -454,6 +456,8 @@ def _seed_series(database: GameDatabase, rng: random.Random) -> None:
     from h21.main import PREVIEW_SIZE, SERIES_MIN_SOLUTIONS
 
     for topic in database.get_topics_with_status("ready"):
+        if topic["slug"] in skip:
+            continue
         available = []
         for difficulty in ("normal", "expert"):
             enough = database.pool_count(topic["slug"], difficulty) >= SERIES_MIN_SOLUTIONS
@@ -536,6 +540,10 @@ def seed_database(
 
     "Today" is the date in `time_zone` (admin's, since each player's day
     follows their own clock), or the system's local date.
+
+    An existing database is added to rather than replaced: an existing
+    account with a persona's name is reused as is, and topics that already
+    exist keep their series, previews and dates.
     """
     if today is None:
         today = _today_in(time_zone)
@@ -547,6 +555,7 @@ def seed_database(
 
     database = GameDatabase(db_path)
     database.ensure_schema()
+    existing_topics = frozenset(topic["slug"] for topic in database.get_all_topics())
     # The base topics are created ready, like an admin's first suggestions;
     # their pools come from the committed sample pools below.
     for topic_slug in ("notable-people", "world-geography"):
@@ -558,6 +567,9 @@ def seed_database(
         username: str, display_name: str,
         role: str = "user", anonymous: bool = False, with_picture: bool = True,
     ) -> int:
+        existing = database.get_account_by_username(username)
+        if existing is not None:
+            return existing["user_id"]
         database.consume_invite(invite_code)
         user_id = database.create_account(
             username, password, role=role, invite_code=invite_code,
@@ -788,7 +800,7 @@ def seed_database(
     database.create_invite_request("+1 555 0100")
 
     pooled_count = _seed_pools(database)
-    _seed_series(database, rng)
+    _seed_series(database, rng, skip=existing_topics)
 
     # Series in every state. A finished series must have no puzzle today, so
     # it goes to a series nobody played today and its unplayed puzzle is
@@ -847,7 +859,7 @@ def seed_database(
     history_start = datetime.combine(today - timedelta(days=history_days), datetime.min.time(), timezone.utc)
     newest_slug = slugify(EXTRA_TOPICS[-1])
     for topic in database.get_all_topics():
-        if topic["slug"] not in (newest_slug, BUILDING_TOPIC[0]):
+        if topic["slug"] not in (newest_slug, BUILDING_TOPIC[0], *existing_topics):
             fixups.topics.append((history_start.isoformat(), topic["slug"]))
     database.close()
     _apply_timestamp_fixups(db_path, fixups)
@@ -1170,6 +1182,11 @@ def main() -> None:
         help="Port for --serve (default: 8000)",
     )
     parser.add_argument(
+        "--keep-data", action="store_true",
+        help="Add the sandbox's personas, topics and history to an existing instance's "
+             "database (in --dir) instead of recreating it",
+    )
+    parser.add_argument(
         "--time-zone",
         help="admin's time zone (e.g. America/New_York), which sets the sandbox's today "
              "(default: the system's)",
@@ -1208,6 +1225,17 @@ def main() -> None:
             outcome = {"win": "solved", "loss": "not solved", "in_progress": "in progress"}[game["outcome"]]
             link = f"  /replay?code={game['share_code']}" if game["outcome"] != "in_progress" else ""
             print(f"  {game['username']:8} {game['topic_slug']} ({game['difficulty']}): {outcome}{link}")
+        return
+
+    if args.keep_data:
+        if not db_path.is_file():
+            print(f"No database at {db_path}.", file=sys.stderr)
+            sys.exit(1)
+        summary = seed_database(
+            db_path, password=args.password, friend_count=args.friends,
+            history_days=args.days, rng_seed=args.seed, time_zone=args.time_zone,
+        )
+        print(f"Added {summary['game_count']} games and {summary['puzzle_count']} puzzles to {db_path}.")
         return
 
     if db_path.is_file() and not args.force:
