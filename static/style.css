@@ -2422,3 +2422,20 @@ a.history-row:hover {
   grid-template-columns: repeat(3, 1fr);
 }
 
+
+/* Points the admin to what needs attention inside the control panel. */
+.attention-badge {
+  display: inline-block;
+  min-width: 1.15rem;
+  height: 1.15rem;
+  margin-left: 0.4rem;
+  padding: 0 0.3rem;
+  border-radius: 0.6rem;
+  background: var(--no);
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 1.15rem;
+  text-align: center;
+  vertical-align: middle;
+}

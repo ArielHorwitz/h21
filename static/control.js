@@ -203,6 +203,7 @@ async function loadInviteRequests() {
       const requests = await response.json();
       renderInviteRequests(requests);
     }
+    refreshAttention();
   } catch (error) {
     console.error("Failed to load invite requests:", error);
   }
@@ -233,7 +234,9 @@ function formatActivityDetail(action, detail) {
     const data = typeof detail === "string" ? JSON.parse(detail) : detail;
     switch (action) {
       case "register":
-        return `invite: ${data.invite_code}`;
+        return data.invite_code ? `invite: ${data.invite_code}` : "open sign-up";
+      case "generate_avatar":
+        return (data.prompt || "(no prompt)") + (data.with_reference_photo ? " + photo" : "");
       case "follow":
         return `followed ${data.target_username}`;
       case "unfollow":
@@ -737,6 +740,7 @@ settingsForm.addEventListener("submit", async (event) => {
     const data = await response.json();
     if (response.ok) {
       renderSettings(data);
+      refreshAttention();
       settingsStatus.textContent = "Saved.";
       settingsStatus.className = "status-success";
     } else {
@@ -752,6 +756,47 @@ settingsForm.addEventListener("submit", async (event) => {
 });
 
 loadSettings();
+
+// -- Attention badges --
+// The Admin tab's badge counts what needs attention; these point to where.
+
+function setBadge(element, label) {
+  if (!element) return;
+  let badge = element.querySelector(".attention-badge");
+  if (!label) {
+    if (badge) badge.remove();
+    return;
+  }
+  if (!badge) {
+    badge = document.createElement("span");
+    badge.className = "attention-badge";
+    element.appendChild(badge);
+  }
+  badge.textContent = label;
+}
+
+async function refreshAttention() {
+  let attention;
+  try {
+    const response = await fetch("/api/admin/attention");
+    if (!response.ok) return;
+    attention = await response.json();
+  } catch {
+    return;
+  }
+  const invitesCount = attention.invite_requests + Number(attention.open_spots_used_up);
+  setBadge(document.querySelector('.control-tabs [data-panel="invites"]'), invitesCount);
+  setBadge(document.querySelector('.control-tabs [data-panel="topics"]'), attention.flagged_series);
+  setBadge(document.getElementById("invite-requests-heading"), attention.invite_requests);
+  setBadge(document.getElementById("open-signups-heading"), attention.open_spots_used_up ? "!" : "");
+  setBadge(document.getElementById("attention-column"), attention.flagged_series);
+
+  const tabBadge = document.querySelector("#nav-admin .tab-badge");
+  if (tabBadge) {
+    tabBadge.textContent = attention.total;
+    tabBadge.hidden = attention.total < 1;
+  }
+}
 
 // -- Tabs --
 
@@ -819,7 +864,7 @@ async function loadSeries() {
   }
   const table = document.createElement("table");
   table.className = "data-table";
-  table.innerHTML = "<thead><tr><th>Topic</th><th>Difficulty</th><th>Status</th><th>Pool</th><th>Played</th><th>Last refill (made/kept)</th><th>Attention</th><th></th></tr></thead>";
+  table.innerHTML = "<thead><tr><th>Topic</th><th>Difficulty</th><th>Status</th><th>Pool</th><th>Played</th><th>Last refill (made/kept)</th><th id='attention-column'>Attention</th><th></th></tr></thead>";
   const body = document.createElement("tbody");
   for (const series of rows) {
     const row = document.createElement("tr");
@@ -831,6 +876,10 @@ async function loadSeries() {
       const cell = document.createElement("td");
       cell.textContent = value;
       row.appendChild(cell);
+    }
+    // The Attention column is off-screen on phones, so flagged rows say so up front.
+    if (series.needs_attention) {
+      setBadge(row.firstChild, "!");
     }
     const actions = document.createElement("td");
     actions.className = "user-actions";
@@ -856,6 +905,7 @@ async function loadSeries() {
   wrapper.className = "table-scroll-wrapper";
   wrapper.appendChild(table);
   seriesList.appendChild(wrapper);
+  refreshAttention();
 }
 
 loadSeries();
