@@ -128,6 +128,14 @@ function renderSummary(game) {
   stats.push(hintsUsed > 0 ? pluralize(hintsUsed, "hint") : "no hints");
   resultStats.textContent = stats.join(" · ");
 
+  if (game.new_puzzle_waiting) {
+    const playLink = document.createElement("a");
+    playLink.className = "primary-btn";
+    playLink.href = `/game?topic=${encodeURIComponent(game.topic_slug)}&difficulty=${encodeURIComponent(game.difficulty)}`;
+    playLink.textContent = "Play today's puzzle";
+    resultActions.appendChild(playLink);
+  }
+
   if (game.result === "win" || game.result === "loss") {
     if (game.is_own_game) {
       const shareText = buildShareText(game);
@@ -155,14 +163,6 @@ function renderSummary(game) {
   replaySummary.hidden = false;
 }
 
-// Today's date in local time, as the server's puzzle dates are.
-function todayIso() {
-  const now = new Date();
-  const month = String(now.getMonth() + 1).padStart(2, "0");
-  const day = String(now.getDate()).padStart(2, "0");
-  return `${now.getFullYear()}-${month}-${day}`;
-}
-
 // How the game ended, for games that didn't end with a correct guess.
 function describeEnding(game) {
   if (game.result === "loss") {
@@ -170,9 +170,8 @@ function describeEnding(game) {
       ? "Out of questions"
       : `Gave up after question ${game.questions_asked}`;
   }
-  if (!game.result) {
-    return game.date === todayIso() ? "Still in progress" : "Left unfinished";
-  }
+  if (game.result === "abandoned") return "Abandoned";
+  if (!game.result) return "Still in progress";
   return null;
 }
 

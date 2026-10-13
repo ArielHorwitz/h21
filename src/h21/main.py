@@ -10,6 +10,7 @@ from contextlib import asynccontextmanager
 from datetime import date as date_type, datetime, timezone
 from pathlib import Path
 from typing import Any, AsyncIterator, Optional
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 logger = logging.getLogger("h21")
 
@@ -53,8 +54,8 @@ PUBLIC_PREFIXES = ("/static/", "/avatars/")
 
 class AskRequest(BaseModel):
     question: str
-    game_id: Optional[int] = None
-    question_number: Optional[int] = None
+    game_id: int
+    question_number: int
 
 
 class NewGameRequest(BaseModel):
@@ -214,6 +215,39 @@ async def no_cache_static(request: Request, call_next):
 DEV_PATHS = ("/control", "/api/invites", "/api/accounts", "/api/query", "/api/invite-requests", "/api/logs", "/api/series", "/api/settings", "/api/admin")
 
 
+# -- Player dates --
+# UTC is the canonical time; each player's day follows their own clock. The
+# browser reports its time zone in a cookie (static/tz.js). Every time zone
+# is within 14 hours of UTC, so a player's date is always UTC's yesterday,
+# today or tomorrow.
+
+TIME_ZONE_COOKIE = "tz"
+
+
+def _time_zone(name: Optional[str]) -> Optional[ZoneInfo]:
+    if not name:
+        return None
+    try:
+        return ZoneInfo(name)
+    except (ZoneInfoNotFoundError, ValueError):
+        return None
+
+
+def _date_in_zone(name: Optional[str]) -> date_type:
+    zone = _time_zone(name) or timezone.utc
+    return datetime.now(timezone.utc).astimezone(zone).date()
+
+
+def player_today(request: Request) -> date_type:
+    """The requesting player's local date (UTC's if their time zone is unknown)."""
+    return _date_in_zone(request.cookies.get(TIME_ZONE_COOKIE))
+
+
+def account_today(account: dict[str, Any]) -> date_type:
+    """A player's local date by their last known time zone, for admin views."""
+    return _date_in_zone(account.get("time_zone"))
+
+
 @app.middleware("http")
 async def require_auth(request: Request, call_next):
     path = request.url.path
@@ -234,6 +268,9 @@ async def require_auth(request: Request, call_next):
 
     request.state.user_id = user_id
     request.state.role = account["role"]
+    time_zone = request.cookies.get(TIME_ZONE_COOKIE)
+    if time_zone and time_zone != account["time_zone"] and _time_zone(time_zone) is not None:
+        database.set_time_zone(user_id, time_zone)
 
     if any(path.startswith(prefix) for prefix in DEV_PATHS):
         if account["role"] != "dev":
@@ -287,9 +324,11 @@ def _too_narrow_detail(pool_sizes: dict[str, int]) -> str:
     )
 
 
-async def get_today_solution(topic_slug: str, difficulty: str) -> str:
-    """Return today's solution for a series, drawing it from the pool if needed."""
-    today = date_type.today()
+async def get_or_draw_solution(today: date_type, topic_slug: str, difficulty: str) -> str:
+    """Return the solution of a series' puzzle for a date, drawing it from the pool if needed.
+
+    Puzzles are drawn on demand, by the first player to start one on that date.
+    """
     async with _puzzle_draw_locks[(topic_slug, difficulty)]:
         existing = database.get_puzzle_solution(today, topic_slug, difficulty)
         if existing is not None:
@@ -701,8 +740,9 @@ async def get_me(request: Request) -> dict[str, Any]:
     account = database.get_account_by_id(user_id)
     if account is None:
         raise HTTPException(status_code=404, detail="Account not found")
-    usage = database.get_daily_usage(user_id, date_type.today())
-    avatar_usage = database.get_avatar_usage(user_id, date_type.today())
+    today = player_today(request)
+    usage = database.get_daily_usage(user_id, today)
+    avatar_usage = database.get_avatar_usage(user_id, today)
     return {
         "user_id": account["user_id"],
         "username": account["username"],
@@ -888,7 +928,7 @@ async def generate_avatar(
     if account is None:
         raise HTTPException(status_code=404, detail="Account not found")
 
-    today = date_type.today()
+    today = player_today(request)
     avatar_usage = database.get_avatar_usage(user_id, today)
     if avatar_usage["used"] >= avatar_usage["limit"]:
         raise HTTPException(
@@ -1254,8 +1294,8 @@ async def delete_invite_api(code: str) -> dict[str, str]:
 @app.get("/api/accounts")
 async def list_accounts() -> list[dict[str, Any]]:
     accounts = database.get_all_accounts()
-    today = date_type.today()
     for account in accounts:
+        today = account_today(account)
         usage = database.get_daily_usage(account["user_id"], today)
         account["questions_used_today"] = usage["questions_used"]
         account["topic_suggestions_used_today"] = usage["topic_suggestions_used"]
@@ -1306,7 +1346,10 @@ async def update_limits(user_id: int, request_body: UpdateLimitsRequest) -> dict
 
 @app.post("/api/accounts/{user_id}/reset-usage")
 async def reset_usage(user_id: int) -> dict[str, str]:
-    database.reset_daily_usage(user_id, date_type.today())
+    account = database.get_account_by_id(user_id)
+    if account is None:
+        raise HTTPException(status_code=404, detail="Account not found")
+    database.reset_daily_usage(user_id, account_today(account))
     return {"status": "ok"}
 
 
@@ -1439,15 +1482,15 @@ async def delete_invite_request(request_id: int) -> dict[str, str]:
 @app.get("/api/topics")
 async def get_topics(request: Request) -> list[dict[str, Any]]:
     user_id = request.state.user_id
-    today = date_type.today()
-    return database.get_topics_ranked(user_id, today)
+    return database.get_topics_ranked(user_id, player_today(request))
 
 
 @app.post("/api/topics")
 async def create_topic(request_body: NewTopicRequest, request: Request) -> dict[str, str]:
     user_id = request.state.user_id
     account = database.get_account_by_id(user_id)
-    usage = database.get_daily_usage(user_id, date_type.today())
+    today = player_today(request)
+    usage = database.get_daily_usage(user_id, today)
     if account and usage["topic_suggestions_used"] >= account["daily_topic_limit"]:
         raise HTTPException(status_code=429, detail="Daily topic suggestion limit reached")
 
@@ -1476,7 +1519,7 @@ async def create_topic(request_body: NewTopicRequest, request: Request) -> dict[
     if not database.add_topic(slug, name, user_id=user_id):
         # Someone else suggested the same name a moment ago.
         raise HTTPException(status_code=409, detail=f"\"{name}\" already exists")
-    database.increment_daily_topic_suggestions(user_id, date_type.today())
+    database.increment_daily_topic_suggestions(user_id, today)
     database.log_activity(user_id, "suggest_topic", {"topic_name": name, "topic_slug": slug})
     _start_topic_build(slug, name)
     return {"slug": slug, "name": name, "status": "generating"}
@@ -1563,25 +1606,54 @@ async def reopen_series(topic_slug: str, difficulty: str) -> dict[str, str]:
 
 # -- Game endpoints --
 
+def _current_game(
+    user_id: int, topic_slug: str, difficulty: str, today: date_type,
+) -> Optional[dict[str, Any]]:
+    """The game a series offers the player: an open one from any date, else today's.
+
+    A game belongs to its puzzle, not to a day, so a player can finish it
+    later; puzzles of the days in between are skipped. An open game from
+    another date with nothing asked doesn't hold anything up: it's dropped.
+    """
+    open_game = database.get_open_game(user_id, topic_slug, difficulty)
+    if open_game is not None:
+        if open_game["questions_asked"] > 0 or open_game["date"] == today.isoformat():
+            return open_game
+        database.delete_game(open_game["game_id"])
+    return database.get_existing_game(user_id, today, topic_slug, difficulty)
+
+
+def _new_puzzle_waiting(game: dict[str, Any], today: date_type) -> bool:
+    """Whether a newer puzzle in the game's series waits for the player once this game ends."""
+    if game["date"] >= today.isoformat():
+        return False
+    if database.get_existing_game(game["user_id"], today, game["topic_slug"], game["difficulty"]) is not None:
+        return False
+    status = database.get_series_status(game["topic_slug"], game["difficulty"])
+    return status in ("available", "winding_down") or \
+        database.get_puzzle_solution(today, game["topic_slug"], game["difficulty"]) is not None
+
+
 @app.get("/api/game/existing")
 async def get_existing_game(request: Request, topic_slug: str, difficulty: str) -> JSONResponse:
     user_id = request.state.user_id
-    today = date_type.today()
-    game = database.get_existing_game(user_id, today, topic_slug, difficulty)
+    today = player_today(request)
+    game = _current_game(user_id, topic_slug, difficulty, today)
     if game is None:
         return Response(status_code=204)
     if game.get("result") is None:
         # Explanations would act as free hints while the game is in progress.
         for question in game.get("questions", []):
             question.pop("explanation", None)
+        game["new_puzzle_waiting"] = _new_puzzle_waiting(game, today)
     return JSONResponse(game)
 
 
 @app.get("/api/game/statuses")
 async def get_game_statuses(request: Request) -> list[dict[str, Any]]:
+    """The user's games on today's puzzles, plus open games from other days."""
     user_id = request.state.user_id
-    today = date_type.today()
-    return database.get_game_statuses(user_id, today)
+    return database.get_game_statuses(user_id, player_today(request))
 
 
 @app.post("/api/game/new")
@@ -1595,13 +1667,12 @@ async def new_game(request_body: NewGameRequest, request: Request) -> dict[str, 
     if topic is None or topic["status"] != "ready":
         raise HTTPException(status_code=404, detail="Topic not found")
 
-    today = date_type.today()
+    today = player_today(request)
     user_id = request.state.user_id
-    existing = database.get_existing_game(user_id, today, request_body.topic_slug, request_body.difficulty)
-    if existing is not None:
+    if _current_game(user_id, request_body.topic_slug, request_body.difficulty, today) is not None:
         raise HTTPException(status_code=409, detail="Game already exists for this puzzle")
 
-    await get_today_solution(request_body.topic_slug, request_body.difficulty)
+    await get_or_draw_solution(today, request_body.topic_slug, request_body.difficulty)
     game = database.create_game(today, request_body.topic_slug, request_body.difficulty, user_id=user_id)
     database.log_activity(user_id, "start_game", {
         "game_id": game["game_id"],
@@ -1621,8 +1692,8 @@ async def end_game(request_body: EndGameRequest, request: Request) -> dict[str, 
         raise HTTPException(status_code=404, detail="Game not found")
     if game["user_id"] is not None and game["user_id"] != request.state.user_id:
         raise HTTPException(status_code=403, detail="Not your game")
-    if game["date"] != date_type.today().isoformat():
-        raise HTTPException(status_code=410, detail="This puzzle has expired")
+    if game["result"] is not None:
+        raise HTTPException(status_code=409, detail="This game has already ended")
 
     database.end_game(request_body.game_id, request_body.result)
     database.log_activity(request.state.user_id, "end_game", {
@@ -1630,11 +1701,11 @@ async def end_game(request_body: EndGameRequest, request: Request) -> dict[str, 
         "result": request_body.result,
     })
 
-    today = date_type.today()
+    puzzle_date = date_type.fromisoformat(game["date"])
     solution = database.get_puzzle_solution(
-        today, game["topic_slug"], game["difficulty"],
+        puzzle_date, game["topic_slug"], game["difficulty"],
     )
-    hints = database.get_puzzle_hints(today, game["topic_slug"], game["difficulty"])
+    hints = database.get_puzzle_hints(puzzle_date, game["topic_slug"], game["difficulty"])
     return {"status": "ok", "solution": solution or "", "hints": hints}
 
 
@@ -1642,7 +1713,9 @@ async def end_game(request_body: EndGameRequest, request: Request) -> dict[str, 
 async def ask(request_body: AskRequest, request: Request) -> dict[str, str]:
     user_id = request.state.user_id
     account = database.get_account_by_id(user_id)
-    usage = database.get_daily_usage(user_id, date_type.today())
+    # A question counts against the date it's asked on, not its puzzle's date.
+    today = player_today(request)
+    usage = database.get_daily_usage(user_id, today)
     if account and usage["questions_used"] >= account["daily_question_limit"]:
         raise HTTPException(status_code=429, detail="Daily question limit reached")
 
@@ -1650,51 +1723,47 @@ async def ask(request_body: AskRequest, request: Request) -> dict[str, str]:
     if not question or len(question) > 500:
         raise HTTPException(status_code=400, detail="Question must be 1-500 characters")
 
-    # Look up topic + difficulty from the game session.
-    topic_slug = "notable-people"
-    difficulty = "normal"
-    if request_body.game_id is not None:
-        game = database.get_game(request_body.game_id)
-        if game is not None:
-            if game["user_id"] is not None and game["user_id"] != user_id:
-                raise HTTPException(status_code=403, detail="Not your game")
-            if game["date"] != date_type.today().isoformat():
-                raise HTTPException(status_code=410, detail="This puzzle has expired")
-            topic_slug = game["topic_slug"]
-            difficulty = game["difficulty"]
+    game = database.get_game(request_body.game_id)
+    if game is None:
+        raise HTTPException(status_code=404, detail="Game not found")
+    if game["user_id"] is not None and game["user_id"] != user_id:
+        raise HTTPException(status_code=403, detail="Not your game")
+    if game["result"] is not None:
+        raise HTTPException(status_code=409, detail="This game has already ended")
+    topic_slug = game["topic_slug"]
+    difficulty = game["difficulty"]
+    puzzle_date = date_type.fromisoformat(game["date"])
 
-    secret_solution = await get_today_solution(topic_slug, difficulty)
+    secret_solution = database.get_puzzle_solution(puzzle_date, topic_slug, difficulty)
+    if secret_solution is None:
+        raise HTTPException(status_code=404, detail="Puzzle not found")
+    await ensure_hints_exist(puzzle_date, topic_slug, difficulty, secret_solution)
     topic_name = database.get_topic_name(topic_slug) or topic_slug
 
     # Build conversation history so the LLM interprets follow-up questions
     # in context of what the player has already asked and been told.
-    history: list[GameHistoryEntry] = []
+    question_number = request_body.question_number
+    past_questions = database.get_game_history(request_body.game_id)
+    history = [
+        GameHistoryEntry(
+            question_number=row["question_number"],
+            question=row["question"],
+            answer=row["answer"],
+        )
+        for row in past_questions
+    ]
     hint_reveal_context: list[HintReveal] = []
-    question_number = request_body.question_number or 1
-    if request_body.game_id is not None:
-        past_questions = database.get_game_history(request_body.game_id)
-        history = [
-            GameHistoryEntry(
-                question_number=row["question_number"],
-                question=row["question"],
-                answer=row["answer"],
+    hint_reveals = database.get_hint_reveals(request_body.game_id)
+    if hint_reveals:
+        hints = database.get_puzzle_hints(puzzle_date, topic_slug, difficulty)
+        hint_reveal_context = [
+            HintReveal(
+                after_question=reveal["after_question"],
+                hint_text=hints[reveal["hint_index"]],
             )
-            for row in past_questions
+            for reveal in hint_reveals
+            if reveal["hint_index"] < len(hints)
         ]
-        hint_reveals = database.get_hint_reveals(request_body.game_id)
-        if hint_reveals:
-            today = date_type.today()
-            hints = database.get_puzzle_hints(
-                today, topic_slug, difficulty,
-            )
-            hint_reveal_context = [
-                HintReveal(
-                    after_question=reveal["after_question"],
-                    hint_text=hints[reveal["hint_index"]],
-                )
-                for reveal in hint_reveals
-                if reveal["hint_index"] < len(hints)
-            ]
 
     # Reject questions that were already asked verbatim in this game.
     question_lower = question.casefold()
@@ -1735,24 +1804,19 @@ async def ask(request_body: AskRequest, request: Request) -> dict[str, str]:
         username, question_number, game_id, result.answer,
     )
 
-    database.increment_daily_questions(user_id, date_type.today())
-
-    # Record the Q&A if a game session is active.
-    if request_body.game_id is not None and request_body.question_number is not None:
-        game = database.get_game(request_body.game_id)
-        if game is not None:
-            database.record_question(
-                request_body.game_id,
-                request_body.question_number,
-                question,
-                result.answer,
-                result.explanation,
-                user_id=user_id,
-            )
-            database.log_activity(user_id, "ask_question", {
-                "game_id": request_body.game_id,
-                "question_number": request_body.question_number,
-            })
+    database.increment_daily_questions(user_id, today)
+    database.record_question(
+        request_body.game_id,
+        request_body.question_number,
+        question,
+        result.answer,
+        result.explanation,
+        user_id=user_id,
+    )
+    database.log_activity(user_id, "ask_question", {
+        "game_id": request_body.game_id,
+        "question_number": request_body.question_number,
+    })
 
     # The explanation is stored but not returned: during a game each one is
     # effectively a hint. It is shown on the results page once the game ends.
@@ -1774,8 +1838,8 @@ async def get_hint(request_body: HintRequest, request: Request) -> dict[str, Any
         raise HTTPException(status_code=404, detail="Game not found")
     if game["user_id"] is not None and game["user_id"] != request.state.user_id:
         raise HTTPException(status_code=403, detail="Not your game")
-    if game["date"] != date_type.today().isoformat():
-        raise HTTPException(status_code=410, detail="This puzzle has expired")
+    if game["result"] is not None:
+        raise HTTPException(status_code=409, detail="This game has already ended")
 
     required_questions = (request_body.hint_index + 1) * 4
     if game["questions_asked"] < required_questions:
@@ -1784,8 +1848,8 @@ async def get_hint(request_body: HintRequest, request: Request) -> dict[str, Any
             detail=f"Must have asked at least {required_questions} questions to unlock this hint",
         )
 
-    today = date_type.today()
-    hints = database.get_puzzle_hints(today, game["topic_slug"], game["difficulty"])
+    puzzle_date = date_type.fromisoformat(game["date"])
+    hints = database.get_puzzle_hints(puzzle_date, game["topic_slug"], game["difficulty"])
     if request_body.hint_index >= len(hints):
         raise HTTPException(status_code=404, detail="Hint not available")
 
@@ -1808,14 +1872,17 @@ async def get_replay(share_code: str, request: Request) -> dict[str, Any]:
     # Gate today's puzzles: only return metadata if the viewer hasn't played.
     viewer_id = request.state.user_id
     is_own_game = game.get("user_id") == viewer_id
-    today = date_type.today()
+    # Gate puzzles the viewer could still play: their today or later (a
+    # friend ahead in time), or one their own open game is on.
+    viewer_today = player_today(request)
+    puzzle_date = date_type.fromisoformat(game["date"])
     gated = False
-    if game["date"] == today.isoformat():
-        has_played = database.has_played_puzzle(
-            viewer_id, today, game["topic_slug"], game["difficulty"],
+    if not database.has_played_puzzle(viewer_id, puzzle_date, game["topic_slug"], game["difficulty"]):
+        gated = puzzle_date >= viewer_today or database.has_open_game_for_puzzle(
+            viewer_id, puzzle_date, game["topic_slug"], game["difficulty"],
         )
-        if not has_played:
-            gated = True
+    if is_own_game and game["result"] is not None:
+        game["new_puzzle_waiting"] = _new_puzzle_waiting(game, viewer_today)
     # Strip internal fields the client doesn't need.
     game.pop("game_id", None)
     game.pop("user_id", None)

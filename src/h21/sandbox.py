@@ -26,6 +26,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Optional
+from zoneinfo import ZoneInfo
 
 from PIL import Image, ImageDraw
 
@@ -530,10 +531,15 @@ def seed_database(
     history_days: int = DEFAULT_HISTORY_DAYS,
     rng_seed: int = DEFAULT_RNG_SEED,
     today: Optional[date] = None,
+    time_zone: Optional[str] = None,
 ) -> dict[str, Any]:
-    """Create and populate a sandbox database. Returns a summary dict."""
+    """Create and populate a sandbox database. Returns a summary dict.
+
+    "Today" is the date in `time_zone` (dev's, since each player's day
+    follows their own clock), or the system's local date.
+    """
     if today is None:
-        today = date.today()
+        today = _today_in(time_zone)
     friend_count = max(1, min(friend_count, len(FRIEND_PERSONAS)))
     history_days = max(1, history_days)
     rng = random.Random(rng_seed)
@@ -572,6 +578,8 @@ def seed_database(
         return user_id
 
     dev_id = create_player(DEV_USERNAME, "Dev", role="dev")
+    if time_zone:
+        database.set_time_zone(dev_id, time_zone)
     friend_ids = [
         create_player(username, display_name)
         for username, display_name in FRIEND_PERSONAS[:friend_count]
@@ -666,8 +674,8 @@ def seed_database(
 
     # Today, dev has one puzzle in each state (solved, not solved, in
     # progress) and the rest unplayed for live play. A friend is mid-game
-    # too, and an unfinished game from earlier in the week shows how
-    # abandoned games look in history.
+    # too, and a game from earlier in the week shows how abandoned games
+    # (a rare state set by the system or an admin) look in history.
     def seed_unplayed(user_id: int, day: date, topic_slug: str, difficulty: str, **options: Any) -> int:
         """Seed a game unless the user already played that puzzle. Returns games added."""
         if database.get_existing_game(user_id, day, topic_slug, difficulty) is not None:
@@ -699,10 +707,12 @@ def seed_database(
 
     if history_days > 3:
         abandoned_day = today - timedelta(days=3)
-        game_count += seed_unplayed(
-            dev_id, abandoned_day, topic_slugs[3 % len(topic_slugs)], "expert",
-            win=False, finished=False,
-        )
+        abandoned_slug = topic_slugs[3 % len(topic_slugs)]
+        added = seed_unplayed(dev_id, abandoned_day, abandoned_slug, "expert", win=False, finished=False)
+        if added:
+            abandoned = database.get_existing_game(dev_id, abandoned_day, abandoned_slug, "expert")
+            database.end_game(abandoned["game_id"], "abandoned")
+        game_count += added
 
     # -- Edge cases: everything else the app can show --
 
@@ -723,6 +733,22 @@ def seed_database(
     game_count += seed_dev_special(win=True, question_count=20, hint_count=5)
     game_count += seed_dev_special(win=False, question_count=21, hint_count=2)
     game_count += seed_dev_special(win=False, question_count=3, hint_count=0)
+
+    # A game from yesterday still in progress carries over: its series
+    # offers it until it ends, with today's puzzle waiting behind it.
+    def seed_carried_over() -> int:
+        yesterday = today - timedelta(days=1)
+        for topic_slug in topic_slugs:
+            for difficulty in difficulties:
+                if (yesterday, topic_slug, difficulty) in puzzle_solutions \
+                        and database.get_existing_game(dev_id, yesterday, topic_slug, difficulty) is None \
+                        and database.get_existing_game(dev_id, today, topic_slug, difficulty) is None:
+                    seed_game(dev_id, yesterday, topic_slug, difficulty, win=False, finished=False, question_count=5)
+                    return 1
+        return 0
+
+    if history_days > 1:
+        game_count += seed_carried_over()
 
     # Strangers play today's popular puzzles, mostly solving them.
     stranger_ids = [create_player(username, display_name) for username, display_name in STRANGER_PERSONAS]
@@ -946,6 +972,12 @@ def _seed_game(
 ACTIVITY_OUTCOMES = (("win", 0.5), ("loss", 0.2), ("in_progress", 0.1), ("skip", 0.2))
 
 
+def _today_in(time_zone: Optional[str]) -> date:
+    if not time_zone:
+        return date.today()
+    return datetime.now(ZoneInfo(time_zone)).date()
+
+
 def add_activity(
     db_path: Path,
     *,
@@ -961,13 +993,15 @@ def add_activity(
     real first player would; their hints are generated when someone plays
     them for real. Returns a summary dict.
     """
-    if today is None:
-        today = date.today()
     rng = random.Random(rng_seed)
     fixups = _TimestampFixups()
     now = datetime.now(timezone.utc)
     database = GameDatabase(db_path)
     database.ensure_schema()
+    if today is None:
+        # Today in dev's time zone, so the activity lands on their day.
+        dev = database.get_account_by_username(DEV_USERNAME)
+        today = _today_in(dev["time_zone"] if dev else None)
 
     personas = [
         account for account in database.get_all_accounts()
@@ -1134,6 +1168,11 @@ def main() -> None:
         help="Port for --serve (default: 8000)",
     )
     parser.add_argument(
+        "--time-zone",
+        help="dev's time zone (e.g. America/New_York), which sets the sandbox's today "
+             "(default: the system's)",
+    )
+    parser.add_argument(
         "--add-activity", action="store_true",
         help="Add today's games for every persona except dev to the existing sandbox, then exit",
     )
@@ -1189,6 +1228,7 @@ def main() -> None:
             friend_count=args.friends,
             history_days=args.days,
             rng_seed=args.seed,
+            time_zone=args.time_zone,
         )
         _print_summary(sandbox_dir, args.password, args.port, summary, has_api_key)
 

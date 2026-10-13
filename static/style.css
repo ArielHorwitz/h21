@@ -1418,6 +1418,20 @@ body[data-tab="profile"] .tab-bar a[data-tab="profile"] .tab-avatar img {
 .meter-segment.depends { background: var(--depends); }
 .meter-segment.win { background: var(--accent); }
 
+.carry-over-note {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 0.45rem 1rem;
+  border-top: 1px solid var(--border);
+  color: var(--accent);
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+.carry-over-note[hidden] {
+  display: none;
+}
+
 .game-main {
   padding-bottom: 9rem;
   gap: 0.75rem;

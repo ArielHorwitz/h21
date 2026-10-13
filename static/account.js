@@ -257,17 +257,9 @@ function capitalize(text) {
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
-// Today's date in local time, as the server's puzzle dates are.
-function todayIso() {
-  const now = new Date();
-  const month = String(now.getMonth() + 1).padStart(2, "0");
-  const day = String(now.getDate()).padStart(2, "0");
-  return `${now.getFullYear()}-${month}-${day}`;
-}
-
 function renderStats(games) {
-  // Everything but today's in-progress games counts; unfinished is unsolved.
-  const finished = games.filter((game) => game.result || game.date !== todayIso());
+  // Everything but games in progress counts; abandoned is unsolved.
+  const finished = games.filter((game) => game.result);
   if (finished.length === 0) return;
   const wins = finished.filter((game) => game.result === "win");
   document.getElementById("stat-played").textContent = String(finished.length);
@@ -280,9 +272,8 @@ function renderStats(games) {
 }
 
 function renderHistoryRow(game) {
-  const finished = game.result === "win" || game.result === "loss";
   let href = null;
-  if (!finished && game.date === todayIso()) {
+  if (!game.result) {
     href = `/game?topic=${encodeURIComponent(game.topic_slug)}&difficulty=${encodeURIComponent(game.difficulty)}`;
   } else if (game.share_code) {
     href = `/replay?code=${encodeURIComponent(game.share_code)}`;
@@ -311,7 +302,7 @@ function renderHistoryRow(game) {
   if (game.result === "win") {
     result.textContent = `✓ ${game.questions_asked}`;
     result.classList.add("is-won");
-  } else if (!game.result && game.date === todayIso()) {
+  } else if (!game.result) {
     result.textContent = "In progress";
     result.classList.add("is-in-progress");
   } else {

@@ -147,9 +147,8 @@ class GameDatabase:
                 player_code  TEXT UNIQUE,
                 anonymous    INTEGER NOT NULL DEFAULT 0,
                 avatar_version INTEGER NOT NULL DEFAULT 0,
-                avatar_generations_used INTEGER NOT NULL DEFAULT 0,
-                avatar_generation_reset TEXT,
                 monthly_avatar_limit INTEGER NOT NULL DEFAULT 3,
+                time_zone    TEXT,
                 created_at  TEXT NOT NULL
             );
 
@@ -178,6 +177,7 @@ class GameDatabase:
                 date                   TEXT NOT NULL,
                 questions_used         INTEGER NOT NULL DEFAULT 0,
                 topic_suggestions_used INTEGER NOT NULL DEFAULT 0,
+                avatar_generations_used INTEGER NOT NULL DEFAULT 0,
                 PRIMARY KEY (user_id, date)
             );
 
@@ -829,6 +829,42 @@ class GameDatabase:
             game["revealed_hints"] = revealed_hints
         return game
 
+    def get_open_game(
+        self, user_id: int, topic_slug: str, difficulty: str,
+    ) -> Optional[dict[str, Any]]:
+        """Return the user's unfinished game in a series, from any date.
+
+        A game belongs to its puzzle, not to a day, so it stays open until it
+        ends; meanwhile the series offers it instead of a newer puzzle.
+        """
+        row = self._connection.execute(
+            "SELECT date FROM games "
+            "WHERE user_id = ? AND topic_slug = ? AND difficulty = ? AND result IS NULL "
+            "ORDER BY started_at DESC LIMIT 1",
+            (user_id, topic_slug, difficulty),
+        ).fetchone()
+        if row is None:
+            return None
+        return self.get_existing_game(user_id, date.fromisoformat(row["date"]), topic_slug, difficulty)
+
+    def delete_game(self, game_id: int) -> None:
+        """Delete a game with nothing in it (no questions, so no hints either)."""
+        self._connection.execute("DELETE FROM hint_reveals WHERE game_id = ?", (game_id,))
+        self._connection.execute("DELETE FROM questions WHERE game_id = ?", (game_id,))
+        self._connection.execute("DELETE FROM games WHERE game_id = ?", (game_id,))
+        self._connection.commit()
+
+    def has_open_game_for_puzzle(
+        self, user_id: int, puzzle_date: date, topic_slug: str, difficulty: str,
+    ) -> bool:
+        row = self._connection.execute(
+            "SELECT 1 FROM games "
+            "WHERE user_id = ? AND date = ? AND topic_slug = ? AND difficulty = ? "
+            "AND result IS NULL LIMIT 1",
+            (user_id, puzzle_date.isoformat(), topic_slug, difficulty),
+        ).fetchone()
+        return row is not None
+
     def has_played_puzzle(
         self, user_id: int, puzzle_date: date, topic_slug: str, difficulty: str,
     ) -> bool:
@@ -845,13 +881,17 @@ class GameDatabase:
     def get_game_statuses(
         self, user_id: int, puzzle_date: date,
     ) -> list[dict[str, Any]]:
-        """Return summary status of all games for a user on a given date."""
+        """Return the user's games on a date's puzzles, plus open games from other dates.
+
+        Open games come first, since they are what a series offers until they end.
+        """
         rows = self._connection.execute(
-            "SELECT topic_slug, difficulty, result, questions_asked "
+            "SELECT date, topic_slug, difficulty, result, questions_asked "
             "FROM games "
-            "WHERE user_id = ? AND date = ? "
-            "AND (result IS NOT NULL OR questions_asked > 0) "
-            "ORDER BY started_at DESC",
+            "WHERE user_id = ? "
+            "AND ((date = ? AND (result IS NOT NULL OR questions_asked > 0)) "
+            "  OR (result IS NULL AND questions_asked > 0)) "
+            "ORDER BY result IS NOT NULL, started_at DESC",
             (user_id, puzzle_date.isoformat()),
         ).fetchall()
         return [dict(row) for row in rows]
@@ -880,10 +920,10 @@ class GameDatabase:
         game["hint_reveals"] = self.get_hint_reveals(game["game_id"])
         topic_name = self.get_topic_name(game["topic_slug"])
         game["topic_name"] = topic_name
-        # The answer is revealed once the game ends, or once its day is over
-        # for games left unfinished.
+        # The solution is revealed once the game ends; open games can be
+        # finished on a later day.
         puzzle_date = date.fromisoformat(game["date"])
-        if game["ended_at"] is not None or puzzle_date < date.today():
+        if game["ended_at"] is not None:
             game["solution"] = self.get_puzzle_solution(
                 puzzle_date, game["topic_slug"], game["difficulty"],
             )
@@ -945,7 +985,8 @@ class GameDatabase:
                 "topic_slug": game["topic_slug"],
                 "topic_name": game["topic_name"] or game["topic_slug"],
                 "difficulty": game["difficulty"],
-                "solution": game["solution"],
+                # Open games keep their solution secret, even from the player.
+                "solution": game["solution"] if game["ended_at"] is not None else None,
                 "share_code": game["share_code"],
                 "started_at": game["started_at"],
                 "ended_at": game["ended_at"],
@@ -1016,8 +1057,8 @@ class GameDatabase:
             "SELECT user_id, username, role, blocked, "
             "daily_question_limit, daily_topic_limit, invite_code, "
             "display_name, player_code, anonymous, "
-            "avatar_version, avatar_generations_used, "
-            "avatar_generation_reset, monthly_avatar_limit, created_at "
+            "avatar_version, "
+            "monthly_avatar_limit, time_zone, created_at "
             "FROM accounts WHERE user_id = ?",
             (user_id,),
         ).fetchone()
@@ -1030,7 +1071,7 @@ class GameDatabase:
             "SELECT user_id, username, role, blocked, "
             "daily_question_limit, daily_topic_limit, invite_code, "
             "display_name, player_code, anonymous, "
-            "avatar_version, monthly_avatar_limit, created_at "
+            "avatar_version, monthly_avatar_limit, time_zone, created_at "
             "FROM accounts ORDER BY created_at DESC"
         ).fetchall()
         return [dict(row) for row in rows]
@@ -1093,36 +1134,30 @@ class GameDatabase:
         return cursor.rowcount > 0
 
     def get_avatar_usage(self, user_id: int, today: date) -> dict[str, Any]:
-        """Return avatar generation usage, resetting the counter if a new month started."""
-        row = self._connection.execute(
-            "SELECT avatar_generations_used, avatar_generation_reset, monthly_avatar_limit "
-            "FROM accounts WHERE user_id = ?",
-            (user_id,),
+        """Return picture generations used in the month of `today` (the player's date)."""
+        limit_row = self._connection.execute(
+            "SELECT monthly_avatar_limit FROM accounts WHERE user_id = ?", (user_id,),
         ).fetchone()
-        if row is None:
-            return {"used": 0, "limit": 3}
-        reset_date_str = row["avatar_generation_reset"]
-        used = row["avatar_generations_used"]
-        if reset_date_str is not None:
-            reset_date = date.fromisoformat(reset_date_str)
-            # Reset if we're in a different month.
-            if today.year != reset_date.year or today.month != reset_date.month:
-                self._connection.execute(
-                    "UPDATE accounts SET avatar_generations_used = 0, "
-                    "avatar_generation_reset = ? WHERE user_id = ?",
-                    (today.isoformat(), user_id),
-                )
-                self._connection.commit()
-                used = 0
-        return {"used": used, "limit": row["monthly_avatar_limit"]}
+        used_row = self._connection.execute(
+            "SELECT COALESCE(SUM(avatar_generations_used), 0) AS used FROM daily_usage "
+            "WHERE user_id = ? AND substr(date, 1, 7) = ?",
+            (user_id, today.isoformat()[:7]),
+        ).fetchone()
+        limit = limit_row["monthly_avatar_limit"] if limit_row is not None else 3
+        return {"used": used_row["used"], "limit": limit}
 
     def increment_avatar_generation(self, user_id: int, today: date) -> None:
-        """Increment the avatar generation counter and set the reset date if unset."""
         self._connection.execute(
-            "UPDATE accounts SET avatar_generations_used = avatar_generations_used + 1, "
-            "avatar_generation_reset = COALESCE(avatar_generation_reset, ?) "
-            "WHERE user_id = ?",
-            (today.isoformat(), user_id),
+            "INSERT INTO daily_usage (user_id, date, avatar_generations_used) VALUES (?, ?, 1) "
+            "ON CONFLICT(user_id, date) DO UPDATE SET avatar_generations_used = avatar_generations_used + 1",
+            (user_id, today.isoformat()),
+        )
+        self._connection.commit()
+
+    def set_time_zone(self, user_id: int, time_zone: str) -> None:
+        """Remember the player's time zone, so admin views can use their date."""
+        self._connection.execute(
+            "UPDATE accounts SET time_zone = ? WHERE user_id = ?", (time_zone, user_id),
         )
         self._connection.commit()
 
@@ -1579,6 +1614,10 @@ class GameDatabase:
 
     # -- Daily usage --
 
+    # Usage is recorded on the player's local date, so quotas reset at their
+    # midnight. A valid clock only reaches three dates at any moment, so
+    # changing it gains at most one extra day's quota, once.
+
     def get_daily_usage(self, user_id: int, usage_date: date) -> dict[str, int]:
         row = self._connection.execute(
             "SELECT questions_used, topic_suggestions_used FROM daily_usage "
@@ -1606,13 +1645,16 @@ class GameDatabase:
         self._connection.commit()
 
     def reset_daily_usage(self, user_id: int, usage_date: date) -> None:
+        """Clear the day's questions and topics and the month's pictures."""
         self._connection.execute(
-            "DELETE FROM daily_usage WHERE user_id = ? AND date = ?",
+            "UPDATE daily_usage SET questions_used = 0, topic_suggestions_used = 0 "
+            "WHERE user_id = ? AND date = ?",
             (user_id, usage_date.isoformat()),
         )
         self._connection.execute(
-            "UPDATE accounts SET avatar_generations_used = 0 WHERE user_id = ?",
-            (user_id,),
+            "UPDATE daily_usage SET avatar_generations_used = 0 "
+            "WHERE user_id = ? AND substr(date, 1, 7) = ?",
+            (user_id, usage_date.isoformat()[:7]),
         )
         self._connection.commit()
 

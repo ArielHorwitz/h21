@@ -48,7 +48,24 @@ function describeGame(game) {
   if (game.result === "loss") {
     return { className: "is-lost", title: "Not solved" };
   }
-  return { className: "is-in-progress", title: `In progress, ${pluralize(game.questions_asked, "question")} asked` };
+  const from = isCarriedOver(game) ? ` (${weekdayOf(game.date)}'s puzzle)` : "";
+  return { className: "is-in-progress", title: `In progress${from}, ${pluralize(game.questions_asked, "question")} asked` };
+}
+
+// The player's date, which the server's "today" follows (see tz.js).
+const TODAY_ISO = (() => {
+  const now = new Date();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${now.getFullYear()}-${month}-${day}`;
+})();
+
+function isCarriedOver(game) {
+  return Boolean(game) && !game.result && game.date !== TODAY_ISO;
+}
+
+function weekdayOf(isoDate) {
+  return new Date(isoDate + "T00:00:00").toLocaleDateString("en-US", { weekday: "short" });
 }
 
 function renderFriendAvatars(friendList) {
@@ -83,7 +100,8 @@ function renderFriendAvatars(friendList) {
 function renderDifficultyButton(topic, difficulty) {
   const series = topic.series[difficulty];
   const label = capitalize(difficulty);
-  if (series.state === "finished") {
+  const game = gameStatuses[`${topic.slug}:${difficulty}`];
+  if (series.state === "finished" && !isCarriedOver(game)) {
     const button = document.createElement("span");
     button.className = `play-btn ${difficulty} is-finished`;
     button.title = `${label}: finished`;
@@ -92,7 +110,6 @@ function renderDifficultyButton(topic, difficulty) {
     return button;
   }
 
-  const game = gameStatuses[`${topic.slug}:${difficulty}`];
   const { className, title } = describeGame(game);
   const button = document.createElement("a");
   button.className = `play-btn ${difficulty} ${className}`.trim();
@@ -110,7 +127,11 @@ function describeSeriesNotes(topic) {
     const series = topic.series[difficulty];
     if (!series) continue;
     const label = capitalize(difficulty);
-    if (series.state === "finished") {
+    const game = gameStatuses[`${topic.slug}:${difficulty}`];
+    if (isCarriedOver(game)) {
+      const after = series.state === "finished" ? "" : " to play today's";
+      notes.push(`${label}: finish ${weekdayOf(game.date)}'s game${after}`);
+    } else if (series.state === "finished") {
       notes.push(`${label} finished`);
     } else if (series.remaining < FEW_PUZZLES_LEFT) {
       notes.push(series.remaining === 0 ? `${label}: last puzzle` : `${label}: ${series.remaining} left`);

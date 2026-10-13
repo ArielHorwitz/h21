@@ -304,6 +304,13 @@ async function tryResumeGame() {
     gameId = data.game_id;
     shareCode = data.share_code;
 
+    if (data.new_puzzle_waiting) {
+      const weekday = new Date(data.date + "T00:00:00").toLocaleDateString("en-US", { weekday: "long" });
+      const note = document.getElementById("carry-over-note");
+      note.textContent = `This is ${weekday}'s puzzle. Today's is ready once you finish or give up.`;
+      note.hidden = false;
+    }
+
     // Finished games go to the results page.
     if (data.result) {
       window.location.href = `/replay?code=${encodeURIComponent(shareCode)}`;

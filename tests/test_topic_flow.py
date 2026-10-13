@@ -136,14 +136,14 @@ class TopicFlowTests(unittest.TestCase):
         async def scenario() -> tuple[str, Optional[str], Optional[str]]:
             with mock.patch.object(main, "date_type") as fake_date:
                 fake_date.today.return_value = date(2026, 10, 10)
-                first = await main.get_today_solution("jazz", "normal")
+                first = await main.get_or_draw_solution(fake_date.today(), "jazz", "normal")
                 await asyncio.gather(*list(main._background_tasks))
                 status_after_refill = self.database.get_series_status("jazz", "normal")
                 # Draw the remaining pool, one day at a time.
                 day = 11
                 while self.database.pool_count("jazz", "normal") > 0:
                     fake_date.today.return_value = date(2026, 10, day)
-                    await main.get_today_solution("jazz", "normal")
+                    await main.get_or_draw_solution(fake_date.today(), "jazz", "normal")
                     day += 1
                 status_after_last = self.database.get_series_status("jazz", "normal")
             return first, status_after_refill, status_after_last
@@ -161,7 +161,7 @@ class TopicFlowTests(unittest.TestCase):
         async def scenario() -> str:
             with mock.patch.object(main, "date_type") as fake_date:
                 fake_date.today.return_value = date(2026, 10, 10)
-                return await main.get_today_solution("jazz", "normal")
+                return await main.get_or_draw_solution(fake_date.today(), "jazz", "normal")
 
         self.assertTrue(asyncio.run(scenario()).startswith("normal solution"))
 
@@ -170,7 +170,7 @@ class TopicFlowTests(unittest.TestCase):
         self.database.set_series_status("jazz", "expert", "unavailable")
         self.use_client(FakeLLMClient(kept={"normal": 60, "expert": 60}))
         with self.assertRaises(HTTPException) as raised:
-            asyncio.run(main.get_today_solution("jazz", "expert"))
+            asyncio.run(main.get_or_draw_solution(date(2026, 10, 10), "jazz", "expert"))
         self.assertEqual(raised.exception.status_code, 404)
 
 
