@@ -29,9 +29,9 @@ Screenshots of every page at phone (390px) and desktop widths, on a seeded sandb
 
 ## Later decisions
 
-- **Compact topic rows** (after user feedback that the tiles were too tall and "Play" was redundant): one row per topic, name and friends who played on the left, Normal/Expert buttons on the right whose look carries the state (gold outline: unplayed; filled gold "Q6": in progress; green "✓ 12": solved; muted "✗": not solved).
-- **Results page** leads with outcome, the answer, the answer meter and stats, then Share / Leaderboard / More puzzles, then the log with revealed hints inline and unused hints collapsed. Share keeps the Wordle-style emoji teaser (one colored dot per answer, a bulb per hint) and passes that text, plus a link, to the native share sheet when available (clipboard otherwise); the link goes to the results page (spoiler-gated) instead of quoting a game ID, so the home page's replay-by-ID box isn't needed.
-- **Profile vs Friends split.** Profile is about you: picture, inline-editable display name, stats (played, solved %, average questions on wins), tappable history, settings (anonymous mode, control panel, log out). Friends holds all social features: recent games, one search box for names and player codes (search now matches exact codes), suggestions, following with unfollow.
+- **Compact topic rows** (after user feedback that the tiles were too tall and "Play" was redundant): one row per topic, the name (which opens the topic's preview), tags and friends who solved on the left, a button per offered series on the right. Button state is color-only (see below).
+- **Results page** leads with the outcome, the solution ("The solution was"), the answer meter and stats, then the actions (see below), then the log with revealed hints inline and unused hints collapsed. Share keeps the Wordle-style emoji teaser (one colored dot per answer, a bulb per hint) and passes that text, plus a link, to the native share sheet when available (clipboard otherwise); the link goes to the results page (spoiler-gated) instead of quoting a game ID, so the home page's replay-by-ID box isn't needed.
+- **Profile vs Friends split.** Profile is about you: picture, inline-editable display name, stats (played, solved %, average questions on wins), tappable history, and the control panel link and Log out. Friends holds everything social: recent games, one search box for names and player codes (results show Follow or Unfollow and "Follows you"), three suggestions with See all, counted links to Following and Followers, and Privacy (the anonymous-mode switch, which alone shows while anonymous mode is on; it hides your name, picture and results). A **People** page (`/people`) has Following, Followers and Suggested as tabs: "Follows you" on people who follow back, Follow back for followers, the full suggestions list. Suggestions and search exclude blocked accounts. No dismissing suggestions (not needed).
 - **Login** is one card with a Log in / Join switch, invite requests behind a link, and `?invite=CODE` prefilling Join so invites can be shared as links.
 - **Help** rewritten for the new UI and inlined (`help-content.html` removed). **Leaderboard** is a ranked list with an Everyone / Friends switch, and `/leaderboard` without a puzzle redirects to Friends. The **control panel** is split into tabs (Invites, Users, Activity, Query, Logs; remembered in the URL hash) and restyled with the shared inputs, buttons and a `data-table` component.
 - `question-log.js` shares log rendering between the game and results pages. Dead CSS from the old layouts was swept (about 740 lines).
@@ -50,15 +50,17 @@ Screenshots of every page at phone (390px) and desktop widths, on a seeded sandb
   - Costs per image as measured: mini high (the old default) $0.033, mini low $0.002, Flare low $0.006, Flare high $0.053.
   - Considered and set aside: assigning curated palettes (dropping color words was simpler), and a style picker on the profile page (a possible follow-up).
 
-- **Suggesting a topic has its own page** (`/suggest`; Today links to it): the form with the quota pill, and "Your topics" (ready ones link to play, creating ones show progress, turned-down ones show the reason and Dismiss). A guide with broad-vs-focused example topics was tried and dropped: good examples are hard to pick, since the sweet spot is a topic with hundreds of well-known subjects ("Pop songs", not "Music" or "Classical composers"), and the user wasn't satisfied with any set. The motivating problem remains (players suggest "Disney" expecting films and get theme parks and executives too). Considered for later: a preview step showing how a topic will be read (scope, sample subjects, sharper alternatives) before it uses up a suggestion.
+- **Suggesting a topic has its own page** (`/suggest`; Today links to it): the form with the quota pill, tappable topic ideas, "Your topics" with their previews and status, and recently turned-down topics from everyone. A guide with broad-vs-focused example topics was tried and dropped: good examples are hard to pick, since the sweet spot is a topic with hundreds of well-known subjects ("Pop songs", not "Music" or "Classical composers"). The "Disney" problem is addressed by topic previews instead (topic flow case).
+- **Help** is a quick primer: e.g. hints are just "A hint unlocks every 4 questions."
+- **Series notes on Today:** "Expert: 8 left" when a series has 9 or fewer puzzles left (any state), "last puzzle" on its final day, "Expert finished" once finished.
 - **Quotas are accented pills** ("3 pictures left this month", "3 topic suggestions left today"), red when used up; remaining picture generations also show on the avatar preview.
 - **The results log ends with how the game ended**, when it wasn't a solve: "Gave up after question N", "Out of questions", "Left unfinished" (past day) or "Still in progress" (today), as a dashed closing entry, in keeping with hints shown where they were revealed.
 - **Results actions trimmed to one row:** Share result, then Leaderboard, both gold outlines; More puzzles was dropped as redundant with the tab bar (it pushed the buttons onto a second row). Renaming the Today tab to Puzzles was discussed and left as Today for the daily-ritual feel.
 - **Two button styles:** filled gold for the main action, gold outline for the rest (the muted grey outline is gone). Danger buttons, text links and segmented switches keep their own looks.
 
-## Status
+## Status (2026-10-13)
 
-- All pages redesigned.
+All pages redesigned; the user is playtesting on the lab for a few more days. All work is on the `playtest` branch (not yet merged into `dev`); `master` is still production.
 
 ## Blind reviews (planned)
 
@@ -67,10 +69,14 @@ Screenshots of every page at phone (390px) and desktop widths, on a seeded sandb
 
 ## Open items
 
-- **For the relaunch session: open registration.** Today the app is invite-only, to keep strangers from running up the API bill. With spending capped by the API limit, the user wants strangers to be able to register without an invite (sending people a link without a code is an unpleasant start), throttled to about three new registrations a day, with a way to switch it off if it gets abused. Not part of this session.
+- **Playtest finishing touches** from the user's next few days of use.
+- **Blind UX review** (planned above, not run yet): eight agents, two starting points, Opus, Sonnet, Sol and Terra, synthesized into one report for the user before anything changes.
+- **Limited open registration**, wanted before the relaunch: strangers can register without an invite, throttled to about three new registrations a day, with a way to switch it off if abused. The invite requirement exists to keep strangers from running up the API bill; the API spending limit now caps that risk, and links that need an invite code are an unpleasant start.
+- **Topic builds at high effort take about five minutes** (with a retry): keep, or build at a lower effort than the game. Unanswered.
+- **Deferred:** a third reviewer per generation batch; per-player local dates (Wordle-like; today the server's local date applies to everyone, and midnight-crossing requests and games need a rule); second seasons for finished series.
+- **Noted, no action:** Firefox for Android with the address bar at the top briefly misplaces the bottom tab bar while its toolbar animates (Firefox behavior; revisit if the gap persists or appears in Chrome). No iPhone check. No avatar style picker. Stats, including solve rates, out of scope.
+- **For the relaunch session** (separate): overhaul deployment, wipe game data, and remove production's config override (`model = "gpt-5.4-mini"`, `reasoning_effort = "high"`), otherwise the new default (`gpt-6-luna`, high) never takes effect.
 
-- Real-phone check done on Android; there won't be an iPhone check.
-- No avatar style picker.
-- Stats (including per-puzzle solve rates) are out of scope.
-- The game model default is now `gpt-6-luna` at high effort; the code default was `gpt-5.4-nano` at high, and production's config sets `gpt-5.4-mini` at high. The concern was date-reasoning mistakes seen in the past (e.g. treating 1400 as before year 1): on 20 date and ordering traps x 3 runs, luna got 60/60 at both medium and high, with no latency difference (median about 2.4s). High costs about 20 more reasoning tokens per answer, roughly $0.00013 vs $0.00012 per question at luna's $0.10/$0.50 per million tokens, so high was chosen for the margin.
-- Topic-related items live in the topic flow case (60ac). Deployment and the relaunch cutover will be overhauled in a separate session, after the topic flow work and a several-day playtest.
+## Decisions on models
+
+- The game model default is `gpt-6-luna` at high effort; the code default was `gpt-5.4-nano` at high. The concern was date-reasoning mistakes seen in the past (e.g. treating 1400 as before year 1): on 20 date and ordering traps x 3 runs, luna got 60/60 at both medium and high, with no latency difference (median about 2.4s). High costs about 20 more reasoning tokens per answer, roughly $0.00013 vs $0.00012 per question at luna's $0.10/$0.50 per million tokens, so high was chosen for the margin.

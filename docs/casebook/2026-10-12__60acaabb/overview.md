@@ -26,6 +26,4 @@ Observed on a real build ("Pixar Movies"): expert kept 39, then 94 on its retry,
 
 ## Open items
 
-- Sandbox support for producing every topic and series state on demand, for the playtest.
-- Build time at high effort (about five minutes with a retry): acceptable, or use a lower effort for generation and validation only.
-- Deferred: a third reviewer per batch; dates (per-player local days); second seasons.
+Closed on 2026-10-13. The sandbox now produces every topic and series state (and much more) for testing. The remaining items moved to the UX case (7563): the build time at high effort, and the deferred third reviewer per batch, per-player local dates and second seasons.
