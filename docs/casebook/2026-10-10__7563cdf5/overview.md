@@ -80,11 +80,15 @@ For the session that picks this case up. Everything needed is in the repo and th
 2. **A sandbox per reviewer:** `uv run h21-sandbox --dir <dir>/sandbox --serve --port <unused port>` (add `--time-zone <zone>` to fix its "today"; the browser's zone must match, see "Dates" in `docs/architecture.md`). It copies the real `config.toml`, OpenAI key included, so live questions, hints, topic builds and pictures cost real money (small per question; a topic build at high effort is the expensive part). Personas log in with the password `sandbox`.
    - **New player:** joins from `/login` without an invite (open sign-ups allow 3 a day by default, one sandbox per reviewer is plenty). A picture is generated for them on joining.
    - **Returning regular:** `alice`, with friends and history.
-   - Both are regular players: no admin features (`dev`, the Admin tab, the control panel) are in scope.
+   - Both are regular players: no admin features (the `admin` persona, the Admin tab, the control panel) are in scope.
 3. **Phone-size browsing:** a headless browser at about 390x844, e.g. Playwright with `timezone_id` set to the sandbox's zone. Screenshots are the reviewers' eyes.
 4. **Reviewers:** eight, four models x two starting points: Opus 5.5 and Sonnet 5.5 (claude CLI), GPT-6.1 Sol and Terra (codex CLI). Terra isn't in the delegate skill's current model table (GPT-5.6 Terra is the previous generation, still callable): confirm with the user which Terra is meant. Not Fable or Astra. Read-only on the code; each writes one report file in its export.
 5. **A neutral brief**, written fresh: what the app is, how to run and reach the sandbox, the starting point, and the task (use the app as that player for a few sessions' worth of play, report friction, confusion, bugs and copy problems with severity, steps and screenshots). State facts only: none of our decisions, ideas or known issues, so the reports stay independent.
 6. **Synthesize** the eight reports into one recommendations report (like the topic flow case's), grouped by agreement, for the user to review before anything changes. Then the final round of fixes, then the relaunch.
+
+### Admin role and badge (2026-10-13)
+
+The `dev` role is renamed `admin` everywhere (code, invites, sandbox persona, docs); it already showed as the Admin tab. Admin accounts start with the H21 admin badge (`static/brand/h21-admin-avatar.png`, the user's blue crown-and-shield design) instead of a generated picture, on registration and in the startup backfill, and can still generate their own. The sandbox's admin persona uses it too. The user also made a purple "Developer" variant; it isn't used. No account is created automatically in production: the first admin still joins with an `h21-invite --role admin` invite, since a built-in login would be a known credential.
 
 ## Roadmap (agreed 2026-10-13)
 
