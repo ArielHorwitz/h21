@@ -15,9 +15,17 @@ All API endpoints are defined in `src/h21/main.py`. JSON request/response bodies
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| GET | `/api/topics` | User | List ready topics, plus the user's own topics that are still generating or failed (`status`, `status_detail`). |
-| POST | `/api/topics` | User | Submit a new topic. LLM normalizes the name, then the topic's puzzle pools are built in the background (status `generating`). Counts against daily topic limit. A failed topic of the same name is replaced. |
-| DELETE | `/api/topics/{slug}` | User | Dismiss a failed topic. Creator only. |
+| GET | `/api/topics` | User | List ready topics, plus the user's own topics still being built. Each has `series` (per difficulty: `state` available/winding_down/finished and `remaining`), `preview` (five solutions), `is_new` and `suggested_by_me`. |
+| POST | `/api/topics` | User | Submit a new topic. LLM tidies the name, then the topic is built in the background (status `generating`). Counts against the daily topic limit. 409 if a topic with the same tidied name exists or is being built; a turned-down one may be tried again. |
+| GET | `/api/topics/turned-down` | User | Recently turned-down topics with the reason (e.g. how many solutions each difficulty kept). |
+
+## Series (dev only)
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/api/series` | Dev | Every series with status, pool size, puzzles played, last refill and any attention flag. |
+| POST | `/api/series/{topic_slug}/{difficulty}/refill` | Dev | Run a refill now. |
+| POST | `/api/series/{topic_slug}/{difficulty}/reopen` | Dev | Make a winding-down or finished series available again and clear its flag. |
 
 ## Games
 

@@ -21,8 +21,8 @@ Colors and sizes are CSS custom properties at the top of `style.css`. The
 
 | Page | Files | Description |
 |------|-------|-------------|
-| Today | `home.html`, `home.js` | Today's topics as compact rows with Normal/Expert buttons whose color shows play state, friends who solved, and a link to Suggest. The user's own topics still being created or turned down appear here too; polls while one is being created. |
-| Suggest | `suggest.html`, `suggest.js` | The suggestion form with the remaining daily quota, and the user's suggested topics with their status (play, creating, or turned down with Dismiss). |
+| Today | `home.html`, `home.js` | Today's topics as compact rows with a button per offered series (color shows play state; finished series greyed out), notes for winding-down series, a New tag, friends who solved, and the topic's preview solutions behind its name. The user's own topics still being built appear too; polls while one is. Links to Suggest. |
+| Suggest | `suggest.html`, `suggest.js` | The suggestion form with the remaining daily quota, tappable topic ideas, the user's topics with their previews and status, and recently turned-down topics. |
 | Game | `index.html`, `game.js` | Gameplay: 21-segment answer meter, starter questions, answer chips with *Why?*, inline hints from one hint button, pinned composer, resume. Finished games go to the results page. |
 | Results | `replay.html`, `replay.js` | Outcome, answer, meter and stats, Share / Leaderboard / More puzzles, then the question log with hints inline. Spoiler-gated for viewers who haven't played the puzzle. |
 | Friends | `friends.html`, `friends.js` | Recent games with friends, search by name or player code, suggestions, following list. |

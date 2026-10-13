@@ -15,7 +15,7 @@
 2. `no_cache_static` middleware sets cache headers on static/page routes
 3. `require_auth` middleware checks the session cookie:
    - Public paths (`/login`, `/api/login`, `/api/register`, `/static/*`) pass through
-   - Dev paths (`/control`, `/api/invites`, `/api/accounts`, `/api/query`) require `role == "dev"`
+   - Dev paths (`/control`, `/api/invites`, `/api/accounts`, `/api/query`, `/api/series` and a few more) require `role == "dev"`
    - All other paths require a valid, non-blocked account
    - Sets `request.state.user_id` and `request.state.role` for downstream handlers
 4. Route handler executes, typically calling `database.*` and/or `llm_client` via helper functions
@@ -44,9 +44,11 @@ Per-user daily quotas tracked in `daily_usage` table:
 
 - All persistent state is in SQLite (WAL mode, foreign keys enabled). No in-memory caches.
 - LLM calls are async. The app uses `AsyncOpenAI`.
-- Puzzles come from a pre-generated pool per topic and difficulty. Each refill generates a batch of 100 solutions in one LLM call and validates them in a second (topic fit, difficulty, duplicates); only kept solutions enter the pool. `get_today_solution` draws one at random on the first request for a date/topic/difficulty (serialized by a per-puzzle lock), generates its hints, and persists it.
-- A new topic is built in the background: both difficulty pools are filled, and the topic becomes `ready`, or `failed` if either pool kept fewer than 50 solutions. Builds interrupted by a restart, and the seeded default topics, are built at startup.
-- A pool is refilled in the background once it drops below 50 solutions. If a refill keeps fewer than 10, the pool is treated as exhausted and not refilled again; when it empties, the topic answers 503.
+- Terms follow `docs/glossary.md`: a **series** is a topic at one difficulty, a **puzzle** is a series' daily instance, a **game** is one player's attempt.
+- Puzzles come from a pre-generated pool per series. Each refill generates a batch of 100 solutions in one LLM call and validates them in a second (topic fit, difficulty, duplicates); only kept solutions enter the pool. Every refill is retried once if it errors or keeps too few, and a bad outcome is only believed once the retry agrees.
+- `get_today_solution` draws a puzzle on the first request for a date and series (serialized by a per-puzzle lock): the solution leaves the pool and becomes the day's puzzle in one transaction, then its hints are generated. If an available series' pool is unexpectedly empty, it refills on the spot.
+- A new topic is built in the background, both difficulties concurrently. Each series with at least 50 solutions becomes `available`, the rest `unavailable`; the topic is `ready` if any series is available and `failed` (with the counts) if none is, or if a difficulty errors twice. A model then sets aside five representative **preview** solutions from the normal pool, shown to players and never drawn. Builds interrupted by a restart resume at startup. There are no built-in topics.
+- Series lifecycle: `available` refills in the background below 50 solutions, one refill at a time across the app. A refill keeping fewer than 10 (after its retry) moves the series to `winding_down`; when its last puzzle is drawn it becomes `finished`. A refill erroring twice flags the series (`needs_attention`) for the control panel, where an admin can refill or reopen it.
 - Hints are backfilled for a puzzle whose hint generation failed.
 - Global in-memory state is limited to in-flight background task bookkeeping and the draw locks.
 - Global module-level variables (`llm_client`, `database`, `signing_secret`) are initialized in the lifespan context manager.

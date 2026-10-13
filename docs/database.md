@@ -14,6 +14,23 @@ SQLite database managed by `GameDatabase` in `src/h21/db.py`. Uses WAL journal m
 | `status_detail` | TEXT | User-facing reason when `failed` (nullable) |
 | `created_at` | TEXT | UTC ISO timestamp |
 
+### `series`
+| Column | Type | Notes |
+|--------|------|-------|
+| `topic_slug` | TEXT FK | |
+| `difficulty` | TEXT | `normal` or `expert` |
+| `status` | TEXT | `available`, `winding_down`, `finished`, or `unavailable` (too few solutions when built) |
+| `needs_attention` | TEXT | Why the admin should look (e.g. a refill failed twice), or NULL |
+
+Primary key `(topic_slug, difficulty)`. Created when a topic is built.
+
+### `preview_solutions`
+| Column | Type | Notes |
+|--------|------|-------|
+| `topic_slug` | TEXT FK | |
+| `position` | INTEGER | 0 to 4 |
+| `solution` | TEXT | A representative solution shown to players; never drawn as a puzzle and excluded from future batches |
+
 ### `pool_solutions`
 | Column | Type | Notes |
 |--------|------|-------|
