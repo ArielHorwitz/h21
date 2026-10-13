@@ -495,6 +495,7 @@ class _TimestampFixups:
     questions: list[tuple[str, int, int]] = field(default_factory=list)
     hint_reveals: list[tuple[str, int, int]] = field(default_factory=list)
     accounts: list[tuple[str, int]] = field(default_factory=list)
+    topics: list[tuple[str, str]] = field(default_factory=list)
 
 
 def seed_database(
@@ -688,6 +689,13 @@ def seed_database(
 
     pooled_count = _seed_pools(database)
     _seed_series(database, rng)
+    # Topics date from the start of the history, except the last extra topic,
+    # which stays new so the New tag has an example.
+    history_start = datetime.combine(today - timedelta(days=history_days), datetime.min.time(), timezone.utc)
+    newest_slug = slugify(EXTRA_TOPICS[-1])
+    for topic in database.get_all_topics():
+        if topic["slug"] != newest_slug:
+            fixups.topics.append((history_start.isoformat(), topic["slug"]))
     database.close()
     _apply_timestamp_fixups(db_path, fixups)
 
@@ -890,6 +898,10 @@ def _apply_timestamp_fixups(db_path: Path, fixups: _TimestampFixups) -> None:
         connection.executemany(
             "UPDATE accounts SET created_at = ? WHERE user_id = ?",
             fixups.accounts,
+        )
+        connection.executemany(
+            "UPDATE topics SET created_at = ? WHERE slug = ?",
+            fixups.topics,
         )
         connection.commit()
     finally:
