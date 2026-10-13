@@ -5,6 +5,18 @@ const requestStatus = document.getElementById("request-topic-status");
 const topicQuota = document.getElementById("topic-quota");
 const myTopicsSection = document.getElementById("my-topics-section");
 const myTopicsList = document.getElementById("my-topics-list");
+const exampleChips = document.getElementById("example-chips");
+const turnedDownSection = document.getElementById("turned-down-section");
+const turnedDownList = document.getElementById("turned-down-list");
+
+// Ideas for topics: tapping one fills in the form.
+const EXAMPLE_TOPICS = [
+  "Pop Songs", "1990s Pop Music", "Roman History", "Ancient Egypt", "World War II",
+  "Greek Mythology", "Famous Painters", "Famous Scientists", "Classic Movies",
+  "Video Games", "Board Games", "Inventions", "World Capitals", "Dog Breeds",
+  "Musical Instruments", "Sitcoms", "Olympic Sports", "Famous Buildings",
+  "Cartoon Characters", "Nobel Prize Winners",
+];
 
 const TOPIC_STATUS_POLL_MS = 4000;
 const DIFFICULTIES = ["normal", "expert"];
@@ -37,6 +49,8 @@ function renderTopicStatus(topic) {
 
   if (topic.status === "ready") {
     for (const difficulty of DIFFICULTIES) {
+      const series = topic.series[difficulty];
+      if (!series || series.state === "finished") continue;
       const link = document.createElement("a");
       link.className = "secondary-btn small-btn";
       link.href = `/game?topic=${encodeURIComponent(topic.slug)}&difficulty=${difficulty}`;
@@ -46,32 +60,14 @@ function renderTopicStatus(topic) {
     return status;
   }
 
-  if (topic.status === "generating") {
-    const mark = document.createElement("span");
-    mark.className = "thinking-mark";
-    mark.innerHTML = THINKING_MARK_SVG;
-    status.appendChild(mark);
-    const text = document.createElement("span");
-    text.className = "field-hint";
-    text.textContent = "Creating puzzles…";
-    status.appendChild(text);
-    return status;
-  }
-
-  const dismissBtn = document.createElement("button");
-  dismissBtn.type = "button";
-  dismissBtn.className = "secondary-btn small-btn";
-  dismissBtn.textContent = "Dismiss";
-  dismissBtn.addEventListener("click", async () => {
-    dismissBtn.disabled = true;
-    try {
-      await fetch("/api/topics/" + encodeURIComponent(topic.slug), { method: "DELETE" });
-    } catch (error) {
-      console.error("Failed to dismiss topic:", error);
-    }
-    await loadMyTopics();
-  });
-  status.appendChild(dismissBtn);
+  const mark = document.createElement("span");
+  mark.className = "thinking-mark";
+  mark.innerHTML = THINKING_MARK_SVG;
+  status.appendChild(mark);
+  const text = document.createElement("span");
+  text.className = "field-hint";
+  text.textContent = "Creating puzzles…";
+  status.appendChild(text);
   return status;
 }
 
@@ -87,10 +83,10 @@ function renderMyTopics(topics) {
     name.className = "person-name";
     name.textContent = topic.name;
     info.appendChild(name);
-    if (topic.status === "failed") {
+    if (topic.preview && topic.preview.length > 0) {
       const detail = document.createElement("span");
-      detail.className = "person-detail topic-failed-text";
-      detail.textContent = topic.status_detail || "This topic could not be created.";
+      detail.className = "person-detail";
+      detail.textContent = topic.preview.join(" · ");
       info.appendChild(detail);
     }
     row.appendChild(info);
@@ -107,12 +103,62 @@ async function loadMyTopics() {
     const topics = (await response.json()).filter((topic) => topic.suggested_by_me);
     renderMyTopics(topics);
     // Keep checking while any of them is still being created.
-    clearTimeout(topicStatusPollTimer);
     if (topics.some((topic) => topic.status === "generating")) {
-      topicStatusPollTimer = setTimeout(loadMyTopics, TOPIC_STATUS_POLL_MS);
+      scheduleTopicPoll();
+    } else {
+      loadTurnedDown();
     }
   } catch (error) {
+    // A dropped connection shouldn't freeze the progress: try again shortly.
     console.error("Failed to load topics:", error);
+    scheduleTopicPoll();
+  }
+}
+
+function scheduleTopicPoll() {
+  clearTimeout(topicStatusPollTimer);
+  topicStatusPollTimer = setTimeout(loadMyTopics, TOPIC_STATUS_POLL_MS);
+}
+
+async function loadTurnedDown() {
+  try {
+    const response = await fetch("/api/topics/turned-down");
+    if (!response.ok) return;
+    const topics = await response.json();
+    turnedDownList.innerHTML = "";
+    for (const topic of topics) {
+      const row = document.createElement("div");
+      row.className = "person-row";
+      const info = document.createElement("span");
+      info.className = "person-info";
+      const name = document.createElement("span");
+      name.className = "person-name";
+      name.textContent = topic.name;
+      info.appendChild(name);
+      const detail = document.createElement("span");
+      detail.className = "person-detail";
+      detail.textContent = topic.detail || "";
+      info.appendChild(detail);
+      row.appendChild(info);
+      turnedDownList.appendChild(row);
+    }
+    turnedDownSection.hidden = topics.length === 0;
+  } catch (error) {
+    console.error("Failed to load turned-down topics:", error);
+  }
+}
+
+function renderExamples() {
+  for (const example of EXAMPLE_TOPICS) {
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "example-chip";
+    chip.textContent = example;
+    chip.addEventListener("click", () => {
+      topicNameInput.value = example;
+      topicNameInput.focus();
+    });
+    exampleChips.appendChild(chip);
   }
 }
 
@@ -172,5 +218,6 @@ requestForm.addEventListener("submit", async (event) => {
   }
 });
 
+renderExamples();
 loadTopicQuota();
 loadMyTopics();

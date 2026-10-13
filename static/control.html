@@ -26,6 +26,7 @@
 
     <nav class="control-tabs" role="tablist" aria-label="Control panel sections">
       <button type="button" role="tab" data-panel="invites">Invites</button>
+      <button type="button" role="tab" data-panel="topics">Topics</button>
       <button type="button" role="tab" data-panel="users">Users</button>
       <button type="button" role="tab" data-panel="activity">Activity</button>
       <button type="button" role="tab" data-panel="query">Query</button>
@@ -73,6 +74,12 @@
     <div class="control-section" data-panel="invites">
       <h2>Invite requests</h2>
       <div id="invite-requests-list"></div>
+    </div>
+
+    <div class="control-section" data-panel="topics">
+      <h2>Series</h2>
+      <p class="field-hint">Each topic at each difficulty. Flagged series come first.</p>
+      <div id="series-list"></div>
     </div>
 
     <div class="control-section" data-panel="activity">

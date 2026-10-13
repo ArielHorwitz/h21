@@ -77,17 +77,42 @@ function renderFriendAvatars(friendList) {
 }
 
 function renderDifficultyButton(topic, difficulty) {
+  const series = topic.series[difficulty];
+  const label = capitalize(difficulty);
+  if (series.state === "finished") {
+    const button = document.createElement("span");
+    button.className = `play-btn ${difficulty} is-finished`;
+    button.title = `${label}: finished`;
+    button.setAttribute("aria-label", button.title);
+    button.textContent = label;
+    return button;
+  }
+
   const game = gameStatuses[`${topic.slug}:${difficulty}`];
   const { className, title } = describeGame(game);
-
   const button = document.createElement("a");
   button.className = `play-btn ${difficulty} ${className}`.trim();
   button.href = `/game?topic=${encodeURIComponent(topic.slug)}&difficulty=${difficulty}`;
-  button.title = `${capitalize(difficulty)}: ${title}`;
-
+  button.title = `${label}: ${title}`;
   button.setAttribute("aria-label", button.title);
-  button.textContent = capitalize(difficulty);
+  button.textContent = label;
   return button;
+}
+
+// Notes about series that are winding down or finished, e.g. "Expert: 12 left".
+function describeSeriesNotes(topic) {
+  const notes = [];
+  for (const difficulty of DIFFICULTIES) {
+    const series = topic.series[difficulty];
+    if (!series) continue;
+    const label = capitalize(difficulty);
+    if (series.state === "finished") {
+      notes.push(`${label} finished`);
+    } else if (series.state === "winding_down") {
+      notes.push(series.remaining === 0 ? `${label}: last puzzle` : `${label}: ${series.remaining} left`);
+    }
+  }
+  return notes;
 }
 
 // Friends who solved either difficulty today, once each.
@@ -105,41 +130,50 @@ function friendsWhoSolved(topic) {
   return friends;
 }
 
-// Status shown to a topic's creator while it is being built, or after it failed.
-function renderPendingTopicStatus(topic) {
+// Shown to a topic's creator while it is being built.
+function renderBuildingStatus() {
   const status = document.createElement("div");
   status.className = "topic-pending-status";
-
-  if (topic.status === "generating") {
-    const mark = document.createElement("span");
-    mark.className = "thinking-mark";
-    mark.innerHTML = THINKING_MARK_SVG;
-    status.appendChild(mark);
-    const text = document.createElement("span");
-    text.textContent = "Creating puzzles… this takes a minute or two.";
-    status.appendChild(text);
-    return status;
-  }
-
+  const mark = document.createElement("span");
+  mark.className = "thinking-mark";
+  mark.innerHTML = THINKING_MARK_SVG;
+  status.appendChild(mark);
   const text = document.createElement("span");
-  text.className = "topic-failed-text";
-  text.textContent = topic.status_detail || "This topic could not be created.";
+  text.textContent = "Creating puzzles… this takes a minute or two.";
   status.appendChild(text);
-
-  const dismissBtn = document.createElement("button");
-  dismissBtn.className = "secondary-btn small-btn";
-  dismissBtn.textContent = "Dismiss";
-  dismissBtn.addEventListener("click", async () => {
-    dismissBtn.disabled = true;
-    try {
-      await fetch("/api/topics/" + encodeURIComponent(topic.slug), { method: "DELETE" });
-    } catch (error) {
-      console.error("Failed to dismiss topic:", error);
-    }
-    await loadTopics();
-  });
-  status.appendChild(dismissBtn);
   return status;
+}
+
+// The topic name toggles a line of preview solutions showing its range.
+function renderTopicName(topic, card) {
+  const name = document.createElement("h2");
+  name.className = "topic-name";
+  if (!topic.preview || topic.preview.length === 0) {
+    name.textContent = topic.name;
+    return name;
+  }
+  const toggle = document.createElement("button");
+  toggle.type = "button";
+  toggle.className = "topic-name-toggle";
+  toggle.setAttribute("aria-expanded", "false");
+  toggle.textContent = topic.name;
+  const chevron = document.createElement("span");
+  chevron.className = "topic-name-chevron";
+  chevron.setAttribute("aria-hidden", "true");
+  chevron.textContent = "▾";
+  toggle.appendChild(chevron);
+
+  const preview = document.createElement("p");
+  preview.className = "topic-preview";
+  preview.hidden = true;
+  preview.textContent = `Solutions might be like: ${topic.preview.join(" · ")}`;
+  toggle.addEventListener("click", () => {
+    preview.hidden = !preview.hidden;
+    toggle.setAttribute("aria-expanded", String(!preview.hidden));
+  });
+  card.appendChild(preview);
+  name.appendChild(toggle);
+  return name;
 }
 
 function renderTopics(topics) {
@@ -148,20 +182,42 @@ function renderTopics(topics) {
   for (const topic of topics) {
     const card = document.createElement("article");
     card.className = "topic-card";
+    const row = document.createElement("div");
+    row.className = "topic-card-row";
+    card.appendChild(row);
 
     const info = document.createElement("div");
     info.className = "topic-info";
-    const name = document.createElement("h2");
-    name.className = "topic-name";
-    name.textContent = topic.name;
-    info.appendChild(name);
-    card.appendChild(info);
+    row.appendChild(info);
 
-    if (topic.status && topic.status !== "ready") {
+    if (topic.status !== "ready") {
+      const name = document.createElement("h2");
+      name.className = "topic-name";
+      name.textContent = topic.name;
+      info.appendChild(name);
       card.classList.add("is-pending");
-      card.appendChild(renderPendingTopicStatus(topic));
+      card.appendChild(renderBuildingStatus());
       topicsList.appendChild(card);
       continue;
+    }
+
+    const nameRow = document.createElement("div");
+    nameRow.className = "topic-name-row";
+    nameRow.appendChild(renderTopicName(topic, card));
+    if (topic.is_new) {
+      const tag = document.createElement("span");
+      tag.className = "topic-tag is-new";
+      tag.textContent = "New";
+      nameRow.appendChild(tag);
+    }
+    info.appendChild(nameRow);
+
+    const notes = describeSeriesNotes(topic);
+    if (notes.length > 0) {
+      const notesLine = document.createElement("div");
+      notesLine.className = "topic-series-notes";
+      notesLine.textContent = notes.join(" · ");
+      info.appendChild(notesLine);
     }
 
     const friends = friendsWhoSolved(topic);
@@ -178,9 +234,11 @@ function renderTopics(topics) {
     const buttons = document.createElement("div");
     buttons.className = "play-buttons";
     for (const difficulty of DIFFICULTIES) {
-      buttons.appendChild(renderDifficultyButton(topic, difficulty));
+      if (topic.series[difficulty]) {
+        buttons.appendChild(renderDifficultyButton(topic, difficulty));
+      }
     }
-    card.appendChild(buttons);
+    row.appendChild(buttons);
 
     topicsList.appendChild(card);
   }
@@ -218,7 +276,10 @@ async function loadTopics() {
       }
     }
   } catch (error) {
+    // A dropped connection shouldn't freeze a topic's progress: try again shortly.
     console.error("Failed to load topics:", error);
+    clearTimeout(topicStatusPollTimer);
+    topicStatusPollTimer = setTimeout(loadTopics, TOPIC_STATUS_POLL_MS);
   }
 }
 

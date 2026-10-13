@@ -719,3 +719,88 @@ for (const tab of controlTabs) {
 
 const initialPanel = location.hash.slice(1);
 showPanel(Array.from(controlTabs).some((tab) => tab.dataset.panel === initialPanel) ? initialPanel : "invites");
+
+// -- Series --
+
+const seriesList = document.getElementById("series-list");
+
+const SERIES_STATUS_LABELS = {
+  available: "Available",
+  winding_down: "Winding down",
+  finished: "Finished",
+  unavailable: "Unavailable",
+};
+
+async function seriesAction(series, action, button) {
+  button.disabled = true;
+  const original = button.textContent;
+  button.textContent = "…";
+  try {
+    const response = await fetch(
+      `/api/series/${encodeURIComponent(series.topic_slug)}/${encodeURIComponent(series.difficulty)}/${action}`,
+      { method: "POST" },
+    );
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      alert(data.detail || "Failed");
+    } else if (action === "refill") {
+      alert(`Added ${data.added} solutions.`);
+    }
+  } finally {
+    button.textContent = original;
+    button.disabled = false;
+    loadSeries();
+  }
+}
+
+async function loadSeries() {
+  const response = await fetch("/api/series");
+  if (!response.ok) return;
+  const rows = await response.json();
+  seriesList.innerHTML = "";
+  if (rows.length === 0) {
+    seriesList.innerHTML = '<p class="field-hint">No series yet.</p>';
+    return;
+  }
+  const table = document.createElement("table");
+  table.className = "data-table";
+  table.innerHTML = "<thead><tr><th>Topic</th><th>Difficulty</th><th>Status</th><th>Pool</th><th>Played</th><th>Last refill (made/kept)</th><th>Attention</th><th></th></tr></thead>";
+  const body = document.createElement("tbody");
+  for (const series of rows) {
+    const row = document.createElement("tr");
+    const cells = [
+      series.topic_name, series.difficulty, SERIES_STATUS_LABELS[series.status] || series.status,
+      series.pool_size, series.puzzles_played, series.last_refill || "–", series.needs_attention || "",
+    ];
+    for (const value of cells) {
+      const cell = document.createElement("td");
+      cell.textContent = value;
+      row.appendChild(cell);
+    }
+    const actions = document.createElement("td");
+    actions.className = "user-actions";
+    const refillBtn = document.createElement("button");
+    refillBtn.type = "button";
+    refillBtn.className = "secondary-btn small-btn";
+    refillBtn.textContent = "Refill";
+    refillBtn.addEventListener("click", () => seriesAction(series, "refill", refillBtn));
+    actions.appendChild(refillBtn);
+    if (series.status === "winding_down" || series.status === "finished" || series.needs_attention) {
+      const reopenBtn = document.createElement("button");
+      reopenBtn.type = "button";
+      reopenBtn.className = "secondary-btn small-btn";
+      reopenBtn.textContent = "Reopen";
+      reopenBtn.addEventListener("click", () => seriesAction(series, "reopen", reopenBtn));
+      actions.appendChild(reopenBtn);
+    }
+    row.appendChild(actions);
+    body.appendChild(row);
+  }
+  table.appendChild(body);
+  const wrapper = document.createElement("div");
+  wrapper.className = "table-scroll-wrapper";
+  wrapper.appendChild(table);
+  seriesList.appendChild(wrapper);
+}
+
+loadSeries();

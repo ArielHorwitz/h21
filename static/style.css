@@ -1052,8 +1052,75 @@ body[data-tab="profile"] .tab-bar a[data-tab="profile"] .tab-avatar img {
   border-radius: var(--radius);
   padding: 0.75rem 0.75rem 0.75rem 0.9rem;
   display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.topic-card-row {
+  display: flex;
   align-items: center;
   gap: 0.75rem;
+}
+
+.topic-name-row {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.topic-name-toggle {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+}
+
+.topic-name-chevron {
+  margin-left: 0.3rem;
+  font-size: 0.75em;
+  color: var(--text-faint);
+  display: inline-block;
+  transition: transform 0.15s;
+}
+
+.topic-name-toggle[aria-expanded="true"] .topic-name-chevron {
+  transform: rotate(180deg);
+}
+
+.topic-preview {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+
+.topic-tag {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+}
+
+.topic-tag.is-new {
+  background: rgba(226, 183, 20, 0.15);
+  color: var(--accent);
+  border: 1px solid rgba(226, 183, 20, 0.45);
+}
+
+.topic-series-notes {
+  font-size: 0.78rem;
+  color: #f0a040;
+}
+
+.play-btn.is-finished {
+  border-color: var(--border);
+  color: var(--text-faint);
+  cursor: default;
 }
 
 .topic-card.is-pending {
@@ -1175,6 +1242,34 @@ body[data-tab="profile"] .tab-bar a[data-tab="profile"] .tab-avatar img {
 .suggest-form-section {
   display: flex;
   flex-direction: column;
+}
+
+.topic-examples,
+#turned-down-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.example-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.example-chip {
+  font: inherit;
+  font-size: 0.85rem;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.35rem 0.75rem;
+  cursor: pointer;
+}
+
+.example-chip:hover {
+  border-color: var(--text-faint);
 }
 
 #my-topics-section {
