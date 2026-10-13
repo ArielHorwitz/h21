@@ -6,7 +6,7 @@ Widened on 2026-10-12 from a UI pass to the whole user experience, including pla
 
 A major pass over the whole app's UI and UX for the clean relaunch (see the puzzle pool case, c254, for the relaunch context). Keep the brand assets and the palette; everything else (layout, buttons, navigation, in-app hints) is open to reconsideration. Mobile first: most play happens on phones.
 
-Work happens on the `ui-pass` branch, based on `dev`.
+Work started on the `ui-pass` branch, based on `dev`, and continued on `playtest`.
 
 ## Audit of the old UI (2026-10-10)
 
@@ -38,7 +38,7 @@ Screenshots of every page at phone (390px) and desktop widths, on a seeded sandb
 
 - **Unsolved games are private.** Failed and abandoned games are the same thing, "not solved", and are never shown to anyone else: leaderboards and recent games list solvers only (as originally designed), and the friend avatars on Today show friends who *solved* the puzzle ("solved", not "played"). A brief experiment showing a "Didn't solve" group on leaderboards was reverted: leaderboards are global (all non-anonymous solvers, with a Friends filter, per the social features case), so it advertised strangers' failures, which isn't the engagement we want. You still see your own: red on Today, ✗ in history (for failed and abandoned alike), "Not this time" on the results page, and both count as unsolved in your stats.
 - **Today's buttons are color-only** (user preference for a clean, aligned look): outline for unplayed, filled gold in progress, filled green solved, filled red not solved. Details are in the button's tooltip and accessible label.
-- **Unfinished games from past days open on the results page**, reading like a failed game, with the answer revealed since the puzzle's day is over.
+- ~~Unfinished games from past days open on the results page~~ (superseded by per-player local dates, 2b: open games now carry over until they end, and "abandoned" is a rare state set by the system or an admin).
 - **The sandbox covers every state on purpose:** dev has a solved, an unsolved and an in-progress puzzle today with the rest unplayed, an abandoned game earlier in the week, and a turned-down topic; friends are mid-game today and didn't solve puzzles dev solved today and yesterday (tests check these stay out of social views).
 
 - **Partially vs Depends redefined in the host prompt** (they overlapped: "partly correct or context-dependent" vs "varies based on interpretation"). Partially: the question is clear but the true answer is mixed (true for part of the subject or to some degree). Depends: the question can't be answered as asked (interpretation, context left open, or not answerable as true/false). Tie-break given to the model: if a more precise question would still be mixed, partially; if it would be a clean yes/no, depends. Help describes each with what to try next and no longer implies either means "close". Checked on 20 borderline questions x 3 runs with `gpt-6-luna`/medium: 51/60 answers as expected vs 38/60 with the old prompt. Depends cases are now unanimous (old prompt answered "Is it old?" for the telephone "yes" and mixed partially/depends for "Was he successful?" for Napoleon). Mixed-nationality questions (Einstein "American?", Curie "French?") still waver between yes and partially, which is arguably defensible.
@@ -55,13 +55,15 @@ Screenshots of every page at phone (390px) and desktop widths, on a seeded sandb
 - **Navigation on subpages** (Suggest, People, Leaderboard, results): the parent tab stays lit, as is standard for tab bars, and there is no back button in the top bar (the user finds top-corner back buttons hard to reach); the phone's back gesture and tapping the lit tab cover going back. Subpages carry their own page title.
 - **Series notes on Today:** "Expert: 8 left" when a series has 9 or fewer puzzles left (any state), "last puzzle" on its final day, "Expert finished" once finished.
 - **Quotas are accented pills** ("3 pictures left this month", "3 topic suggestions left today"), red when used up; remaining picture generations also show on the avatar preview.
-- **The results log ends with how the game ended**, when it wasn't a solve: "Gave up after question N", "Out of questions", "Left unfinished" (past day) or "Still in progress" (today), as a dashed closing entry, in keeping with hints shown where they were revealed.
+- **The results log ends with how the game ended**, when it wasn't a solve: "Gave up after question N", "Out of questions", "Abandoned" or "Still in progress" (since 2b), as a dashed closing entry, in keeping with hints shown where they were revealed.
 - **Results actions trimmed to one row:** Share result, then Leaderboard, both gold outlines; More puzzles was dropped as redundant with the tab bar (it pushed the buttons onto a second row). Renaming the Today tab to Puzzles was discussed and left as Today for the daily-ritual feel.
 - **Two button styles:** filled gold for the main action, gold outline for the rest (the muted grey outline is gone). Danger buttons, text links and segmented switches keep their own looks.
 
-## Status (2026-10-13)
+## Status (end of the 2026-10-10 to 10-13 session)
 
-All pages redesigned; the user is playtesting on the lab for a few more days. All work is on the `playtest` branch (not yet merged into `dev`); `master` is still production.
+Feature-complete for the relaunch: roadmap items 2a (open registration), 2b (per-player local dates) and 2c (structural checks instead of a third reviewer) are built, tested (58 unit tests) and deployed to the lab; 2d was dropped. All work is on the `playtest` branch; the user is merging it into `dev` and pushing at the end of this session. `master` is still production. The user keeps playtesting on the lab.
+
+**Next: the blind UX review**, run by a new session on another machine (this host has 1 CPU, about 1 GB of RAM and little disk, too small for eight reviewers, each needing an agent, a sandbox server and a headless browser). See "Running the UX review" below.
 
 ## Blind reviews (planned)
 
@@ -69,6 +71,20 @@ How the topic flow review was run, to repeat for the UX review: each reviewer go
 
 - **Topic flow:** two independent agents (Opus 5.5 and GPT-6.1 Sol), the same neutral brief (current behavior and observed problems as facts, none of our ideas), code without the casebook. Their reports are synthesized into one recommendation report for the user to review before anything is changed. The topic flow case (60ac) holds the work that follows.
 - **Whole-app UX:** eight blind agents on regular-user features only (no admin), each running its own local sandbox and driving it at phone size: two starting points (a brand-new player, and a returning regular with friends and history), four models each (Opus, Sonnet, Sol, Terra). Synthesized into one report for the user to review before addressing. Fable and Astra are not used.
+
+### Running the UX review (handoff)
+
+For the session that picks this case up. Everything needed is in the repo and this case; nothing depends on the lab.
+
+1. **Export per reviewer** from the merged branch: `git archive dev -- . ':!docs/casebook' | tar -x -C <reviewer dir>`, then `uv sync` (or share one install and point each sandbox at its own `--dir`, to save disk).
+2. **A sandbox per reviewer:** `uv run h21-sandbox --dir <dir>/sandbox --serve --port <unused port>` (add `--time-zone <zone>` to fix its "today"; the browser's zone must match, see "Dates" in `docs/architecture.md`). It copies the real `config.toml`, OpenAI key included, so live questions, hints, topic builds and pictures cost real money (small per question; a topic build at high effort is the expensive part). Personas log in with the password `sandbox`.
+   - **New player:** joins from `/login` without an invite (open sign-ups allow 3 a day by default, one sandbox per reviewer is plenty). A picture is generated for them on joining.
+   - **Returning regular:** `alice`, with friends and history.
+   - Both are regular players: no admin features (`dev`, the Admin tab, the control panel) are in scope.
+3. **Phone-size browsing:** a headless browser at about 390x844, e.g. Playwright with `timezone_id` set to the sandbox's zone. Screenshots are the reviewers' eyes.
+4. **Reviewers:** eight, four models x two starting points: Opus 5.5 and Sonnet 5.5 (claude CLI), GPT-6.1 Sol and Terra (codex CLI). Terra isn't in the delegate skill's current model table (GPT-5.6 Terra is the previous generation, still callable): confirm with the user which Terra is meant. Not Fable or Astra. Read-only on the code; each writes one report file in its export.
+5. **A neutral brief**, written fresh: what the app is, how to run and reach the sandbox, the starting point, and the task (use the app as that player for a few sessions' worth of play, report friction, confusion, bugs and copy problems with severity, steps and screenshots). State facts only: none of our decisions, ideas or known issues, so the reports stay independent.
+6. **Synthesize** the eight reports into one recommendations report (like the topic flow case's), grouped by agreement, for the user to review before anything changes. Then the final round of fixes, then the relaunch.
 
 ## Roadmap (agreed 2026-10-13)
 
@@ -88,7 +104,7 @@ How the topic flow review was run, to repeat for the UX review: each reviewer go
      - As built: the browser reports its IANA time zone in a `tz` cookie (`static/tz.js` on every page); the account remembers it for admin views. An open game from another day with no questions is dropped rather than carried over. Open sign-ups stay per UTC day. The sandbox takes `--time-zone` for dev's today. Found on the way: `/api/history` sent the solution of games still in progress (fixed).
      - Previous notes: Wordle-like: each player's day follows their own local time. Today one server-local date decides the puzzle for everyone, which runs through puzzles, games, leaderboards and every "today"; midnight-crossing requests and games need a rule. The riskiest remaining change, so it goes early enough for the playtest to shake it out.
    - **c. A third reviewer per generation batch: dropped 2026-10-13 for structural checks in the parsers** (built on `playtest`). The worry was any reply going off the rails (a refusal, or a topic name that's really a prompt, e.g. to recite Shakespeare), not batch quality. A yes/no reviewer would need parsing itself, could fail or refuse like any model, and adds time and cost per batch, so the existing parsers enforce structure instead: at least half the requested names and a validator verdict on at least 90% of the batch, counting only names from the batch. A failed check is an error (retried, then flagged), so it's never mistaken for a topic running dry, and a refusal can never become a puzzle. Before this, a validator replying "KEEP <refusal sentence>" would have put that sentence in the pool. An exact-name check against past puzzles was offered and not taken: duplicates stay the model's judgment (they're in its exclusion list). A reviewer can still be added if something slips past the checks. A length limit on names was tried and dropped: real titles can be long, and essay-like lines are rejected by the validator anyway.
-3. **Release-candidate mode:** feature freeze, merge `playtest` into `dev`, run the blind UX review (planned above), and give the user a last round of fixes and changes.
+3. **Release-candidate mode:** feature freeze, merge `playtest` into `dev` (the user, at the end of the 2026-10-13 session), run the blind UX review on another machine (see "Running the UX review"), and give the user a last round of fixes and changes.
 4. **Relaunch**, probably in a separate session (see below).
 
 Dropped: second seasons (easy to add later if the app takes off; series already carry a state). No longer considered: the Firefox toolbar gap, an iPhone check, an avatar style picker, stats and solve rates.
@@ -96,6 +112,8 @@ Dropped: second seasons (easy to add later if the app takes off; series already 
 ## For the relaunch session
 
 Overhaul deployment, wipe game data, and remove production's config override (`model = "gpt-5.4-mini"`, `reasoning_effort = "high"`), otherwise the new default (`gpt-6-luna`, high) never takes effect. Production today runs `master` as root under systemd (`/etc/systemd/system/h21.service`, code in `/opt/h21`, config in `/root/.config/h21/config.toml`), behind Caddy at h21.ariel.tools; changing it needs the user's sudo.
+
+Also for the relaunch: the database must be created fresh (no migrations; the schema changed throughout, e.g. `settings`, `accounts.time_zone`, `daily_usage.avatar_generations_used`). Open sign-ups default to 3 a day with their own quotas (200 questions, 2 topics, 3 pictures): the user may want to set these in the control panel (Admin tab, Invites) right after launch.
 
 ## Decisions on models
 
