@@ -271,6 +271,18 @@ class BatchResult:
     raw_response: str
 
 
+# Structural checks on generation and validation replies. They catch a reply
+# that went off the rails (a refusal, an essay, a garbled list) without
+# judging quality, which is the validator's job. A failed check is an error,
+# so the refill is retried and, if it fails again, reported rather than
+# mistaken for a topic running dry.
+
+# A batch needs at least this share of the requested solutions.
+MIN_BATCH_SHARE = 0.5
+# The validator must give a verdict on at least this share of the batch.
+MIN_VERDICT_SHARE = 0.9
+
+
 async def generate_solution_batch(
     client: LLMClient,
     exclusion_list: list[str],
@@ -299,9 +311,9 @@ async def generate_solution_batch(
     response = await client.ask(prompt, "Generate the subjects.")
 
     solutions = _parse_line_per_solution(response)
-    if not solutions:
+    if len(solutions) < batch_size * MIN_BATCH_SHARE:
         raise LLMError(
-            "Batch generation returned no valid solutions",
+            f"Batch generation returned {len(solutions)} usable lines of {batch_size} requested",
             "AI returned an empty or unparseable batch response.",
         )
 
@@ -360,26 +372,37 @@ async def validate_solution_batch(
 
     response = await client.ask(prompt, "Review the subjects.")
 
-    results = []
+    # Verdicts only count for names in the batch (matched loosely, kept in
+    # the generator's spelling), one per name: the first wins.
+    batch_names = {solution.casefold(): solution for solution in solutions}
+    verdicts: dict[str, ValidationResult] = {}
     for line in response.strip().splitlines():
         line = line.strip()
         if not line:
             continue
         if line.upper().startswith("KEEP "):
-            solution = line[5:].strip()
-            results.append(ValidationResult(solution=solution, kept=True, reason=""))
+            name, kept, reason = line[5:].strip(), True, ""
         elif line.upper().startswith("REJECT "):
             rest = line[7:].strip()
             if " | " in rest:
-                solution, reason = rest.split(" | ", 1)
+                name, reason = rest.split(" | ", 1)
             else:
-                solution = rest
-                reason = "no reason given"
-            results.append(ValidationResult(
-                solution=solution.strip(), kept=False, reason=reason.strip(),
-            ))
+                name, reason = rest, "no reason given"
+            kept = False
         else:
             logger.warning("Unparseable validation line: %r", line)
+            continue
+        solution = batch_names.get(name.strip().casefold())
+        if solution is None:
+            logger.warning("Validation verdict for a name not in the batch: %r", line)
+            continue
+        verdicts.setdefault(solution, ValidationResult(solution=solution, kept=kept, reason=reason.strip()))
+    if len(verdicts) < len(solutions) * MIN_VERDICT_SHARE:
+        raise LLMError(
+            f"Validation gave verdicts on {len(verdicts)} of {len(solutions)} solutions",
+            "AI returned an incomplete or unparseable validation response.",
+        )
+    results = list(verdicts.values())
 
     kept_count = sum(1 for result in results if result.kept)
     rejected_count = sum(1 for result in results if not result.kept)
