@@ -52,6 +52,7 @@ Screenshots of every page at phone (390px) and desktop widths, on a seeded sandb
 
 - **Suggesting a topic has its own page** (`/suggest`; Today links to it): the form with the quota pill, tappable topic ideas, "Your topics" with their previews and status, and recently turned-down topics from everyone. A guide with broad-vs-focused example topics was tried and dropped: good examples are hard to pick, since the sweet spot is a topic with hundreds of well-known subjects ("Pop songs", not "Music" or "Classical composers"). The "Disney" problem is addressed by topic previews instead (topic flow case).
 - **Help** is a quick primer: e.g. hints are just "A hint unlocks every 4 questions."
+- **Navigation on subpages** (Suggest, People, Leaderboard, results): the parent tab stays lit, as is standard for tab bars, and there is no back button in the top bar (the user finds top-corner back buttons hard to reach); the phone's back gesture and tapping the lit tab cover going back. Subpages carry their own page title.
 - **Series notes on Today:** "Expert: 8 left" when a series has 9 or fewer puzzles left (any state), "last puzzle" on its final day, "Expert finished" once finished.
 - **Quotas are accented pills** ("3 pictures left this month", "3 topic suggestions left today"), red when used up; remaining picture generations also show on the avatar preview.
 - **The results log ends with how the game ended**, when it wasn't a solve: "Gave up after question N", "Out of questions", "Left unfinished" (past day) or "Still in progress" (today), as a dashed closing entry, in keeping with hints shown where they were revealed.
@@ -64,6 +65,8 @@ All pages redesigned; the user is playtesting on the lab for a few more days. Al
 
 ## Blind reviews (planned)
 
+How the topic flow review was run, to repeat for the UX review: each reviewer got its own export of the code without the casebook (`git archive <branch> -- . ':!docs/casebook'`), so it couldn't see our ideas, plus a neutral brief stating facts and the task but no proposed solutions. Reviewers wrote a report file in their export and changed nothing else. Models: Opus and GPT-6.1 Sol; the user prefers not to use Fable or Astra. For the UX review, each reviewer additionally runs its own local sandbox (`h21-sandbox --dir <dir> --serve --port <unused port>`) and drives it at phone size, logged in as a regular player (`alice`), not `dev`.
+
 - **Topic flow:** two independent agents (Opus 5.5 and GPT-6.1 Sol), the same neutral brief (current behavior and observed problems as facts, none of our ideas), code without the casebook. Their reports are synthesized into one recommendation report for the user to review before anything is changed. The topic flow case (60ac) holds the work that follows.
 - **Whole-app UX:** eight blind agents on regular-user features only (no admin), each running its own local sandbox and driving it at phone size: two starting points (a brand-new player, and a returning regular with friends and history), four models each (Opus, Sonnet, Sol, Terra). Synthesized into one report for the user to review before addressing. Fable and Astra are not used.
 
@@ -75,7 +78,7 @@ All pages redesigned; the user is playtesting on the lab for a few more days. Al
 - **Topic builds at high effort take about five minutes** (with a retry): keep, or build at a lower effort than the game. Unanswered.
 - **Deferred:** a third reviewer per generation batch; per-player local dates (Wordle-like; today the server's local date applies to everyone, and midnight-crossing requests and games need a rule); second seasons for finished series.
 - **Noted, no action:** Firefox for Android with the address bar at the top briefly misplaces the bottom tab bar while its toolbar animates (Firefox behavior; revisit if the gap persists or appears in Chrome). No iPhone check. No avatar style picker. Stats, including solve rates, out of scope.
-- **For the relaunch session** (separate): overhaul deployment, wipe game data, and remove production's config override (`model = "gpt-5.4-mini"`, `reasoning_effort = "high"`), otherwise the new default (`gpt-6-luna`, high) never takes effect.
+- **For the relaunch session** (separate): overhaul deployment, wipe game data, and remove production's config override (`model = "gpt-5.4-mini"`, `reasoning_effort = "high"`), otherwise the new default (`gpt-6-luna`, high) never takes effect. Production today runs `master` as root under systemd (`/etc/systemd/system/h21.service`, code in `/opt/h21`, config in `/root/.config/h21/config.toml`), behind Caddy at h21.ariel.tools; changing it needs the user's sudo.
 
 ## Decisions on models
 
