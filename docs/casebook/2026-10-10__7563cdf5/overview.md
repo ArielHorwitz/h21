@@ -115,9 +115,33 @@ Dropped: second seasons (easy to add later if the app takes off; series already 
 
 ## For the relaunch session
 
-Overhaul deployment, wipe game data, and remove production's config override (`model = "gpt-5.4-mini"`, `reasoning_effort = "high"`), otherwise the new default (`gpt-6-luna`, high) never takes effect. Production today runs `master` as root under systemd (`/etc/systemd/system/h21.service`, code in `/opt/h21`, config in `/root/.config/h21/config.toml`), behind Caddy at h21.ariel.tools; changing it needs the user's sudo.
+(Superseded in part by "Relaunch progress" above.) Overhaul deployment, wipe game data, and remove production's config override (`model = "gpt-5.4-mini"`, `reasoning_effort = "high"`), otherwise the new default (`gpt-6-luna`, high) never takes effect. Production today runs `master` as root under systemd (`/etc/systemd/system/h21.service`, code in `/opt/h21`, config in `/root/.config/h21/config.toml`), behind Caddy at h21.ariel.tools; changing it needs the user's sudo.
 
 Also for the relaunch: the database must be created fresh (no migrations; the schema changed throughout, e.g. `settings`, `accounts.time_zone`, `daily_usage.avatar_generations_used`). Open sign-ups default to 3 a day with their own quotas (200 questions, 2 topics, 3 pictures): the user may want to set these in the control panel (Admin tab, Invites) right after launch. After seeding the first topics, the admin can remove their New tags (control panel, Topics tab, "Remove all"), so they don't all look new at launch.
+
+### Relaunch progress (2026-10-20)
+
+The user decided to launch without waiting for the blind UX review (no active users, so it can run after launch) and to deploy H21 like the other apps on the box (BetMarket, Flock Vote, Shukit): a systemd **user** service owned by `ariel`, no sudo per deploy. See "Deployment" in `docs/development.md`.
+
+Done:
+- `playtest` merged into `dev` and `master` (fast-forward) and pushed; the `playtest` branch and worktree are gone. The lab (red slot) ran exactly this app code; its scripts now deploy `dev`.
+- `deploy/deploy.sh`, `deploy/h21.service`, a nightly `h21-backup` timer, and a backup CLI. Config and data live under `~/.local/share/h21/` (config in `config/h21/config.toml`, data in `data/h21/`), apart from `ariel`'s default XDG paths. The OpenAI key comes from `~/data/sec/openai.env`, the same key the lab uses. The production config sets only `secure_cookies = true`, so the model is the code default (`gpt-6-luna`, high) and the old `gpt-5.4-mini` override is gone by construction.
+- The new server is deployed and running on `127.0.0.1:8440` with an empty database; Caddy still sends h21.ariel.tools to the old root server on 8000.
+
+Not done, waiting for the user's laptop (ssh as `ubuntu` for sudo):
+1. **Inventory trip (read-only):** map the old root deployment before removing anything. Known: `/etc/systemd/system/h21.service` (runs `/opt/h21/.venv/bin/h21` as root, `HOME=/root`), `/opt/h21` (a git clone with a virtualenv), `/root/.config/h21/`, `/root/.local/share/h21/`. Found: the old virtualenv's Python is root's own uv install (`/root/.local/share/uv/python/cpython-3.13...`), so root likely has uv itself (`/root/.local/bin/uv`?) and a cache (`/root/.cache/uv`); whether anything else of root's uses them is unknown. The block:
+
+```
+sudo ls -la /root /root/.config /root/.local /root/.local/share /root/.local/bin /root/.cache
+sudo du -sh /opt/h21 /root/.config/h21 /root/.local/share/h21 /root/.local/share/uv /root/.cache/uv /root/.local/bin/uv
+sudo ls -la /root/.config/h21 /root/.local/share/h21
+sudo grep -v -i key /root/.config/h21/config.toml
+sudo crontab -l -u root
+systemctl list-unit-files | grep -i h21
+```
+
+2. **Cutover trip:** written from the inventory. Stop and disable the root unit and remove its file, point the Caddy block at `127.0.0.1:8440` and reload, archive the old config and data into a tarball owned by `ariel` (a record; it isn't migrated, since the relaunch starts fresh), delete `/opt/h21`, and ask about the shared uv pieces rather than removing them blindly. Then check https://h21.ariel.tools/.
+3. **Set up:** an admin invite (see "Admin CLIs against production" in `docs/development.md`), the admin registers (gets the admin badge), suggests the first topics, removes their New tags, and sets the open sign-up numbers.
 
 ## Decisions on models
 
