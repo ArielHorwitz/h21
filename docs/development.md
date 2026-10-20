@@ -62,6 +62,7 @@ h21 --host 0.0.0.0 --port 3000
 | `h21-invite` | Generate an invite code for user registration |
 | `h21-sandbox` | Create and run a seeded local sandbox instance for testing |
 | `h21-pool` | Evaluate puzzle generation and validation prompts for a topic, without touching the database |
+| `h21-backup <dir>` | Archive a consistent copy of the database plus the avatars into `<dir>`, keeping the newest 10 (`--keep`) |
 
 ## Local Testing Sandbox
 
@@ -143,6 +144,37 @@ played yet is independently solved (50%), failed (20%), started without
 finishing (10%) or skipped (20%), so running it again later in the day fills
 in some of the skipped ones. Puzzles nobody has drawn yet are drawn from
 the pool, as for a real first player.
+
+## Deployment
+
+Production (https://h21.ariel.tools) runs as a systemd **user** service owned by
+`ariel`, like the other apps on the box, so deploying needs no sudo:
+
+```bash
+deploy/deploy.sh            # deploy the tip of master
+deploy/deploy.sh <commit>   # deploy a specific commit, e.g. to roll back
+```
+
+Each commit is built from `git archive` into its own release under
+`~/.local/share/h21/releases/`, with its own virtualenv; `current` points at the
+live one and the three newest are kept. The service (`deploy/h21.service`)
+listens on `127.0.0.1:8440` behind Caddy (`deploy/Caddyfile.example`).
+
+- **Config and data** live in `~/.local/share/h21/config/h21/config.toml` and
+  `~/.local/share/h21/data/h21/`, set through `XDG_CONFIG_HOME` and
+  `XDG_DATA_HOME` in the unit, apart from `ariel`'s default XDG paths, so a
+  local `h21`, `h21-reset` or `h21-sandbox` never touches production. The first
+  deploy writes the config with `secure_cookies = true`; the model and effort
+  are the code defaults.
+- **The OpenAI key** comes from `~/data/sec/openai.env` (`EnvironmentFile`).
+- **Backups:** `h21-backup` archives a consistent copy of the database plus the
+  avatars; `h21-backup.timer` runs it nightly into `~/.local/share/h21/backups`,
+  keeping 10.
+- **Logs:** `journalctl --user -u h21.service`, and `h21.log` in the data
+  directory.
+- **Admin CLIs** against production need the same environment, e.g.
+  `XDG_CONFIG_HOME=~/.local/share/h21/config XDG_DATA_HOME=~/.local/share/h21/data ~/.local/share/h21/current/.venv/bin/h21-invite --role admin`
+  (with the key from `~/data/sec/openai.env` exported).
 
 ## Project Structure
 

@@ -1,0 +1,8 @@
+[Unit]
+Description=Back up the H21 database and avatars
+
+[Service]
+Type=oneshot
+Environment=XDG_CONFIG_HOME=%h/.local/share/h21/config
+Environment=XDG_DATA_HOME=%h/.local/share/h21/data
+ExecStart=%h/.local/share/h21/current/.venv/bin/h21-backup %h/.local/share/h21/backups --keep 10

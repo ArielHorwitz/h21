@@ -17,6 +17,7 @@ h21-reset = "h21.reset:main"
 h21-invite = "h21.invite:main"
 h21-sandbox = "h21.sandbox:main"
 h21-pool = "h21.generate:main"
+h21-backup = "h21.backup:main"
 
 [build-system]
 requires = ["hatchling"]

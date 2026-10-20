@@ -1,0 +1,18 @@
+[Unit]
+Description=H21 (https://h21.ariel.tools)
+After=network-online.target
+
+[Service]
+Type=simple
+# Config and data live beside the releases, apart from ariel's default XDG
+# paths, so a local h21, h21-reset or h21-sandbox never touches production.
+Environment=XDG_CONFIG_HOME=%h/.local/share/h21/config
+Environment=XDG_DATA_HOME=%h/.local/share/h21/data
+EnvironmentFile=%h/data/sec/openai.env
+WorkingDirectory=%h/.local/share/h21
+ExecStart=%h/.local/share/h21/current/.venv/bin/h21 --host 127.0.0.1 --port 8440
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=default.target

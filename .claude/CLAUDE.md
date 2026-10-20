@@ -14,7 +14,9 @@ An AI-powered 21 questions trivia game. Players pick a topic (suggested by playe
 | `src/h21/avatar.py` | AI-generated profile pictures: OpenAI image API, Pillow resize, file management |
 | `src/h21/invite.py` | CLI utility to generate invite codes |
 | `src/h21/reset.py` | CLI utility to delete database and logs |
+| `src/h21/backup.py` | CLI utility to archive the database and avatars (nightly in production) |
 | `src/h21/sandbox.py` | CLI utility to create/run a seeded local sandbox instance for testing |
+| `deploy/` | Production deploy script, systemd user units and Caddy example (see docs/development.md) |
 | `src/h21/generate.py` | `h21-pool` CLI to evaluate puzzle generation and validation prompts |
 
 ## Frontend Layout
