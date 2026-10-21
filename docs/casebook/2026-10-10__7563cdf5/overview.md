@@ -128,20 +128,13 @@ Done:
 - `deploy/deploy.sh`, `deploy/h21.service`, a nightly `h21-backup` timer, and a backup CLI. Config and data live under `~/.local/share/h21/` (config in `config/h21/config.toml`, data in `data/h21/`), apart from `ariel`'s default XDG paths. The OpenAI key comes from `~/data/sec/openai.env`, the same key the lab uses. The production config sets only `secure_cookies = true`, so the model is the code default (`gpt-6-luna`, high) and the old `gpt-5.4-mini` override is gone by construction.
 - The new server is deployed and running on `127.0.0.1:8440` with an empty database; Caddy still sends h21.ariel.tools to the old root server on 8000.
 
-Not done, waiting for the user's laptop (ssh as `ubuntu` for sudo):
-1. **Inventory trip (read-only):** map the old root deployment before removing anything. Known: `/etc/systemd/system/h21.service` (runs `/opt/h21/.venv/bin/h21` as root, `HOME=/root`), `/opt/h21` (a git clone with a virtualenv), `/root/.config/h21/`, `/root/.local/share/h21/`. Found: the old virtualenv's Python is root's own uv install (`/root/.local/share/uv/python/cpython-3.13...`), so root likely has uv itself (`/root/.local/bin/uv`?) and a cache (`/root/.cache/uv`); whether anything else of root's uses them is unknown. The block:
+**Cutover done (2026-10-21).** The inventory showed, besides the known paths, `/root/.config/h21-old` and `/root/.local/share/h21-old`, and root's own uv install (binaries, Pythons, cache, config, and installer lines in root's shell files) used only by H21. The user wanted nothing H21-related left behind root, so one root block switched Caddy to `127.0.0.1:8440` (before stopping the old server, so no downtime), disabled and removed the root unit, archived `/opt/h21` (without its virtualenv) and all the old config and data to `~/.local/share/h21/backups/old-root-deployment-2026-10-21.tgz` (owned by `ariel`, mode 600; it holds the old, revoked key), and deleted them; a second removed root's uv and its shell hooks. h21.ariel.tools now serves the user service, and the neighbouring sites were checked.
 
-```
-sudo ls -la /root /root/.config /root/.local /root/.local/share /root/.local/bin /root/.cache
-sudo du -sh /opt/h21 /root/.config/h21 /root/.local/share/h21 /root/.local/share/uv /root/.cache/uv /root/.local/bin/uv
-sudo ls -la /root/.config/h21 /root/.local/share/h21
-sudo grep -v -i key /root/.config/h21/config.toml
-sudo crontab -l -u root
-systemctl list-unit-files | grep -i h21
-```
+**New API keys.** The old key is being revoked. `~/data/sec/apikey` (list / write / run, never printing keys) names them: production uses `openai.h21.prod`, written to `~/.local/share/h21/config/openai.env` (the unit's `EnvironmentFile`; `deploy.sh` refuses to run without it), and the lab uses `openai.dev.lemcel` in its own env file. Both were checked against the API.
 
-2. **Cutover trip:** written from the inventory. Stop and disable the root unit and remove its file, point the Caddy block at `127.0.0.1:8440` and reload, archive the old config and data into a tarball owned by `ariel` (a record; it isn't migrated, since the relaunch starts fresh), delete `/opt/h21`, and ask about the shared uv pieces rather than removing them blindly. Then check https://h21.ariel.tools/.
-3. **Set up:** an admin invite (see "Admin CLIs against production" in `docs/development.md`), the admin registers (gets the admin badge), suggests the first topics, removes their New tags, and sets the open sign-up numbers.
+**Production config** (`~/.local/share/h21/config/h21/config.toml`): `secure_cookies = true` and the old invite request hint ("Email, whatsapp, telegram, or discord handle"); everything else is the code default.
+
+**Next: setup.** An admin invite was created for the user (`/login?invite=<code>`); then the user registers as admin (gets the badge), suggests the first topics, removes their New tags and sets the open sign-up numbers. The blind UX review can follow at any time.
 
 ## Decisions on models
 
