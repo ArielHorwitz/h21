@@ -38,6 +38,7 @@ An AI-powered 21 questions trivia game. Players pick a topic (suggested by playe
 | `static/partials/*.html` | Shared top bar and tab bar, included by `render_page` |
 | `static/question-log.js` | Question log rendering shared by game and results |
 | `static/nav.js` | Shared script: Profile tab avatar, Admin tab and its badge for devs |
+| `static/manifest.webmanifest` | Web app manifest (name, dark background and theme colour, icons) so an installed app opens on the brand colour |
 | `static/tz.js` | Loaded by every page: reports the browser's time zone in a cookie, which sets the player's date |
 
 ## Progressive Discovery
