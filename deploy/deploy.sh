@@ -7,8 +7,9 @@
 # Each commit becomes its own release directory with its own virtualenv, built from
 # `git archive` so only committed files go live. `current` points at the live release,
 # and the three newest releases are kept for rollback. Runs as a user service, so no
-# step here needs sudo. The OpenAI key comes from ~/data/sec/openai.env (see h21.service);
-# the rest of the config is in ~/.local/share/h21/config/h21/config.toml, written with
+# step here needs sudo. The OpenAI key comes from ~/.local/share/h21/config/openai.env
+# (see h21.service), written with: ~/data/sec/apikey write openai.h21.prod OPENAI_API_KEY <file>.
+# The rest of the config is in ~/.local/share/h21/config/h21/config.toml, written with
 # production defaults on the first deploy and never overwritten.
 #
 # H21_PORT is only for the health check, for when a drop-in moves the service to
@@ -22,6 +23,12 @@ unit_directory="$HOME/.config/systemd/user"
 config_file="$home_directory/config/h21/config.toml"
 port="${H21_PORT:-8440}"
 releases_to_keep=3
+
+key_file="$home_directory/config/openai.env"
+if [[ ! -f "$key_file" ]]; then
+  echo "Missing $key_file. Write it with: ~/data/sec/apikey write openai.h21.prod OPENAI_API_KEY $key_file" >&2
+  exit 1
+fi
 
 commit="$(git -C "$repository" rev-parse --verify "$revision^{commit}")"
 release="$home_directory/releases/$commit"

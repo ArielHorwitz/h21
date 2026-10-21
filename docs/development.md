@@ -166,7 +166,10 @@ listens on `127.0.0.1:8440` behind Caddy (`deploy/Caddyfile.example`).
   local `h21`, `h21-reset` or `h21-sandbox` never touches production. The first
   deploy writes the config with `secure_cookies = true`; the model and effort
   are the code defaults.
-- **The OpenAI key** comes from `~/data/sec/openai.env` (`EnvironmentFile`).
+- **The OpenAI key** is production's own (`openai.h21.prod`), in
+  `~/.local/share/h21/config/openai.env` (mode 600, the unit's `EnvironmentFile`),
+  written without printing it by `~/data/sec/apikey write openai.h21.prod OPENAI_API_KEY <file>`.
+  `deploy.sh` refuses to run without it.
 - **Backups:** `h21-backup` archives a consistent copy of the database plus the
   avatars; `h21-backup.timer` runs it nightly into `~/.local/share/h21/backups`,
   keeping 10.
@@ -174,7 +177,7 @@ listens on `127.0.0.1:8440` behind Caddy (`deploy/Caddyfile.example`).
   directory.
 - **Admin CLIs** against production need the same environment, e.g.
   `XDG_CONFIG_HOME=~/.local/share/h21/config XDG_DATA_HOME=~/.local/share/h21/data ~/.local/share/h21/current/.venv/bin/h21-invite --role admin`
-  (with the key from `~/data/sec/openai.env` exported).
+  (with the key exported, e.g. via `~/data/sec/apikey run openai.h21.prod OPENAI_API_KEY -- ...`).
 
 ## Project Structure
 
