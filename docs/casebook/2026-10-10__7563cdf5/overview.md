@@ -134,7 +134,11 @@ Done:
 
 **Production config** (`~/.local/share/h21/config/h21/config.toml`): `secure_cookies = true` and the old invite request hint ("Email, whatsapp, telegram, or discord handle"); everything else is the code default.
 
-**Next: setup.** An admin invite was created for the user (`/login?invite=<code>`); then the user registers as admin (gets the badge), suggests the first topics, removes their New tags and sets the open sign-up numbers. The blind UX review can follow at any time.
+**Setup done.** The user registered as admin through an admin invite and created the first topics: Famous Israelis, Notable People, Roman History, World Geography, and a food topic (Famous Dishes was recommended: one kind of subject, hundreds of well-known examples, easy to narrow with yes/no questions), then went over the admin panel.
+
+## Closed (2026-10-21)
+
+H21 is relaunched at https://h21.ariel.tools/. The old API key is revoked and deleted. The red lab slot and its playtest instance (and its local backups) were removed. The blind UX review was dropped by the user (not needed). Later, only if needed: the "suspect user" review in the control panel, should open sign-ups be abused.
 
 ## Decisions on models
 
