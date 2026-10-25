@@ -2,6 +2,7 @@ const MAX_QUESTIONS = 21;
 const HINTS_TOTAL = 5;
 const QUESTIONS_PER_HINT = 4;
 
+const gameScroll = document.getElementById("game-scroll");
 const questionLog = document.getElementById("question-log");
 const questionInput = document.getElementById("question-input");
 const submitBtn = document.getElementById("submit-btn");
@@ -73,7 +74,7 @@ function updateProgress() {
 // -- Log --
 
 function scrollToLatest() {
-  window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
+  gameScroll.scrollTo({ top: gameScroll.scrollHeight, behavior: "smooth" });
 }
 
 function addQuestionEntry(question) {
@@ -358,7 +359,7 @@ async function init() {
     questionInput.focus();
   }
   updateProgress();
-  window.scrollTo({ top: document.body.scrollHeight });
+  gameScroll.scrollTo({ top: gameScroll.scrollHeight });
 }
 
 init();
