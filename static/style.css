@@ -1473,6 +1473,36 @@ body.game-page {
   color: var(--accent);
 }
 
+.preview-chips {
+  list-style: none;
+  margin: 0.45rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.preview-chips li {
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.2rem 0.65rem;
+  font-size: 0.9rem;
+}
+
+.expert-warning {
+  background: rgba(244, 67, 54, 0.12);
+  border: 1px solid rgba(244, 67, 54, 0.5);
+  border-radius: var(--radius);
+  padding: 0.6rem 0.8rem;
+  color: #ff8a80;
+  font-weight: 600;
+}
+
+.expert-warning a {
+  color: inherit;
+}
+
 #question-log {
   display: flex;
   flex-direction: column;

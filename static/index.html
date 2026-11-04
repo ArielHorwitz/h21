@@ -39,8 +39,16 @@
   <div class="game-scroll" id="game-scroll">
   <main class="page game-main">
     <section id="game-intro" class="game-intro" hidden>
+      <p class="expert-warning" id="expert-warning" hidden>
+        Expert difficulty is very hard. Consider playing <a id="expert-warning-normal" href="#">Normal</a>.
+      </p>
+      <div id="game-intro-preview" hidden>
+        <p class="game-intro-lead"><strong id="game-intro-preview-topic"></strong> includes things like:</p>
+        <ul class="preview-chips" id="game-intro-preview-solutions"></ul>
+      </div>
       <p class="game-intro-lead">
-        I'm thinking of something from <strong id="game-intro-topic"></strong>.
+        <span id="game-intro-preview-other" hidden>I'm thinking of another one.</span>
+        <span id="game-intro-plain">I'm thinking of something from <strong id="game-intro-topic"></strong>.</span>
         Work out what it is in 21 yes-or-no questions.
       </p>
     </section>

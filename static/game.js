@@ -16,6 +16,13 @@ const gameTopic = document.getElementById("game-topic");
 const gameDifficulty = document.getElementById("game-difficulty");
 const gameIntro = document.getElementById("game-intro");
 const gameIntroTopic = document.getElementById("game-intro-topic");
+const gameIntroPlain = document.getElementById("game-intro-plain");
+const gameIntroPreview = document.getElementById("game-intro-preview");
+const gameIntroPreviewTopic = document.getElementById("game-intro-preview-topic");
+const gameIntroPreviewSolutions = document.getElementById("game-intro-preview-solutions");
+const gameIntroPreviewOther = document.getElementById("game-intro-preview-other");
+const expertWarning = document.getElementById("expert-warning");
+const expertWarningNormal = document.getElementById("expert-warning-normal");
 
 // Parse topic and difficulty from URL query params.
 const urlParams = new URLSearchParams(window.location.search);
@@ -41,6 +48,7 @@ function capitalize(text) {
 function setTopicName(name) {
   gameTopic.textContent = name;
   gameIntroTopic.textContent = name;
+  gameIntroPreviewTopic.textContent = name;
   document.title = `${name} — H21`;
 }
 
@@ -48,6 +56,24 @@ function setTopicName(name) {
 setTopicName(topicSlug.split("-").map(capitalize).join(" "));
 gameDifficulty.textContent = capitalize(difficulty);
 gameDifficulty.classList.add(difficulty);
+if (difficulty === "expert") {
+  expertWarning.hidden = false;
+  expertWarningNormal.href = `/game?${new URLSearchParams({ topic: topicSlug, difficulty: "normal" })}`;
+}
+
+// The intro names a few preview solutions, which are never puzzles, to show
+// the topic's range; without them it just names the topic.
+function showPreview(solutions) {
+  if (!solutions || solutions.length === 0) return;
+  for (const solution of solutions) {
+    const chip = document.createElement("li");
+    chip.textContent = solution;
+    gameIntroPreviewSolutions.appendChild(chip);
+  }
+  gameIntroPreview.hidden = false;
+  gameIntroPreviewOther.hidden = false;
+  gameIntroPlain.hidden = true;
+}
 
 async function loadTopicName() {
   try {
@@ -55,7 +81,10 @@ async function loadTopicName() {
     if (!response.ok) return;
     const topics = await response.json();
     const topic = topics.find((candidate) => candidate.slug === topicSlug);
-    if (topic) setTopicName(topic.name);
+    if (topic) {
+      setTopicName(topic.name);
+      showPreview(topic.preview);
+    }
   } catch {
     // Keep the fallback name.
   }
