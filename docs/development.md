@@ -145,6 +145,18 @@ finishing (10%) or skipped (20%), so running it again later in the day fills
 in some of the skipped ones. Puzzles nobody has drawn yet are drawn from
 the pool, as for a real first player.
 
+## Lab Previews
+
+A preview for the user to try runs as a sandbox at https://h21.lab.ariel.tools:
+`h21-sandbox --dir ~/.local/share/h21-lab`, served by an `h21-lab.service`
+user unit on `127.0.0.1:8470` with the same `XDG_CONFIG_HOME`/`XDG_DATA_HOME`
+the sandbox prints, and a Caddy lab host proxying to it. The lab uses a
+development key, never production's, as `OPENAI_API_KEY=...` in
+`~/.local/share/h21-lab/openai.env` (mode 600, the unit's `EnvironmentFile`).
+Agents never handle keys: if the file is missing, ask the user to provision it.
+A preview that only looks at pages works without it (drawing puzzles from the
+sandbox pools makes no API calls), so a placeholder value is enough to start.
+
 ## Deployment
 
 Production (https://h21.ariel.tools) runs as a systemd **user** service owned by
@@ -166,10 +178,10 @@ listens on `127.0.0.1:8440` behind Caddy (`deploy/Caddyfile.example`).
   local `h21`, `h21-reset` or `h21-sandbox` never touches production. The first
   deploy writes the config with `secure_cookies = true`; the model and effort
   are the code defaults.
-- **The OpenAI key** is production's own (`openai.h21.prod`), in
-  `~/.local/share/h21/config/openai.env` (mode 600, the unit's `EnvironmentFile`),
-  written without printing it by `~/data/sec/apikey write openai.h21.prod OPENAI_API_KEY <file>`.
-  `deploy.sh` refuses to run without it.
+- **The OpenAI key** is production's own, as `OPENAI_API_KEY=...` in
+  `~/.local/share/h21/config/openai.env` (mode 600, the unit's `EnvironmentFile`).
+  `deploy.sh` refuses to run without it. Agents never handle keys: if the file
+  is missing, ask the user to provision it.
 - **Backups:** `h21-backup` archives a consistent copy of the database plus the
   avatars; `h21-backup.timer` runs it nightly into `~/.local/share/h21/backups`,
   keeping 10.
@@ -177,7 +189,7 @@ listens on `127.0.0.1:8440` behind Caddy (`deploy/Caddyfile.example`).
   directory.
 - **Admin CLIs** against production need the same environment, e.g.
   `XDG_CONFIG_HOME=~/.local/share/h21/config XDG_DATA_HOME=~/.local/share/h21/data ~/.local/share/h21/current/.venv/bin/h21-invite --role admin`
-  (with the key exported, e.g. via `~/data/sec/apikey run openai.h21.prod OPENAI_API_KEY -- ...`).
+  (with the key exported from that same `openai.env`).
 
 ## Project Structure
 

@@ -8,7 +8,7 @@
 # `git archive` so only committed files go live. `current` points at the live release,
 # and the three newest releases are kept for rollback. Runs as a user service, so no
 # step here needs sudo. The OpenAI key comes from ~/.local/share/h21/config/openai.env
-# (see h21.service), written with: ~/data/sec/apikey write openai.h21.prod OPENAI_API_KEY <file>.
+# (see h21.service), production's own key, provisioned by the user.
 # The rest of the config is in ~/.local/share/h21/config/h21/config.toml, written with
 # production defaults on the first deploy and never overwritten.
 #
@@ -26,7 +26,7 @@ releases_to_keep=3
 
 key_file="$home_directory/config/openai.env"
 if [[ ! -f "$key_file" ]]; then
-  echo "Missing $key_file. Write it with: ~/data/sec/apikey write openai.h21.prod OPENAI_API_KEY $key_file" >&2
+  echo "Missing $key_file, which holds production's OpenAI key as OPENAI_API_KEY=... (mode 600). Ask the user to provision it." >&2
   exit 1
 fi
 
